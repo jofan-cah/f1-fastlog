@@ -1,0 +1,544 @@
+<?php
+
+// ================================================================
+// 3. app/Http/Controllers/GoodsReceivedController.php
+// ================================================================
+
+namespace App\Http\Controllers;
+
+use App\Models\GoodsReceived;
+use App\Models\GoodsReceivedDetail;
+use App\Models\ItemDetail;
+use App\Models\PurchaseOrder;
+use App\Models\PoDetail;
+use App\Models\Supplier;
+use App\Models\Item;
+use App\Models\ActivityLog;
+use App\Models\Stock;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
+
+class GoodsReceivedController extends Controller
+{
+    public function __construct()
+    {
+        // $this->middleware('auth');
+        // Nanti bisa ditambah permission middleware
+    }
+
+    // Tampilkan daftar goods received
+    public function index(Request $request)
+    {
+        $query = GoodsReceived::with(['purchaseOrder', 'supplier', 'receivedBy'])
+            ->withCount('grDetails');
+
+        // Filter by PO
+        if ($request->filled('po_id')) {
+            $query->byPO($request->po_id);
+        }
+
+        // Filter by supplier
+        if ($request->filled('supplier_id')) {
+            $query->bySupplier($request->supplier_id);
+        }
+
+        // Filter by status
+        if ($request->filled('status')) {
+            $query->byStatus($request->status);
+        }
+
+        // Filter by date range
+        if ($request->filled('start_date')) {
+            $startDate = Carbon::parse($request->start_date);
+            $endDate = $request->filled('end_date')
+                ? Carbon::parse($request->end_date)
+                : now();
+
+            $query->dateRange($startDate, $endDate);
+        }
+
+        // Search
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('receive_number', 'like', "%{$search}%")
+                    ->orWhereHas('purchaseOrder', function ($q2) use ($search) {
+                        $q2->where('po_number', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('supplier', function ($q2) use ($search) {
+                        $q2->where('supplier_name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        // Sorting
+        $sortField = $request->get('sort', 'receive_date');
+        $sortDirection = $request->get('direction', 'desc');
+
+        $allowedSorts = ['receive_number', 'receive_date', 'status'];
+        if (in_array($sortField, $allowedSorts)) {
+            $query->orderBy($sortField, $sortDirection);
+        }
+
+        $goodsReceived = $query->paginate(15)->withQueryString();
+
+        // Statistics
+        $statistics = GoodsReceived::getStatistics();
+
+        // Filter options
+        $suppliers = Supplier::active()
+            ->whereHas('goodsReceived')
+            ->orderBy('supplier_name')
+            ->get();
+
+        $purchaseOrders = PurchaseOrder::whereIn('status', ['sent', 'partial'])
+            ->orderBy('po_number')
+            ->get();
+
+        return view('goods-received.index', compact(
+            'goodsReceived',
+            'statistics',
+            'suppliers',
+            'purchaseOrders',
+            'sortField',
+            'sortDirection'
+        ));
+    }
+
+    // Tampilkan form create goods received
+    public function create(Request $request)
+    {
+        $poId = $request->get('po_id');
+
+        // Get POs yang bisa di-receive
+        $availablePOs = PurchaseOrder::whereIn('status', ['sent', 'partial'])
+            ->with(['supplier', 'poDetails.item'])
+            ->orderBy('po_number')
+            ->get();
+
+        // Selected PO
+        $selectedPO = $poId ? PurchaseOrder::with(['supplier', 'poDetails.item'])->find($poId) : null;
+
+        // Generate receive number
+        $receiveNumber = GoodsReceived::generateReceiveNumber();
+
+        return view('goods-received.create', compact(
+            'availablePOs',
+            'selectedPO',
+            'receiveNumber'
+        ));
+    }
+
+    // Store goods received baru
+   public function store(Request $request)
+{
+    $validator = Validator::make($request->all(), [
+        'receive_number' => 'required|string|max:50|unique:goods_receiveds,receive_number',
+        'po_id' => 'required|string|exists:purchase_orders,po_id',
+        'receive_date' => 'required|date',
+        'notes' => 'nullable|string',
+        'items' => 'required|array|min:1',
+        'items.*.item_id' => 'required|string|exists:items,item_id',
+        'items.*.quantity_received' => 'required|integer|min:1',
+        'items.*.quantity_to_stock' => 'required|integer|min:0',
+        'items.*.quantity_to_ready' => 'required|integer|min:0',
+        'items.*.unit_price' => 'required|numeric|min:0',
+        'items.*.batch_number' => 'nullable|string',
+        'items.*.expiry_date' => 'nullable|date',
+        'items.*.notes' => 'nullable|string',
+    ], [
+        'receive_number.required' => 'Nomor penerimaan wajib diisi.',
+        'receive_number.unique' => 'Nomor penerimaan sudah digunakan.',
+        'po_id.required' => 'PO wajib dipilih.',
+        'receive_date.required' => 'Tanggal penerimaan wajib diisi.',
+        'items.required' => 'Items wajib diisi.',
+        'items.min' => 'Minimal 1 item harus dipilih.',
+    ]);
+
+    // Custom validation untuk split quantities
+    $validator->after(function($validator) use ($request) {
+        if ($request->has('items')) {
+            foreach ($request->items as $index => $item) {
+                $totalSplit = $item['quantity_to_stock'] + $item['quantity_to_ready'];
+                if ($totalSplit !== (int)$item['quantity_received']) {
+                    $validator->errors()->add(
+                        "items.{$index}.quantity_split",
+                        'Total quantity to stock + ready harus sama dengan quantity received.'
+                    );
+                }
+            }
+        }
+    });
+
+    // if ($validator->fails()) {
+    //     return back()
+    //         ->withErrors($validator)
+    //         ->withInput();
+    // }
+
+    try {
+        DB::beginTransaction();
+
+        $po = PurchaseOrder::find($request->po_id);
+
+        // Generate GR ID
+        $grId = $this->generateGRId();
+
+        // Create Goods Received
+        $gr = GoodsReceived::create([
+            'gr_id' => $grId,
+            'receive_number' => $request->receive_number,
+            'po_id' => $request->po_id,
+            'supplier_id' => $po->supplier_id,
+            'receive_date' => $request->receive_date,
+            'status' => 'partial', // Will be updated based on completion
+            'notes' => $request->notes,
+            'received_by' => Auth::id(),
+        ]);
+
+        // Create GR Details and ItemDetails
+        foreach ($request->items as $itemData) {
+            $grDetail = GoodsReceivedDetail::create([
+                'gr_detail_id' => GoodsReceivedDetail::generateDetailId(),
+                'gr_id' => $gr->gr_id,
+                'item_id' => $itemData['item_id'],
+                'quantity_received' => $itemData['quantity_received'],
+                'quantity_to_stock' => $itemData['quantity_to_stock'],
+                'quantity_to_ready' => $itemData['quantity_to_ready'],
+                'unit_price' => $itemData['unit_price'],
+                'batch_number' => $itemData['batch_number'],
+                'expiry_date' => $itemData['expiry_date'],
+                'notes' => $itemData['notes'],
+            ]);
+
+
+            // **NEW: Generate ItemDetail records HANYA untuk quantity_to_ready**
+            $this->generateItemDetailsForReady($grDetail, $itemData);
+
+            // Update PO detail quantity received
+            $grDetail->updatePODetail();
+        }
+
+        // Process stock updates
+        $gr->processStockUpdates();
+
+        // Update PO status
+        $gr->updatePOStatus();
+
+        // Update GR status based on PO completion
+        if ($gr->isCompleteReceive()) {
+            $gr->update(['status' => 'complete']);
+        }
+
+        // Log activity
+        ActivityLog::logActivity('goods_receiveds', $gr->gr_id, 'create', null, $gr->toArray());
+
+        DB::commit();
+
+        return redirect()->route('goods-received.show', $gr)
+            ->with('success', 'Penerimaan barang berhasil dicatat dan item details telah digenerate!');
+
+    } catch (\Exception $e) {
+        DB::rollback();
+        return back()
+            ->withInput()
+            ->with('error', 'Gagal mencatat penerimaan: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Update stock untuk quantity_to_stock (barang masuk gudang)
+ *
+ * @param array $itemData
+ * @return void
+ */
+private function updateStockFromReceiving(array $itemData)
+{
+    if ($itemData['quantity_to_stock'] > 0) {
+        // Cari atau buat stock record
+        $stock = Stock::firstOrCreate(
+            ['item_id' => $itemData['item_id']],
+            [
+                'stock_id' => $this->generateStockId(),
+                'quantity_available' => 0,
+                'quantity_used' => 0,
+                'total_quantity' => 0,
+                'last_updated' => now(),
+            ]
+        );
+
+        // Add stock untuk quantity_to_stock
+        $stock->addStock(
+            $itemData['quantity_to_stock'],
+            'goods_received',
+            Auth::id()
+        );
+    }
+}
+
+/**
+ * Generate ItemDetail records HANYA untuk quantity_to_ready
+ *
+ * @param GoodsReceivedDetail $grDetail
+ * @param array $itemData
+ * @return void
+ */
+private function generateItemDetailsForReady(GoodsReceivedDetail $grDetail, array $itemData)
+{
+    // Generate ItemDetails HANYA untuk quantity_to_ready
+    if ($itemData['quantity_to_ready'] > 0) {
+        $item = Item::find($itemData['item_id']);
+        $itemCode = $item->item_code;
+
+        for ($i = 1; $i <= $itemData['quantity_to_ready']; $i++) {
+
+            // Generate serial number yang unique
+            $serialNumber = $this->generateSerialNumber($itemCode, $i);
+
+            // quantity_to_ready langsung jadi used
+            $status = 'available';
+            $location = 'DEPLOYMENT';
+            $notes = "Unit {$item->item_name} langsung deploy untuk project urgent";
+
+            // Create ItemDetail record
+            ItemDetail::create([
+                'item_detail_id' => ItemDetail::generateItemDetailId(),
+                'gr_detail_id' => $grDetail->gr_detail_id,
+                'item_id' => $itemData['item_id'],
+                'serial_number' => $serialNumber,
+                'custom_attributes' => null, // Kosongkan dulu, nanti diedit manual
+                'qr_code' => null, // Will be generated later if needed
+                'status' => $status,
+                'location' => $location,
+                'notes' => $notes,
+            ]);
+        }
+    }
+}
+
+/**
+ * Generate stock ID
+ *
+ * @return string
+ */
+private function generateStockId(): string
+{
+    $lastStock = Stock::orderBy('stock_id', 'desc')->first();
+    $lastNumber = $lastStock ? (int) substr($lastStock->stock_id, 3) : 0;
+    $newNumber = $lastNumber + 1;
+    return 'STK' . str_pad($newNumber, 8, '0', STR_PAD_LEFT);
+}
+
+/**
+ * Generate serial number for item
+ *
+ * @param string $itemCode
+ * @param int $sequence
+ * @return string
+ */
+private function generateSerialNumber(string $itemCode, int $sequence): string
+{
+    $year = date('Y');
+
+    // Get last serial number untuk item ini di tahun yang sama
+    $lastSerial = ItemDetail::whereHas('item', function($q) use ($itemCode) {
+            $q->where('item_code', $itemCode);
+        })
+        ->where('serial_number', 'like', "{$itemCode}-{$year}-%")
+        ->orderBy('serial_number', 'desc')
+        ->first();
+
+    $lastNumber = 0;
+    if ($lastSerial) {
+        $lastNumber = (int) substr($lastSerial->serial_number, -3);
+    }
+
+    $newNumber = $lastNumber + $sequence;
+    return "{$itemCode}-{$year}-" . str_pad($newNumber, 3, '0', STR_PAD_LEFT);
+}
+    // Tampilkan detail goods received
+    public function show(GoodsReceived $goodsReceived)
+    {
+        $goodsReceived->load([
+            'purchaseOrder.poDetails.item',
+            'supplier',
+            'receivedBy.userLevel',
+            'grDetails.item.category'
+        ]);
+
+        // Summary info
+        $summaryInfo = $goodsReceived->getSummaryInfo();
+
+        // Status info
+        $statusInfo = $goodsReceived->getStatusInfo();
+
+        return view('goods-received.show', compact(
+            'goodsReceived',
+            'summaryInfo',
+            'statusInfo'
+        ));
+    }
+
+    // Tampilkan form edit goods received
+    public function edit(GoodsReceived $goodsReceived)
+    {
+        // Only allow edit if status is partial
+        if ($goodsReceived->status === 'complete') {
+            return back()->with('error', 'Penerimaan yang sudah complete tidak dapat diedit.');
+        }
+
+        $goodsReceived->load(['grDetails.item', 'purchaseOrder.poDetails.item']);
+
+        return view('goods-received.edit', compact('goodsReceived'));
+    }
+
+    // Update goods received
+    public function update(Request $request, GoodsReceived $goodsReceived)
+    {
+        if ($goodsReceived->status === 'complete') {
+            return back()->with('error', 'Penerimaan yang sudah complete tidak dapat diedit.');
+        }
+
+        $validator = Validator::make($request->all(), [
+            'receive_date' => 'required|date',
+            'notes' => 'nullable|string',
+            'items' => 'required|array|min:1',
+            'items.*.quantity_received' => 'required|integer|min:1',
+            'items.*.quantity_to_stock' => 'required|integer|min:0',
+            'items.*.quantity_to_ready' => 'required|integer|min:0',
+            'items.*.unit_price' => 'required|numeric|min:0',
+            'items.*.batch_number' => 'nullable|string',
+            'items.*.expiry_date' => 'nullable|date',
+            'items.*.notes' => 'nullable|string',
+        ]);
+
+        // Custom validation untuk split quantities
+        $validator->after(function ($validator) use ($request) {
+            if ($request->has('items')) {
+                foreach ($request->items as $index => $item) {
+                    $totalSplit = $item['quantity_to_stock'] + $item['quantity_to_ready'];
+                    if ($totalSplit !== (int)$item['quantity_received']) {
+                        $validator->errors()->add(
+                            "items.{$index}.quantity_split",
+                            'Total quantity to stock + ready harus sama dengan quantity received.'
+                        );
+                    }
+                }
+            }
+        });
+
+        if ($validator->fails()) {
+            return back()
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $oldData = $goodsReceived->toArray();
+
+            // Update GR header
+            $goodsReceived->update([
+                'receive_date' => $request->receive_date,
+                'notes' => $request->notes,
+            ]);
+
+            // Update GR details
+            foreach ($request->items as $grDetailId => $itemData) {
+                $grDetail = GoodsReceivedDetail::find($grDetailId);
+
+                if ($grDetail) {
+                    $grDetail->update([
+                        'quantity_received' => $itemData['quantity_received'],
+                        'quantity_to_stock' => $itemData['quantity_to_stock'],
+                        'quantity_to_ready' => $itemData['quantity_to_ready'],
+                        'unit_price' => $itemData['unit_price'],
+                        'batch_number' => $itemData['batch_number'],
+                        'expiry_date' => $itemData['expiry_date'],
+                        'notes' => $itemData['notes'],
+                    ]);
+
+                    // Update PO detail
+                    $grDetail->updatePODetail();
+                }
+            }
+
+            // Re-process stock updates (this might need adjustment based on business logic)
+            // For now, we assume stock was already processed and won't double-process
+
+            // Update PO status
+            $goodsReceived->updatePOStatus();
+
+            // Update GR status
+            if ($goodsReceived->isCompleteReceive()) {
+                $goodsReceived->update(['status' => 'complete']);
+            }
+
+            // Log activity
+            ActivityLog::logActivity('goods_receiveds', $goodsReceived->gr_id, 'update', $oldData, $goodsReceived->fresh()->toArray());
+
+            DB::commit();
+
+            return redirect()->route('goods-received.show', $goodsReceived)
+                ->with('success', 'Penerimaan barang berhasil diupdate!');
+        } catch (\Exception $e) {
+            DB::rollback();
+            return back()
+                ->withInput()
+                ->with('error', 'Gagal mengupdate penerimaan: ' . $e->getMessage());
+        }
+    }
+
+    // API endpoint untuk get PO details yang belum fully received
+    public function getPODetails(Request $request, $poId)
+    {
+        $po = PurchaseOrder::with(['poDetails.item.category', 'supplier'])->find($poId);
+
+        if (!$po) {
+            return response()->json(['error' => 'PO not found'], 404);
+        }
+
+        $details = $po->poDetails->map(function ($poDetail) {
+            $remainingQty = $poDetail->quantity_ordered - $poDetail->quantity_received;
+
+            return [
+                'po_detail_id' => $poDetail->po_detail_id,
+                'item_id' => $poDetail->item_id,
+                'item_code' => $poDetail->item->item_code,
+                'item_name' => $poDetail->item->item_name,
+                'category_name' => $poDetail->item->category->category_name,
+                'unit' => $poDetail->item->unit,
+                'quantity_ordered' => $poDetail->quantity_ordered,
+                'quantity_received' => $poDetail->quantity_received,
+                'remaining_quantity' => $remainingQty,
+                'unit_price' => $poDetail->unit_price,
+                'can_receive' => $remainingQty > 0,
+            ];
+        })->filter(function ($detail) {
+            return $detail['can_receive']; // Only return items that can still be received
+        })->values();
+
+        return response()->json([
+            'po' => [
+                'po_id' => $po->po_id,
+                'po_number' => $po->po_number,
+                'supplier_name' => $po->supplier->supplier_name,
+                'po_date' => $po->po_date->format('Y-m-d'),
+            ],
+            'details' => $details
+        ]);
+    }
+
+    // Generate GR ID
+    private function generateGRId(): string
+    {
+        $lastGR = GoodsReceived::orderBy('gr_id', 'desc')->first();
+        $lastNumber = $lastGR ? (int) substr($lastGR->gr_id, 2) : 0;
+        $newNumber = $lastNumber + 1;
+        return 'GR' . str_pad($newNumber, 6, '0', STR_PAD_LEFT);
+    }
+}
