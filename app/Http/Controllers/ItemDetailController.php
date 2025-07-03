@@ -157,7 +157,7 @@ class ItemDetailController extends Controller
             if (empty($itemDetail->qr_code)) {
                 $qrCode = $this->generateQRCodeForItem($itemDetail);
                 if ($qrCode) {
-                    $updateData['qr_code'] = $qrCode .'.svg';
+                    $updateData['qr_code'] = $qrCode . '.svg';
                     $qrGenerated = true;
                 }
             }
@@ -509,11 +509,16 @@ class ItemDetailController extends Controller
                 Log::info('Created QR code directory: ' . $fullPath);
             }
 
-            // Generate QR code as SVG (no ImageMagick needed)
-            $svgContent = QrCode::format('svg')
-                ->size(300)
-                ->margin(2)
-                ->errorCorrection('M')
+            // // Generate QR code as SVG (no ImageMagick needed)
+            // $svgContent = QrCode::format('svg')
+            //     ->size(300)
+            //     ->margin(2)
+            //     ->errorCorrection('M')
+            //     ->generate($qrContent);
+
+            $svgContent = QrCode::size(500)           // Perbesar ukuran
+                ->margin(4)           // Perbesar margin/quiet zone
+                ->errorCorrection('L') // Tingkatkan error correction
                 ->generate($qrContent);
 
             // Define storage path with SVG extension
