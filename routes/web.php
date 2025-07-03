@@ -18,6 +18,11 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserLevelController;
+use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\ApprovalController;
+use App\Http\Controllers\RequestController;
+use App\Http\Controllers\TransactionHistoryController;
+use App\Models\Transaction; // For static methods in routes
 
 // ================================================================
 // PUBLIC ROUTES (Guest Only)
@@ -268,6 +273,344 @@ Route::middleware('auth')->group(function () {
 
         // Get transaction options for specific item
         Route::get('/{itemDetail}/transaction-options', [ItemDetailController::class, 'getTransactionOptions'])->name('transaction.options');
+    });
+
+
+      Route::middleware(['auth', 'check.user.level:admin,logistik'])->group(function () {
+
+        // Approval routes (sudah ada di atas, bisa dipindah kesini jika mau strict)
+        Route::prefix('admin/approvals')->name('admin.approvals.')->group(function () {
+            Route::get('/advanced-analytics', [ApprovalController::class, 'advancedAnalytics'])->name('advanced-analytics');
+            Route::post('/system-override/{transaction}', [ApprovalController::class, 'systemOverride'])->name('system-override');
+        });
+
+        // Stock sync management (admin only functions)
+        Route::prefix('admin/stocks')->name('admin.stocks.')->group(function () {
+            Route::post('/force-sync-all', [StockController::class, 'forceSyncAll'])->name('force-sync-all');
+            Route::get('/sync-logs', [StockController::class, 'getSyncLogs'])->name('sync-logs');
+        });
+
+        // Transaction system management
+        Route::prefix('admin/transactions')->name('admin.transactions.')->group(function () {
+            Route::get('/system-overview', [TransactionHistoryController::class, 'systemOverview'])->name('system-overview');
+            Route::post('/cleanup-old-transactions', [TransactionHistoryController::class, 'cleanupOldTransactions'])->name('cleanup');
+        });
+    });
+
+    // Teknisi Only Routes
+    Route::middleware(['auth', 'check.user.level:teknisi'])->group(function () {
+
+        // Quick access routes for field technicians
+        Route::prefix('field')->name('field.')->group(function () {
+            Route::get('/quick-scan', function() {
+                return view('field.quick-scan');
+            })->name('quick-scan');
+
+            Route::get('/my-equipment', [RequestController::class, 'myItems'])->name('my-equipment');
+
+            Route::post('/quick-return/{itemDetail}', [RequestController::class, 'quickReturn'])->name('quick-return');
+        });
+    });
+
+    // Admin Only Routes
+    Route::middleware(['auth', 'check.user.level:admin'])->group(function () {
+
+        // System administration
+        Route::prefix('system')->name('system.')->group(function () {
+            Route::get('/transaction-settings', function() {
+                return view('system.transaction-settings');
+            })->name('transaction-settings');
+
+            Route::get('/qr-settings', function() {
+                return view('system.qr-settings');
+            })->name('qr-settings');
+        });
+    });
+
+    // ================================================================
+    // DYNAMIC SIDEBAR ROUTES (untuk load sidebar content)
+    // ================================================================
+
+    Route::get('/api/sidebar/transaction-counts', function() {
+        $user = auth()->user();
+        $levelName = strtolower($user->getUserLevel()->level_name ?? '');
+
+        $counts = [];
+
+        if (in_array($levelName, ['admin', 'logistik'])) {
+            $counts['pending_approvals'] = Transaction::pending()->count();
+            $counts['approved_today'] = Transaction::approved()
+                ->whereDate('approved_date', today())->count();
+        }
+
+        if ($levelName === 'teknisi') {
+            $counts['my_pending'] = Transaction::where('created_by', $user->user_id)
+                ->where('status', Transaction::STATUS_PENDING)->count();
+            $counts['my_items'] = \App\Models\TransactionDetail::whereHas('transaction', function($query) use ($user) {
+                    $query->where('created_by', $user->user_id)
+                          ->where('status', Transaction::STATUS_APPROVED)
+                          ->where('transaction_type', Transaction::TYPE_OUT);
+                })
+                ->whereHas('itemDetail', function($query) {
+                    $query->where('status', 'used');
+                })->count();
+        }
+
+        return response()->json([
+            'success' => true,
+            'counts' => $counts,
+            'user_level' => $levelName
+        ]);
+    })->name('api.sidebar.transaction-counts');
+
+    // ================================================================
+    // MOBILE/PWA ROUTES (jika diperlukan untuk mobile app)
+    // ================================================================
+
+    Route::prefix('mobile')->name('mobile.')->group(function () {
+        Route::get('/scanner', function() {
+            return view('mobile.scanner', ['layout' => 'mobile']);
+        })->name('scanner');
+
+        Route::get('/my-requests', function() {
+            return redirect()->route('requests.index');
+        })->name('my-requests');
+
+        Route::get('/quick-actions', function() {
+            return view('mobile.quick-actions');
+        })->name('quick-actions');
+    });
+
+    // ================================================================
+    // WEBHOOK ROUTES (untuk external system integration)
+    // ================================================================
+
+    Route::prefix('webhooks')->name('webhooks.')->group(function () {
+        // External system notifications
+        Route::post('/transaction-update', function(Request $request) {
+            // Handle external system transaction updates
+            // This could be from ERP, CMMS, etc.
+
+            $request->validate([
+                'reference_id' => 'required|string',
+                'status' => 'required|string',
+                'notes' => 'nullable|string'
+            ]);
+
+            // Find transaction by reference_id
+            $transaction = Transaction::where('reference_id', $request->reference_id)->first();
+
+            if ($transaction) {
+                $transaction->notes = $transaction->notes . "\n\nExternal update: " . $request->notes;
+                $transaction->save();
+
+                return response()->json(['success' => true]);
+            }
+
+            return response()->json(['success' => false, 'message' => 'Transaction not found'], 404);
+        })->name('transaction-update');
+
+        // QR Code validation from external scanners
+        Route::post('/validate-qr', function(Request $request) {
+            $request->validate(['qr_content' => 'required|json']);
+
+            try {
+                $qrData = json_decode($request->qr_content, true);
+                $itemDetail = \App\Models\ItemDetail::where('item_detail_id', $qrData['item_detail_id'])->first();
+
+                return response()->json([
+                    'valid' => (bool) $itemDetail,
+                    'item_name' => $itemDetail ? $itemDetail->item->item_name : null,
+                    'status' => $itemDetail ? $itemDetail->status : null
+                ]);
+
+            } catch (\Exception $e) {
+                return response()->json(['valid' => false, 'error' => $e->getMessage()]);
+            }
+        })->name('validate-qr');
+    });
+
+       // TRANSACTION MANAGEMENT ROUTES
+    // ================================================================
+
+    // Main Transaction Management
+    Route::prefix('transactions')->name('transactions.')->group(function () {
+        // Basic CRUD
+        Route::get('/', [TransactionController::class, 'index'])->name('index');
+        Route::get('/create', [TransactionController::class, 'create'])->name('create');
+        Route::post('/', [TransactionController::class, 'store'])->name('store');
+        Route::get('/{transaction}', [TransactionController::class, 'show'])->name('show');
+        Route::get('/{transaction}/edit', [TransactionController::class, 'edit'])->name('edit');
+        Route::put('/{transaction}', [TransactionController::class, 'update'])->name('update');
+
+        // Transaction Actions
+        Route::post('/{transaction}/cancel', [TransactionController::class, 'cancel'])->name('cancel');
+        Route::get('/history', [TransactionController::class, 'history'])->name('history');
+        Route::get('/export', [TransactionController::class, 'export'])->name('export');
+    });
+
+    // Transaction API Routes
+    Route::prefix('api/transactions')->name('api.transactions.')->group(function () {
+        // QR Integration
+        Route::post('/create-from-qr', [TransactionController::class, 'createFromQR'])->name('create-from-qr');
+        Route::post('/scan-qr', [TransactionController::class, 'scanQR'])->name('scan-qr');
+
+        // Helper APIs
+        Route::get('/available-items', [TransactionController::class, 'getAvailableItems'])->name('available-items');
+        Route::get('/types', function() {
+            return response()->json(Transaction::getUserAllowedTypes());
+        })->name('types');
+    });
+
+    // ================================================================
+    // APPROVAL MANAGEMENT ROUTES (Admin & Logistik Only)
+    // ================================================================
+
+    Route::prefix('approvals')->name('approvals.')->group(function () {
+        // Approval Dashboard
+        Route::get('/', [ApprovalController::class, 'index'])->name('index');
+        Route::get('/{transaction}', [ApprovalController::class, 'show'])->name('show');
+
+        // Single Approval Actions
+        Route::post('/{transaction}/approve', [ApprovalController::class, 'approve'])->name('approve');
+        Route::post('/{transaction}/reject', [ApprovalController::class, 'reject'])->name('reject');
+        Route::post('/{transaction}/quick-approve', [ApprovalController::class, 'quickApprove'])->name('quick-approve');
+
+        // Bulk Actions
+        Route::post('/bulk-approve', [ApprovalController::class, 'bulkApprove'])->name('bulk-approve');
+        Route::post('/bulk-reject', [ApprovalController::class, 'bulkReject'])->name('bulk-reject');
+
+        // Approval History & Analytics
+        Route::get('/history', [ApprovalController::class, 'history'])->name('history');
+        Route::get('/analytics', [ApprovalController::class, 'analytics'])->name('analytics');
+    });
+
+    // Approval API Routes
+    Route::prefix('api/approvals')->name('api.approvals.')->group(function () {
+        Route::get('/summary', [ApprovalController::class, 'getSummary'])->name('summary');
+        Route::get('/{transaction}/details', [ApprovalController::class, 'getTransactionDetails'])->name('details');
+    });
+
+    // ================================================================
+    // REQUEST MANAGEMENT ROUTES (Teknisi)
+    // ================================================================
+
+    Route::prefix('requests')->name('requests.')->group(function () {
+        // Request Dashboard
+        Route::get('/', [RequestController::class, 'index'])->name('index');
+        Route::get('/create', [RequestController::class, 'create'])->name('create');
+        Route::post('/', [RequestController::class, 'store'])->name('store');
+        Route::get('/{transaction}', [RequestController::class, 'show'])->name('show');
+        Route::post('/{transaction}/cancel', [RequestController::class, 'cancel'])->name('cancel');
+
+        // Request History & My Items
+        Route::get('/history', [RequestController::class, 'history'])->name('history');
+        Route::get('/my-items', [RequestController::class, 'myItems'])->name('my-items');
+        Route::post('/return-item', [RequestController::class, 'returnItem'])->name('return-item');
+    });
+
+    // Enhanced search routes
+    Route::prefix('api/requests')->name('api.requests.')->group(function () {
+        // Existing routes...
+        Route::get('/quick-request', [RequestController::class, 'quickRequest'])->name('quick-request');
+        Route::get('/items-by-category', [RequestController::class, 'getItemsByCategory'])->name('items-by-category');
+        Route::get('/search-items', [RequestController::class, 'searchItems'])->name('search-items');
+
+        // Additional enhanced routes
+        Route::get('/categories', [RequestController::class, 'getCategories'])->name('categories');
+        Route::get('/item-suggestions', [RequestController::class, 'getItemSuggestions'])->name('item-suggestions');
+    });
+    // ================================================================
+    // TRANSACTION HISTORY & REPORTS ROUTES
+    // ================================================================
+
+    Route::prefix('transaction-history')->name('transaction-history.')->group(function () {
+        // History Dashboard
+        Route::get('/', [TransactionHistoryController::class, 'index'])->name('index');
+        Route::get('/{transaction}', [TransactionHistoryController::class, 'show'])->name('show');
+
+        // Reports & Analytics
+        Route::get('/analytics', [TransactionHistoryController::class, 'analytics'])->name('analytics');
+        Route::post('/report', [TransactionHistoryController::class, 'report'])->name('report');
+        Route::get('/alerts', [TransactionHistoryController::class, 'alerts'])->name('alerts');
+        Route::get('/stock-movement', [TransactionHistoryController::class, 'stockMovement'])->name('stock-movement');
+    });
+
+    // Transaction History API Routes
+    Route::prefix('api/transaction-history')->name('api.transaction-history.')->group(function () {
+        Route::get('/item-timeline', [TransactionHistoryController::class, 'itemTimeline'])->name('item-timeline');
+    });
+
+    // ================================================================
+    // STOCK SYNC ROUTES (Enhancement to existing stock routes)
+    // ================================================================
+
+    // Add to existing stocks routes group
+    Route::prefix('stocks')->name('stocks.')->group(function () {
+        // Existing routes remain unchanged...
+
+        // New sync routes
+        Route::post('/sync-all', [StockController::class, 'syncAll'])->name('sync-all');
+        Route::post('/{stock}/sync', [StockController::class, 'syncStock'])->name('sync');
+        Route::get('/inconsistencies', [StockController::class, 'inconsistencies'])->name('inconsistencies');
+        Route::post('/auto-fix-inconsistencies', [StockController::class, 'autoFixInconsistencies'])->name('auto-fix-inconsistencies');
+    });
+
+    // Stock Sync API Routes
+    Route::prefix('api/stocks')->name('api.stocks.')->group(function () {
+        // Existing API routes remain unchanged...
+
+        // New sync API routes
+        Route::get('/{stock}/validate', [StockController::class, 'validateConsistency'])->name('validate');
+        Route::get('/{stock}/movement-summary', [StockController::class, 'getMovementSummary'])->name('movement-summary');
+        Route::get('/dashboard-summary', [StockController::class, 'getDashboardSummary'])->name('dashboard-summary');
+    });
+
+    // ================================================================
+    // QR SCANNER ROUTES (Enhancement)
+    // ================================================================
+
+    Route::prefix('qr')->name('qr.')->group(function () {
+        // Transaction QR Scanner
+        Route::get('/transaction-scanner', function() {
+            return view('qr.transaction-scanner');
+        })->name('transaction-scanner');
+
+        // Item QR Scanner
+        Route::get('/item-scanner', function() {
+            return view('qr.item-scanner');
+        })->name('item-scanner');
+    });
+
+    // QR API Routes
+    Route::prefix('api/qr')->name('api.qr.')->group(function () {
+        // Transaction QR Processing
+        Route::post('/scan-for-transaction', [TransactionController::class, 'scanQR'])->name('scan-for-transaction');
+        Route::post('/validate-transaction-qr', function(Request $request) {
+            $request->validate(['qr_content' => 'required|json']);
+
+            try {
+                $qrData = json_decode($request->qr_content, true);
+
+                if (!$qrData || $qrData['type'] !== 'item_detail') {
+                    throw new \Exception('Invalid QR code type');
+                }
+
+                $itemDetail = \App\Models\ItemDetail::where('item_detail_id', $qrData['item_detail_id'])->first();
+
+                return response()->json([
+                    'success' => true,
+                    'valid' => (bool) $itemDetail,
+                    'transaction_ready' => $itemDetail ? $itemDetail->isTransactionReady() : false
+                ]);
+
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 400);
+            }
+        })->name('validate-transaction-qr');
     });
 
 

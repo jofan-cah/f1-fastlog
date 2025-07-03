@@ -161,44 +161,64 @@
             </div>
         </div>
 
-        <!-- Transaksi -->
+<!-- Transaksi -->
         <div class="space-y-1">
             @php
-                $transactionMenuActive = request()->routeIs(['requests.*', 'transaction-history.*', 'approvals.*']);
+                $transactionMenuActive = request()->routeIs(['transactions.*', 'requests.*', 'transaction-history.*', 'approvals.*']);
                 $transactionMenuOpen = $transactionMenuActive ? 'true' : 'false';
             @endphp
             <button onclick="toggleDropdown('transactions'); setActiveMenu(this);"
                     class="sidebar-item w-full flex items-center justify-between p-3 rounded-xl transition-all duration-200 group
                            {{ $transactionMenuActive ? 'bg-red-600/20 text-red-400 border border-red-500/30' : 'text-gray-300 hover:text-white hover:bg-white/10' }}">
                 <div class="flex items-center space-x-3">
-                    <i class="fas fa-ticket-alt group-hover:scale-110 transition-transform"></i>
+                    <i class="fas fa-exchange-alt group-hover:scale-110 transition-transform"></i>
                     <span class="font-medium">Transaksi</span>
                 </div>
                 <i id="transactions-icon" class="fas fa-chevron-down transition-transform {{ $transactionMenuActive ? 'rotate-180' : '' }}"></i>
             </button>
             <div id="transactions" class="overflow-hidden transition-all duration-300 {{ $transactionMenuActive ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0' }}">
                 <div class="ml-8 space-y-1">
-                    <a href="#"
+                    <a href="{{ route('transactions.index', ['type' => 'IN']) }}"
+                       class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
+                              {{ request()->routeIs('transactions.*') && request()->get('type') == 'IN' ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
+                        <i class="fas fa-arrow-down w-4"></i> Barang Masuk
+                    </a>
+                    <a href="{{ route('transactions.index', ['type' => 'OUT']) }}"
+                       class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
+                              {{ request()->routeIs('transactions.*') && request()->get('type') == 'OUT' ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
+                        <i class="fas fa-arrow-up w-4"></i> Barang Keluar
+                    </a>
+                    <a href="{{ route('transactions.index', ['type' => 'REPAIR']) }}"
+                       class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
+                              {{ request()->routeIs('transactions.*') && request()->get('type') == 'REPAIR' ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
+                        <i class="fas fa-wrench w-4"></i> Barang Repair
+                    </a>
+                    <a href="{{ route('transactions.index', ['type' => 'LOST']) }}"
+                       class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
+                              {{ request()->routeIs('transactions.*') && request()->get('type') == 'LOST' ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
+                        <i class="fas fa-exclamation-triangle w-4"></i> Barang Hilang
+                    </a>
+                    {{-- <a href="{{ route('requests.index') }}"
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
                               {{ request()->routeIs('requests.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
-                        Permintaan Barang
+                        <i class="fas fa-plus w-4"></i> Permintaan Barang
                     </a>
-                    <a href="#"
-                       class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
-                              {{ request()->routeIs('transaction-history.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
-                        Riwayat Transaksi
-                    </a>
-                    <a href="#"
+                    <a href="{{ route('approvals.index') }}"
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
                               {{ request()->routeIs('approvals.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
-                        Approval Transaksi
+                        <i class="fas fa-check-circle w-4"></i> Approval Transaksi
                     </a>
+                    <a href="{{ route('transaction-history.index') }}"
+                       class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
+                              {{ request()->routeIs('transaction-history.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
+                        <i class="fas fa-history w-4"></i> Riwayat Transaksi
+                    </a> --}}
                 </div>
             </div>
         </div>
 
         <!-- Laporan -->
-        <div class="space-y-1">
+        {{-- <div class="space-y-1">
             @php
                 $reportMenuActive = request()->routeIs(['stock-reports.*', 'transaction-reports.*', 'po-reports.*']);
                 $reportMenuOpen = $reportMenuActive ? 'true' : 'false';
@@ -231,7 +251,7 @@
                     </a>
                 </div>
             </div>
-        </div>
+        </div> --}}
 
         <!-- Pengaturan -->
         <div class="space-y-1">
@@ -250,27 +270,27 @@
             </button>
             <div id="settings" class="overflow-hidden transition-all duration-300 {{ $settingsMenuActive ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0' }}">
                 <div class="ml-8 space-y-1">
-                    <a href="#"
+                    {{-- <a href="#"
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
                               {{ request()->routeIs('system-settings.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
                         Pengaturan Sistem
-                    </a>
+                    </a> --}}
                     <a href="{{ route('activity-logs.index') }}"
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
                               {{ request()->routeIs('activity-logs.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
                         Log Aktivitas
                     </a>
-                    <a href="#"
+                    {{-- <a href="#"
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
                               {{ request()->routeIs('backup.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
                         Backup Data
-                    </a>
+                    </a> --}}
                 </div>
             </div>
         </div>
 
         <!-- Tools -->
-        <div class="space-y-1">
+        {{-- <div class="space-y-1">
             @php
                 $toolsMenuActive = request()->routeIs(['scan-qr.*', 'print-qr.*', 'import-data.*']);
                 $toolsMenuOpen = $toolsMenuActive ? 'true' : 'false';
@@ -303,7 +323,7 @@
                     </a>
                 </div>
             </div>
-        </div>
+        </div> --}}
 
     </nav>
 </div>

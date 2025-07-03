@@ -325,4 +325,456 @@ class Stock extends Model
             Log::error('Failed to log stock movement: ' . $e->getMessage());
         }
     }
+
+
+    // ================================================================
+    // SYNC METHODS - Add these to existing Stock.php model
+    // ================================================================
+
+    /**
+     * Synchronize stock with actual item_details status
+     */
+    public function syncWithItemDetails(): array
+    {
+        try {
+            $item = $this->item;
+            if (!$item) {
+                throw new \Exception('Item not found');
+            }
+
+            // Calculate actual quantities from item_details
+            $actualQuantities = $this->calculateActualQuantities($item);
+
+            // Store old values for logging
+            $oldValues = [
+                'quantity_available' => $this->quantity_available,
+                'quantity_used' => $this->quantity_used,
+                'total_quantity' => $this->total_quantity,
+            ];
+
+            // Update stock with actual quantities
+            $this->quantity_available = $actualQuantities['available'];
+            $this->quantity_used = $actualQuantities['used'];
+            $this->total_quantity = $actualQuantities['total'];
+            $this->last_updated = now();
+            $this->save();
+
+            // Log the sync
+            ActivityLog::logActivity(
+                'stocks',
+                $this->stock_id,
+                'sync',
+                $oldValues,
+                [
+                    'quantity_available' => $this->quantity_available,
+                    'quantity_used' => $this->quantity_used,
+                    'total_quantity' => $this->total_quantity,
+                    'sync_method' => 'auto'
+                ]
+            );
+
+            return [
+                'success' => true,
+                'old_values' => $oldValues,
+                'new_values' => $actualQuantities,
+                'changes' => [
+                    'available_diff' => $actualQuantities['available'] - $oldValues['quantity_available'],
+                    'used_diff' => $actualQuantities['used'] - $oldValues['quantity_used'],
+                    'total_diff' => $actualQuantities['total'] - $oldValues['total_quantity'],
+                ]
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Failed to sync stock with item details: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Calculate actual quantities based on item_details status
+     */
+    private function calculateActualQuantities(Item $item): array
+    {
+        $itemDetails = $item->itemDetails;
+
+        $quantities = [
+            'available' => 0,
+            'used' => 0,
+            'repair' => 0,
+            'lost' => 0,
+            'damaged' => 0,
+            'maintenance' => 0,
+            'reserved' => 0,
+            'total' => 0
+        ];
+
+        foreach ($itemDetails as $detail) {
+            $status = $detail->status;
+
+            // Count by status
+            if (isset($quantities[$status])) {
+                $quantities[$status]++;
+            }
+
+            // Available count (status = 'available')
+            if ($status === 'available') {
+                // Already counted above
+            }
+
+            // Used count (status = 'used', 'repair', 'maintenance', 'reserved')
+            elseif (in_array($status, ['used', 'repair', 'maintenance', 'reserved'])) {
+                $quantities['used']++;
+            }
+
+            // Total count (exclude 'lost' and 'damaged' from total)
+            if (!in_array($status, ['lost', 'damaged'])) {
+                $quantities['total']++;
+            }
+        }
+
+        // Return the main quantities needed for stock table
+        return [
+            'available' => $quantities['available'],
+            'used' => $quantities['used'],
+            'total' => $quantities['total'],
+            'detailed' => $quantities // For detailed reporting
+        ];
+    }
+
+    /**
+     * Validate stock consistency with item_details
+     */
+    public function validateConsistency(): array
+    {
+        try {
+            $item = $this->item;
+            if (!$item) {
+                throw new \Exception('Item not found');
+            }
+
+            $actualQuantities = $this->calculateActualQuantities($item);
+            $discrepancies = [];
+
+            if ($this->quantity_available !== $actualQuantities['available']) {
+                $discrepancies[] = "Available: Stock({$this->quantity_available}) vs Actual({$actualQuantities['available']})";
+            }
+
+            if ($this->quantity_used !== $actualQuantities['used']) {
+                $discrepancies[] = "Used: Stock({$this->quantity_used}) vs Actual({$actualQuantities['used']})";
+            }
+
+            if ($this->total_quantity !== $actualQuantities['total']) {
+                $discrepancies[] = "Total: Stock({$this->total_quantity}) vs Actual({$actualQuantities['total']})";
+            }
+
+            return [
+                'consistent' => empty($discrepancies),
+                'message' => empty($discrepancies) ? 'Stock consistent' : 'Stock inconsistent',
+                'actual_quantities' => $actualQuantities,
+                'stock_quantities' => [
+                    'available' => $this->quantity_available,
+                    'used' => $this->quantity_used,
+                    'total' => $this->total_quantity,
+                ],
+                'discrepancies' => $discrepancies
+            ];
+
+        } catch (\Exception $e) {
+            return [
+                'consistent' => false,
+                'message' => 'Validation error: ' . $e->getMessage(),
+                'discrepancies' => [$e->getMessage()]
+            ];
+        }
+    }
+
+    /**
+     * Auto-fix stock inconsistencies
+     */
+    public function autoFixInconsistency(): array
+    {
+        $validation = $this->validateConsistency();
+
+        if ($validation['consistent']) {
+            return [
+                'success' => true,
+                'message' => 'Stock already consistent',
+                'fixed' => false
+            ];
+        }
+
+        $syncResult = $this->syncWithItemDetails();
+
+        return [
+            'success' => $syncResult['success'],
+            'message' => $syncResult['success'] ? 'Stock inconsistency fixed' : 'Failed to fix inconsistency',
+            'fixed' => $syncResult['success'],
+            'changes' => $syncResult['changes'] ?? []
+        ];
+    }
+
+    // ================================================================
+    // STATIC METHODS FOR BULK OPERATIONS
+    // ================================================================
+
+    /**
+     * Sync all stocks with their item_details
+     */
+    public static function syncAllStocks(): array
+    {
+        $stocks = self::with('item.itemDetails')->get();
+        $syncedCount = 0;
+        $errors = [];
+
+        foreach ($stocks as $stock) {
+            $result = $stock->syncWithItemDetails();
+
+            if ($result['success']) {
+                $syncedCount++;
+            } else {
+                $errors[] = [
+                    'stock_id' => $stock->stock_id,
+                    'item_name' => $stock->item->item_name ?? 'Unknown',
+                    'error' => $result['message'] ?? 'Unknown error'
+                ];
+            }
+        }
+
+        return [
+            'success' => true,
+            'total_stocks' => $stocks->count(),
+            'synced_count' => $syncedCount,
+            'errors_count' => count($errors),
+            'errors' => $errors,
+            'message' => "Synced {$syncedCount} of {$stocks->count()} stocks"
+        ];
+    }
+
+    /**
+     * Get inconsistencies report for all stocks
+     */
+    public static function getInconsistenciesReport(): array
+    {
+        $stocks = self::with('item.itemDetails')->get();
+        $inconsistencies = [];
+        $consistentCount = 0;
+
+        foreach ($stocks as $stock) {
+            $validation = $stock->validateConsistency();
+
+            if (!$validation['consistent']) {
+                $inconsistencies[] = [
+                    'stock_id' => $stock->stock_id,
+                    'item_code' => $stock->item->item_code ?? 'N/A',
+                    'item_name' => $stock->item->item_name ?? 'Unknown',
+                    'validation' => $validation
+                ];
+            } else {
+                $consistentCount++;
+            }
+        }
+
+        return [
+            'total_stocks' => $stocks->count(),
+            'consistent_count' => $consistentCount,
+            'inconsistent_count' => count($inconsistencies),
+            'inconsistencies' => $inconsistencies,
+            'consistency_rate' => $stocks->count() > 0 ? round(($consistentCount / $stocks->count()) * 100, 2) : 0,
+            'needs_sync' => count($inconsistencies) > 0
+        ];
+    }
+
+    /**
+     * Auto-fix all stock inconsistencies
+     */
+    public static function autoFixAllInconsistencies(): array
+    {
+        $report = self::getInconsistenciesReport();
+
+        if ($report['inconsistent_count'] === 0) {
+            return [
+                'success' => true,
+                'message' => 'No inconsistencies found',
+                'fixed_count' => 0,
+                'total_checked' => $report['total_stocks']
+            ];
+        }
+
+        $fixedCount = 0;
+        $errors = [];
+
+        foreach ($report['inconsistencies'] as $inconsistency) {
+            try {
+                $stock = self::find($inconsistency['stock_id']);
+                if ($stock) {
+                    $result = $stock->autoFixInconsistency();
+                    if ($result['success'] && $result['fixed']) {
+                        $fixedCount++;
+                    }
+                }
+            } catch (\Exception $e) {
+                $errors[] = [
+                    'stock_id' => $inconsistency['stock_id'],
+                    'error' => $e->getMessage()
+                ];
+            }
+        }
+
+        return [
+            'success' => true,
+            'message' => "Fixed {$fixedCount} of {$report['inconsistent_count']} inconsistencies",
+            'total_checked' => $report['total_stocks'],
+            'inconsistent_found' => $report['inconsistent_count'],
+            'fixed_count' => $fixedCount,
+            'errors_count' => count($errors),
+            'errors' => $errors
+        ];
+    }
+
+    /**
+     * Get stock movement summary for an item
+     */
+    public function getMovementSummary(int $days = 30): array
+    {
+        $startDate = now()->subDays($days);
+
+        // Get item details with their transaction history
+        $itemDetails = $this->item->itemDetails()
+            ->with(['transactionDetails.transaction.createdBy'])
+            ->get();
+
+        $movements = [];
+        $totalIn = 0;
+        $totalOut = 0;
+
+        foreach ($itemDetails as $detail) {
+            foreach ($detail->transactionDetails as $transactionDetail) {
+                $transaction = $transactionDetail->transaction;
+
+                if ($transaction->transaction_date >= $startDate && $transaction->status === 'approved') {
+                    $movementType = $this->getMovementType($transactionDetail->status_before, $transactionDetail->status_after);
+
+                    $movements[] = [
+                        'date' => $transaction->transaction_date,
+                        'type' => $transaction->transaction_type,
+                        'movement' => $movementType,
+                        'status_change' => $transactionDetail->status_before . ' → ' . $transactionDetail->status_after,
+                        'serial_number' => $detail->serial_number,
+                        'created_by' => $transaction->createdBy->full_name ?? 'Unknown',
+                        'transaction_number' => $transaction->transaction_number
+                    ];
+
+                    if ($movementType === 'in') {
+                        $totalIn++;
+                    } elseif ($movementType === 'out') {
+                        $totalOut++;
+                    }
+                }
+            }
+        }
+
+        return [
+            'item_id' => $this->item_id,
+            'item_name' => $this->item->item_name ?? 'Unknown',
+            'period_days' => $days,
+            'total_movements' => count($movements),
+            'total_in' => $totalIn,
+            'total_out' => $totalOut,
+            'net_movement' => $totalIn - $totalOut,
+            'current_stock' => [
+                'available' => $this->quantity_available,
+                'used' => $this->quantity_used,
+                'total' => $this->total_quantity
+            ],
+            'movements' => collect($movements)->sortByDesc('date')->values()->toArray()
+        ];
+    }
+
+    /**
+     * Determine movement type based on status change
+     */
+    private function getMovementType(string $statusBefore, string $statusAfter): string
+    {
+        // In movements (increasing available stock)
+        if ($statusBefore !== 'available' && $statusAfter === 'available') {
+            return 'in';
+        }
+
+        // Out movements (decreasing available stock)
+        if ($statusBefore === 'available' && $statusAfter !== 'available') {
+            return 'out';
+        }
+
+        // Neutral movements (no stock impact)
+        return 'neutral';
+    }
+
+    /**
+     * Get low stock alerts
+     */
+    public static function getLowStockAlerts(): array
+    {
+        $lowStockItems = self::lowStock()
+            ->with('item')
+            ->get()
+            ->map(function ($stock) {
+                $item = $stock->item;
+                return [
+                    'stock_id' => $stock->stock_id,
+                    'item_code' => $item->item_code ?? 'N/A',
+                    'item_name' => $item->item_name ?? 'Unknown',
+                    'current_available' => $stock->quantity_available,
+                    'min_stock' => $item->min_stock ?? 0,
+                    'shortage' => max(0, ($item->min_stock ?? 0) - $stock->quantity_available),
+                    'status' => $stock->getStockStatus(),
+                    'last_updated' => $stock->last_updated
+                ];
+            });
+
+        return [
+            'total_low_stock' => $lowStockItems->count(),
+            'items' => $lowStockItems->toArray(),
+            'total_shortage' => $lowStockItems->sum('shortage')
+        ];
+    }
+
+    /**
+     * Get stock dashboard summary
+     */
+    public static function getDashboardSummary(): array
+    {
+        $stockSummary = self::getStockSummary();
+        $lowStockAlerts = self::getLowStockAlerts();
+        $inconsistencies = self::getInconsistenciesReport();
+
+        return [
+            'stock_overview' => $stockSummary,
+            'low_stock_alerts' => [
+                'count' => $lowStockAlerts['total_low_stock'],
+                'items' => array_slice($lowStockAlerts['items'], 0, 5) // Top 5 for dashboard
+            ],
+            'consistency_status' => [
+                'consistent_rate' => $inconsistencies['consistency_rate'],
+                'needs_sync' => $inconsistencies['needs_sync'],
+                'inconsistent_count' => $inconsistencies['inconsistent_count']
+            ],
+            'recent_movements' => self::getRecentMovements(10)
+        ];
+    }
+
+    /**
+     * Get recent stock movements across all items
+     */
+    public static function getRecentMovements(int $limit = 20): array
+    {
+        // This would need to be implemented with a proper stock_movements table
+        // For now, we'll return a placeholder
+        return [
+            'message' => 'Recent movements tracking requires stock_movements table implementation',
+            'suggestion' => 'Consider implementing dedicated stock_movements table for detailed movement tracking'
+        ];
+    }
 }

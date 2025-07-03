@@ -122,4 +122,9 @@ class User extends Authenticatable
             $q->where('level_name', $levelName);
         });
     }
+      // Alternative: atau bisa juga return UserLevel object dengan fallback
+    public function getUserLevel()
+    {
+        return $this->userLevel ?? new \App\Models\UserLevel(['level_name' => 'Unknown']);
+    }
 }
