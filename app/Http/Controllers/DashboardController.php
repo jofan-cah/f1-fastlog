@@ -1,331 +1,472 @@
 <?php
 
-// ================================================================
-// app/Http/Controllers/DashboardController.php
-// Command: php artisan make:controller DashboardController
-// ================================================================
-
 namespace App\Http\Controllers;
 
+use App\Models\Stock;
+use App\Models\Item;
+use App\Models\ItemDetail;
+use App\Models\Transaction;
+use App\Models\TransactionDetail;
+use App\Models\GoodsReceived;
+use App\Models\PurchaseOrder;
+use App\Models\Category;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use App\Models\User;
-use App\Models\UserLevel;
-// use App\Models\Item;
-// use App\Models\Stock;
-// use App\Models\PurchaseOrder;
-// use App\Models\Transaction;
+use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
-    public function __construct()
-    {
-        // $this->middleware('auth');
-    }
-
     public function index()
     {
-        $user = Auth::user();
+        // Stock Overview
+        $stockSummary = Stock::getStockSummary();
 
-        // Data dasar untuk dashboard
-        $data = [
-            'user' => $user,
-            'user_level' => $user->getLevelName(),
-            'is_admin' => $user->isAdmin(),
-            'is_logistik' => $user->isLogistik(),
-            'is_teknisi' => $user->isTeknisi(),
-        ];
+        // Transaction Statistics
+        $transactionStats = Transaction::getTransactionStats(30);
 
-        // Statistik dasar yang bisa ditampilkan saat ini
-        $data['basic_stats'] = $this->getBasicStats();
+        // Item Statistics
+        $itemStats = $this->getItemStatistics();
 
-        // Menu yang tersedia berdasarkan level user
-        $data['available_menus'] = $this->getAvailableMenus($user);
+        // Low Stock Alerts
+        $lowStockAlerts = Stock::getLowStockAlerts();
 
-        // Aktivitas terbaru user (jika tabel activity_logs sudah ada)
-        $data['recent_activities'] = $this->getRecentActivities($user);
+        // Recent Activities
+        $recentActivities = $this->getRecentActivities();
 
-        // Alert/notifikasi sederhana
-        $data['alerts'] = $this->getAlerts($user);
+        // Monthly Trends
+        $monthlyTrends = $this->getMonthlyTrends();
 
-        return view('dashboard.index', $data);
+        // Category Statistics
+        $categoryStats = $this->getCategoryStatistics();
+
+        // Goods Received Statistics
+        $goodsReceivedStats = GoodsReceived::getStatistics();
+
+        // Status Change Trends
+        $statusChangeTrends = TransactionDetail::getStatusChangeStats(30);
+
+        // Critical Alerts
+        $criticalAlerts = $this->getCriticalAlerts();
+
+        // Pending Approvals
+        $pendingApprovals = $this->getPendingApprovals();
+
+        // Utilization Metrics
+        $utilizationMetrics = $this->getUtilizationMetrics();
+
+        return view('dashboard.index', compact(
+            'stockSummary',
+            'transactionStats',
+            'itemStats',
+            'lowStockAlerts',
+            'recentActivities',
+            'monthlyTrends',
+            'categoryStats',
+            'goodsReceivedStats',
+            'statusChangeTrends',
+            'criticalAlerts',
+            'pendingApprovals',
+            'utilizationMetrics'
+        ));
     }
 
-    // Statistik dasar dari tabel yang sudah ada
-    private function getBasicStats()
+    private function getItemStatistics(): array
     {
-        try {
-            $stats = [
-                'total_users' => User::count(),
-                'active_users' => User::where('is_active', true)->count(),
-                'total_user_levels' => UserLevel::count(),
-                'users_by_level' => UserLevel::withCount('users')->get(),
-            ];
+        $totalItems = Item::count();
+        $activeItems = Item::where('is_active', true)->count();
+        $inactiveItems = $totalItems - $activeItems;
 
-            // Nanti bisa ditambah ketika tabel lain sudah ada
-            /*
-            $stats['total_items'] = Item::count();
-            $stats['total_suppliers'] = Supplier::count();
-            $stats['active_pos'] = PurchaseOrder::where('status', '!=', 'cancelled')->count();
-            $stats['pending_transactions'] = Transaction::where('status', 'pending')->count();
-            $stats['low_stock_items'] = DB::table('items')
-                ->join('stocks', 'items.item_id', '=', 'stocks.item_id')
-                ->where('stocks.quantity_available', '<=', DB::raw('items.min_stock'))
+        $itemsWithStock = Item::whereHas('stock', function($query) {
+            $query->where('total_quantity', '>', 0);
+        })->count();
+
+        $itemsWithoutStock = $totalItems - $itemsWithStock;
+
+        return [
+            'total_items' => $totalItems,
+            'active_items' => $activeItems,
+            'inactive_items' => $inactiveItems,
+            'items_with_stock' => $itemsWithStock,
+            'items_without_stock' => $itemsWithoutStock,
+            'low_stock_items' => Item::lowStock()->count(),
+        ];
+    }
+
+    private function getRecentActivities(): array
+    {
+        $activities = collect();
+
+        // Recent Transactions
+        $recentTransactions = Transaction::with(['item', 'createdBy'])
+            ->orderBy('created_at', 'desc')
+            ->limit(10)
+            ->get()
+            ->map(function($transaction) {
+                return [
+                    'type' => 'transaction',
+                    'icon' => 'fas fa-exchange-alt',
+                    'title' => 'Transaction ' . $transaction->transaction_number,
+                    'description' => $transaction->getTypeInfo()['text'] . ' - ' . ($transaction->item->item_name ?? 'Unknown Item'),
+                    'user' => $transaction->createdBy->full_name ?? 'Unknown',
+                    'time' => $transaction->created_at,
+                    'status' => $transaction->getStatusInfo(),
+                ];
+            });
+
+        // Recent Goods Received
+        $recentGoodsReceived = GoodsReceived::with(['supplier', 'receivedBy'])
+            ->orderBy('created_at', 'desc')
+            ->limit(5)
+            ->get()
+            ->map(function($gr) {
+                return [
+                    'type' => 'goods_received',
+                    'icon' => 'fas fa-truck',
+                    'title' => 'Goods Received ' . $gr->receive_number,
+                    'description' => 'From ' . ($gr->supplier->supplier_name ?? 'Unknown Supplier'),
+                    'user' => $gr->receivedBy->full_name ?? 'Unknown',
+                    'time' => $gr->created_at,
+                    'status' => $gr->getStatusInfo(),
+                ];
+            });
+
+        return $activities->merge($recentTransactions)
+            ->merge($recentGoodsReceived)
+            ->sortByDesc('time')
+            ->take(15)
+            ->values()
+            ->toArray();
+    }
+
+    private function getMonthlyTrends(): array
+    {
+        $last6Months = collect();
+
+        for ($i = 5; $i >= 0; $i--) {
+            $month = now()->subMonths($i);
+            $monthStart = $month->startOfMonth();
+            $monthEnd = $month->endOfMonth();
+
+            $transactions = Transaction::whereBetween('transaction_date', [$monthStart, $monthEnd])
+                ->groupBy('transaction_type')
+                ->selectRaw('transaction_type, COUNT(*) as count')
+                ->pluck('count', 'transaction_type')
+                ->toArray();
+
+            $goodsReceived = GoodsReceived::whereBetween('receive_date', [$monthStart, $monthEnd])
                 ->count();
-            */
 
-            return $stats;
-        } catch (\Exception $e) {
-            // Jika ada error (misal tabel belum ada), return stats kosong
-            return [
-                'total_users' => 0,
-                'active_users' => 0,
-                'total_user_levels' => 0,
-                'users_by_level' => collect(),
-            ];
-        }
-    }
-
-    // Menu yang tersedia berdasarkan level user
-    private function getAvailableMenus($user)
-    {
-        $baseMenus = [
-            [
-                'title' => 'Dashboard',
-                'icon' => 'fas fa-tachometer-alt',
-                'route' => 'dashboard',
-                'active' => true,
-                'permission' => 'dashboard.read'
-            ]
-        ];
-
-        $allMenus = [
-            // User Management
-            [
-                'title' => 'Pengguna',
-                'icon' => 'fas fa-users',
-                'route' => 'users.index',
-                'permission' => 'users.read',
-                'admin_only' => true
-            ],
-            [
-                'title' => 'Level Pengguna',
-                'icon' => 'fas fa-user-tag',
-                'route' => 'user-levels.index',
-                'permission' => 'user_levels.read',
-                'admin_only' => true
-            ],
-
-            // Data Master (nanti)
-            [
-                'title' => 'Kategori Barang',
-                'icon' => 'fas fa-tags',
-                'route' => 'categories.index',
-                'permission' => 'categories.read',
-                'coming_soon' => true
-            ],
-            [
-                'title' => 'Data Supplier',
-                'icon' => 'fas fa-truck',
-                'route' => 'suppliers.index',
-                'permission' => 'suppliers.read',
-                'coming_soon' => true
-            ],
-            [
-                'title' => 'Data Barang',
-                'icon' => 'fas fa-boxes',
-                'route' => 'items.index',
-                'permission' => 'items.read',
-                'coming_soon' => true
-            ],
-
-            // Inventory (nanti)
-            [
-                'title' => 'Stok Barang',
-                'icon' => 'fas fa-warehouse',
-                'route' => 'stocks.index',
-                'permission' => 'stocks.read',
-                'coming_soon' => true
-            ],
-            [
-                'title' => 'Purchase Order',
-                'icon' => 'fas fa-shopping-cart',
-                'route' => 'purchase-orders.index',
-                'permission' => 'purchase_orders.read',
-                'coming_soon' => true
-            ],
-            [
-                'title' => 'Transaksi',
-                'icon' => 'fas fa-exchange-alt',
-                'route' => 'transactions.index',
-                'permission' => 'transactions.read',
-                'coming_soon' => true
-            ],
-
-            // Tools
-            [
-                'title' => 'Scan QR Code',
-                'icon' => 'fas fa-qrcode',
-                'route' => 'qr.scanner',
-                'permission' => 'qr_scanner.scan',
-                'coming_soon' => true
-            ],
-        ];
-
-        // Filter menu berdasarkan level user
-        $availableMenus = $baseMenus;
-
-        foreach ($allMenus as $menu) {
-            $canAccess = true;
-
-            // Cek jika menu hanya untuk admin
-            if (isset($menu['admin_only']) && $menu['admin_only'] && !$user->isAdmin()) {
-                $canAccess = false;
-            }
-
-            // Nanti bisa ditambah permission check
-            // if (isset($menu['permission']) && !$user->hasPermission($module, $action)) {
-            //     $canAccess = false;
-            // }
-
-            if ($canAccess) {
-                $availableMenus[] = $menu;
-            }
+            $last6Months->push([
+                'month' => $month->format('M Y'),
+                'month_short' => $month->format('M'),
+                'transactions' => $transactions,
+                'goods_received' => $goodsReceived,
+                'total_transactions' => array_sum($transactions),
+            ]);
         }
 
-        return $availableMenus;
+        return $last6Months->toArray();
     }
 
-    // Aktivitas terbaru user
-    private function getRecentActivities($user)
+    private function getCategoryStatistics(): array
     {
-        try {
-            // Cek apakah model ActivityLog ada dan tabel sudah ada
-            if (class_exists(\App\Models\ActivityLog::class)) {
-                return $user->activityLogs()
-                    ->latest()
-                    ->take(5)
-                    ->get()
-                    ->map(function ($log) {
-                        return [
-                            'action' => $log->action,
-                            'table_name' => $log->table_name,
-                            'created_at' => $log->created_at,
-                            'description' => $this->formatActivityDescription($log)
-                        ];
-                    });
-            }
-        } catch (\Exception $e) {
-            // Jika tabel belum ada atau error lain
-        }
+        $categories = Category::with(['items.stock'])
+            ->where('is_active', true)
+            ->get()
+            ->map(function($category) {
+                $items = $category->items;
+                $totalItems = $items->count();
+                $totalStock = $items->sum(function($item) {
+                    return $item->stock->total_quantity ?? 0;
+                });
+                $availableStock = $items->sum(function($item) {
+                    return $item->stock->quantity_available ?? 0;
+                });
 
-        // Return aktivitas dummy untuk sementara
-        return collect([
-            [
-                'action' => 'login',
-                'table_name' => 'users',
-                'created_at' => now(),
-                'description' => 'Login ke sistem'
-            ]
-        ]);
+                return [
+                    'category_name' => $category->category_name,
+                    'total_items' => $totalItems,
+                    'total_stock' => $totalStock,
+                    'available_stock' => $availableStock,
+                    'utilization_rate' => $totalStock > 0 ? round((($totalStock - $availableStock) / $totalStock) * 100, 1) : 0,
+                ];
+            })
+            ->sortByDesc('total_stock')
+            ->take(10)
+            ->values()
+            ->toArray();
+
+        return $categories;
     }
 
-    // Format deskripsi aktivitas
-    private function formatActivityDescription($log)
-    {
-        $tableNames = [
-            'users' => 'Pengguna',
-            'user_levels' => 'Level Pengguna',
-            'items' => 'Barang',
-            'suppliers' => 'Supplier',
-            'categories' => 'Kategori',
-            'purchase_orders' => 'Purchase Order',
-            'transactions' => 'Transaksi',
-        ];
-
-        $actions = [
-            'create' => 'Menambah',
-            'update' => 'Mengubah',
-            'delete' => 'Menghapus',
-            'login' => 'Login',
-            'logout' => 'Logout',
-        ];
-
-        $tableName = $tableNames[$log->table_name] ?? $log->table_name;
-        $action = $actions[$log->action] ?? $log->action;
-
-        return "{$action} {$tableName}";
-    }
-
-    // Alert/notifikasi untuk user
-    private function getAlerts($user)
+    private function getCriticalAlerts(): array
     {
         $alerts = [];
 
-        // Alert welcome untuk user baru
-        if ($user->created_at->diffInDays(now()) <= 1) {
-            $alerts[] = [
-                'type' => 'info',
-                'message' => 'Selamat datang di Sistem Logistik! Anda adalah user baru.',
-                'icon' => 'fas fa-info-circle'
-            ];
-        }
-
-        // Alert untuk admin tentang sistem
-        if ($user->isAdmin()) {
+        // Low Stock Items
+        $lowStockCount = Stock::lowStock()->count();
+        if ($lowStockCount > 0) {
             $alerts[] = [
                 'type' => 'warning',
-                'message' => 'Sistem masih dalam tahap pengembangan. Beberapa fitur belum tersedia.',
-                'icon' => 'fas fa-exclamation-triangle'
+                'icon' => 'fas fa-exclamation-triangle',
+                'title' => 'Low Stock Alert',
+                'message' => "{$lowStockCount} items have low stock levels",
+                'action_url' => route('stocks.index', ['filter' => 'low']),
+                'action_text' => 'View Details'
             ];
         }
 
-        // Nanti bisa ditambah alert lain seperti:
-        /*
-        // Alert stok rendah
-        if ($user->isLogistik() || $user->isAdmin()) {
-            $lowStockCount = $this->getLowStockCount();
-            if ($lowStockCount > 0) {
-                $alerts[] = [
-                    'type' => 'danger',
-                    'message' => "Ada {$lowStockCount} barang dengan stok rendah!",
-                    'icon' => 'fas fa-exclamation-circle',
-                    'link' => route('stocks.index', ['filter' => 'low'])
-                ];
-            }
+        // Out of Stock Items
+        $outOfStockCount = Stock::outOfStock()->count();
+        if ($outOfStockCount > 0) {
+            $alerts[] = [
+                'type' => 'danger',
+                'icon' => 'fas fa-times-circle',
+                'title' => 'Out of Stock Alert',
+                'message' => "{$outOfStockCount} items are out of stock",
+                'action_url' => route('stocks.index', ['filter' => 'empty']),
+                'action_text' => 'View Details'
+            ];
         }
 
-        // Alert PO pending approval
-        if ($user->isAdmin()) {
-            $pendingPO = $this->getPendingPOCount();
-            if ($pendingPO > 0) {
-                $alerts[] = [
-                    'type' => 'warning',
-                    'message' => "Ada {$pendingPO} Purchase Order menunggu persetujuan!",
-                    'icon' => 'fas fa-clock',
-                    'link' => route('purchase-orders.index', ['status' => 'pending'])
-                ];
-            }
+        // Pending Transactions
+        $pendingCount = Transaction::where('status', Transaction::STATUS_PENDING)->count();
+        if ($pendingCount > 0) {
+            $alerts[] = [
+                'type' => 'info',
+                'icon' => 'fas fa-clock',
+                'title' => 'Pending Approvals',
+                'message' => "{$pendingCount} transactions waiting for approval",
+                'action_url' => route('transactions.index', ['status' => 'pending']),
+                'action_text' => 'Review Now'
+            ];
         }
-        */
+
+        // Items in Repair
+        $repairCount = ItemDetail::where('status', 'repair')->count();
+        if ($repairCount > 0) {
+            $alerts[] = [
+                'type' => 'warning',
+                'icon' => 'fas fa-wrench',
+                'title' => 'Items in Repair',
+                'message' => "{$repairCount} items are currently in repair",
+                'action_url' => route('item-details.index', ['status' => 'repair']),
+                'action_text' => 'View Details'
+            ];
+        }
 
         return $alerts;
     }
 
-    // Method untuk get data summary (untuk AJAX calls)
-    public function getSummary()
+    private function getPendingApprovals(): array
     {
-        $user = Auth::user();
+        return Transaction::with(['item', 'createdBy'])
+            ->where('status', Transaction::STATUS_PENDING)
+            ->orderBy('created_at', 'desc')
+            ->limit(10)
+            ->get()
+            ->map(function($transaction) {
+                return [
+                    'id' => $transaction->transaction_id,
+                    'number' => $transaction->transaction_number,
+                    'type' => $transaction->getTypeInfo(),
+                    'item_name' => $transaction->item->item_name ?? 'Unknown',
+                    'created_by' => $transaction->createdBy->full_name ?? 'Unknown',
+                    'created_at' => $transaction->created_at,
+                    'age_hours' => $transaction->created_at->diffInHours(now()),
+                    'notes' => $transaction->notes,
+                ];
+            })
+            ->toArray();
+    }
 
-        return response()->json([
-            'user' => [
-                'name' => $user->full_name,
-                'level' => $user->getLevelName(),
-                'last_login' => $user->updated_at->format('d/m/Y H:i')
-            ],
-            'stats' => $this->getBasicStats(),
-            'alerts_count' => count($this->getAlerts($user))
-        ]);
+    private function getUtilizationMetrics(): array
+    {
+        $totalItems = ItemDetail::count();
+        $availableItems = ItemDetail::where('status', 'available')->count();
+        $usedItems = ItemDetail::where('status', 'used')->count();
+        $repairItems = ItemDetail::where('status', 'repair')->count();
+        $lostItems = ItemDetail::where('status', 'lost')->count();
+
+        return [
+            'total_items' => $totalItems,
+            'available_items' => $availableItems,
+            'used_items' => $usedItems,
+            'repair_items' => $repairItems,
+            'lost_items' => $lostItems,
+            'utilization_rate' => $totalItems > 0 ? round(($usedItems / $totalItems) * 100, 1) : 0,
+            'availability_rate' => $totalItems > 0 ? round(($availableItems / $totalItems) * 100, 1) : 0,
+        ];
+    }
+
+    public function getChartData(Request $request)
+    {
+        $type = $request->get('type');
+
+        switch ($type) {
+            case 'stock-trends':
+                return $this->getStockTrendsData();
+            case 'transaction-trends':
+                return $this->getTransactionTrendsData();
+            case 'category-distribution':
+                return $this->getCategoryDistributionData();
+            case 'status-distribution':
+                return $this->getStatusDistributionData();
+            default:
+                return response()->json(['error' => 'Invalid chart type'], 400);
+        }
+    }
+
+    private function getStockTrendsData(): array
+    {
+        $last30Days = collect();
+
+        for ($i = 29; $i >= 0; $i--) {
+            $date = now()->subDays($i);
+
+            // This is a simplified version - in reality you'd need stock movement tracking
+            $stockData = Stock::selectRaw('
+                SUM(quantity_available) as total_available,
+                SUM(quantity_used) as total_used,
+                SUM(total_quantity) as total_inventory
+            ')->first();
+
+            $last30Days->push([
+                'date' => $date->format('Y-m-d'),
+                'date_formatted' => $date->format('M d'),
+                'available' => $stockData->total_available ?? 0,
+                'used' => $stockData->total_used ?? 0,
+                'total' => $stockData->total_inventory ?? 0,
+            ]);
+        }
+
+        return $last30Days->toArray();
+    }
+
+    private function getTransactionTrendsData(): array
+    {
+        $last30Days = collect();
+
+        for ($i = 29; $i >= 0; $i--) {
+            $date = now()->subDays($i);
+
+            $transactions = Transaction::whereDate('transaction_date', $date)
+                ->groupBy('transaction_type')
+                ->selectRaw('transaction_type, COUNT(*) as count')
+                ->pluck('count', 'transaction_type')
+                ->toArray();
+
+            $last30Days->push([
+                'date' => $date->format('Y-m-d'),
+                'date_formatted' => $date->format('M d'),
+                'in' => $transactions[Transaction::TYPE_IN] ?? 0,
+                'out' => $transactions[Transaction::TYPE_OUT] ?? 0,
+                'repair' => $transactions[Transaction::TYPE_REPAIR] ?? 0,
+                'return' => $transactions[Transaction::TYPE_RETURN] ?? 0,
+                'lost' => $transactions[Transaction::TYPE_LOST] ?? 0,
+            ]);
+        }
+
+        return $last30Days->toArray();
+    }
+
+    private function getCategoryDistributionData(): array
+    {
+        return Category::with(['items.stock'])
+            ->where('is_active', true)
+            ->get()
+            ->map(function($category) {
+                $totalStock = $category->items->sum(function($item) {
+                    return $item->stock->total_quantity ?? 0;
+                });
+
+                return [
+                    'category' => $category->category_name,
+                    'total_stock' => $totalStock,
+                    'item_count' => $category->items->count(),
+                ];
+            })
+            ->where('total_stock', '>', 0)
+            ->sortByDesc('total_stock')
+            ->take(10)
+            ->values()
+            ->toArray();
+    }
+
+    private function getStatusDistributionData(): array
+    {
+        $statusCounts = ItemDetail::groupBy('status')
+            ->selectRaw('status, COUNT(*) as count')
+            ->pluck('count', 'status')
+            ->toArray();
+
+        $statusLabels = [
+            'available' => 'Available',
+            'used' => 'Used',
+            'repair' => 'In Repair',
+            'lost' => 'Lost',
+            'damaged' => 'Damaged',
+            'maintenance' => 'Maintenance',
+            'reserved' => 'Reserved',
+        ];
+
+        return collect($statusCounts)
+            ->map(function($count, $status) use ($statusLabels) {
+                return [
+                    'status' => $status,
+                    'label' => $statusLabels[$status] ?? ucfirst($status),
+                    'count' => $count,
+                ];
+            })
+            ->values()
+            ->toArray();
+    }
+
+    // API Methods for real-time updates
+    public function getPendingCount()
+    {
+        $count = Transaction::where('status', Transaction::STATUS_PENDING)->count();
+        return response()->json(['count' => $count]);
+    }
+
+    public function getLowStockCount()
+    {
+        $count = Stock::lowStock()->count();
+        return response()->json(['count' => $count]);
+    }
+
+    public function getAlerts()
+    {
+        $alerts = $this->getCriticalAlerts();
+        return response()->json(['alerts' => $alerts]);
+    }
+
+    public function getQuickStats()
+    {
+        $stats = [
+            'total_items' => Item::count(),
+            'available_items' => ItemDetail::where('status', 'available')->count(),
+            'pending_approvals' => Transaction::where('status', Transaction::STATUS_PENDING)->count(),
+            'low_stock_items' => Stock::lowStock()->count(),
+            'transactions_today' => Transaction::whereDate('created_at', today())->count(),
+            'goods_received_today' => GoodsReceived::whereDate('created_at', today())->count(),
+            'utilization_rate' => $this->calculateUtilizationRate(),
+        ];
+
+        return response()->json($stats);
+    }
+
+    // public function getRecentActivities()
+    // {
+    //     $activities = $this->getRecentActivities();
+    //     return response()->json(['activities' => $activities]);
+    // }
+
+    private function calculateUtilizationRate(): float
+    {
+        $totalItems = ItemDetail::count();
+        $usedItems = ItemDetail::where('status', 'used')->count();
+
+        return $totalItems > 0 ? round(($usedItems / $totalItems) * 100, 1) : 0;
     }
 }

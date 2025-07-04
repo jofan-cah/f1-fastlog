@@ -55,11 +55,17 @@ Route::middleware('auth')->group(function () {
 
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::prefix('dashboard')->name('dashboard.')->group(function () {
-        Route::get('/stats', [DashboardController::class, 'getStats'])->name('stats');
-        Route::get('/summary', [DashboardController::class, 'getSummary'])->name('summary');
-    });
-    // ================================================================
+    // Dashboard API endpoints for real-time updates
+// Dashboard API Routes untuk real-time updates
+Route::prefix('dashboard')->name('dashboard.')->group(function () {
+    Route::get('/chart-data', [DashboardController::class, 'getChartData'])->name('chart-data');
+    Route::get('/pending-count', [DashboardController::class, 'getPendingCount'])->name('pending-count');
+    Route::get('/low-stock-count', [DashboardController::class, 'getLowStockCount'])->name('low-stock-count');
+    Route::get('/alerts', [DashboardController::class, 'getAlerts'])->name('alerts');
+    Route::get('/quick-stats', [DashboardController::class, 'getQuickStats'])->name('quick-stats');
+    Route::get('/recent-activities', [DashboardController::class, 'getRecentActivities'])->name('recent-activities');
+});
+// ================================================================
     // USER MANAGEMENT ROUTES
     // ================================================================
 
@@ -276,7 +282,7 @@ Route::middleware('auth')->group(function () {
     });
 
 
-      Route::middleware(['auth', 'check.user.level:admin,logistik'])->group(function () {
+    Route::middleware(['auth', 'check.user.level:admin,logistik'])->group(function () {
 
         // Approval routes (sudah ada di atas, bisa dipindah kesini jika mau strict)
         Route::prefix('admin/approvals')->name('admin.approvals.')->group(function () {
@@ -302,7 +308,7 @@ Route::middleware('auth')->group(function () {
 
         // Quick access routes for field technicians
         Route::prefix('field')->name('field.')->group(function () {
-            Route::get('/quick-scan', function() {
+            Route::get('/quick-scan', function () {
                 return view('field.quick-scan');
             })->name('quick-scan');
 
@@ -317,11 +323,11 @@ Route::middleware('auth')->group(function () {
 
         // System administration
         Route::prefix('system')->name('system.')->group(function () {
-            Route::get('/transaction-settings', function() {
+            Route::get('/transaction-settings', function () {
                 return view('system.transaction-settings');
             })->name('transaction-settings');
 
-            Route::get('/qr-settings', function() {
+            Route::get('/qr-settings', function () {
                 return view('system.qr-settings');
             })->name('qr-settings');
         });
@@ -331,7 +337,7 @@ Route::middleware('auth')->group(function () {
     // DYNAMIC SIDEBAR ROUTES (untuk load sidebar content)
     // ================================================================
 
-    Route::get('/api/sidebar/transaction-counts', function() {
+    Route::get('/api/sidebar/transaction-counts', function () {
         $user = auth()->user();
         $levelName = strtolower($user->getUserLevel()->level_name ?? '');
 
@@ -346,12 +352,12 @@ Route::middleware('auth')->group(function () {
         if ($levelName === 'teknisi') {
             $counts['my_pending'] = Transaction::where('created_by', $user->user_id)
                 ->where('status', Transaction::STATUS_PENDING)->count();
-            $counts['my_items'] = \App\Models\TransactionDetail::whereHas('transaction', function($query) use ($user) {
-                    $query->where('created_by', $user->user_id)
-                          ->where('status', Transaction::STATUS_APPROVED)
-                          ->where('transaction_type', Transaction::TYPE_OUT);
-                })
-                ->whereHas('itemDetail', function($query) {
+            $counts['my_items'] = \App\Models\TransactionDetail::whereHas('transaction', function ($query) use ($user) {
+                $query->where('created_by', $user->user_id)
+                    ->where('status', Transaction::STATUS_APPROVED)
+                    ->where('transaction_type', Transaction::TYPE_OUT);
+            })
+                ->whereHas('itemDetail', function ($query) {
                     $query->where('status', 'used');
                 })->count();
         }
@@ -368,15 +374,15 @@ Route::middleware('auth')->group(function () {
     // ================================================================
 
     Route::prefix('mobile')->name('mobile.')->group(function () {
-        Route::get('/scanner', function() {
+        Route::get('/scanner', function () {
             return view('mobile.scanner', ['layout' => 'mobile']);
         })->name('scanner');
 
-        Route::get('/my-requests', function() {
+        Route::get('/my-requests', function () {
             return redirect()->route('requests.index');
         })->name('my-requests');
 
-        Route::get('/quick-actions', function() {
+        Route::get('/quick-actions', function () {
             return view('mobile.quick-actions');
         })->name('quick-actions');
     });
@@ -387,7 +393,7 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('webhooks')->name('webhooks.')->group(function () {
         // External system notifications
-        Route::post('/transaction-update', function(Request $request) {
+        Route::post('/transaction-update', function (Request $request) {
             // Handle external system transaction updates
             // This could be from ERP, CMMS, etc.
 
@@ -411,7 +417,7 @@ Route::middleware('auth')->group(function () {
         })->name('transaction-update');
 
         // QR Code validation from external scanners
-        Route::post('/validate-qr', function(Request $request) {
+        Route::post('/validate-qr', function (Request $request) {
             $request->validate(['qr_content' => 'required|json']);
 
             try {
@@ -423,14 +429,13 @@ Route::middleware('auth')->group(function () {
                     'item_name' => $itemDetail ? $itemDetail->item->item_name : null,
                     'status' => $itemDetail ? $itemDetail->status : null
                 ]);
-
             } catch (\Exception $e) {
                 return response()->json(['valid' => false, 'error' => $e->getMessage()]);
             }
         })->name('validate-qr');
     });
 
-       // TRANSACTION MANAGEMENT ROUTES
+    // TRANSACTION MANAGEMENT ROUTES
     // ================================================================
 
     // Main Transaction Management
@@ -457,7 +462,7 @@ Route::middleware('auth')->group(function () {
 
         // Helper APIs
         Route::get('/available-items', [TransactionController::class, 'getAvailableItems'])->name('available-items');
-        Route::get('/types', function() {
+        Route::get('/types', function () {
             return response()->json(Transaction::getUserAllowedTypes());
         })->name('types');
     });
@@ -572,12 +577,12 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('qr')->name('qr.')->group(function () {
         // Transaction QR Scanner
-        Route::get('/transaction-scanner', function() {
+        Route::get('/transaction-scanner', function () {
             return view('qr.transaction-scanner');
         })->name('transaction-scanner');
 
         // Item QR Scanner
-        Route::get('/item-scanner', function() {
+        Route::get('/item-scanner', function () {
             return view('qr.item-scanner');
         })->name('item-scanner');
     });
@@ -586,7 +591,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('api/qr')->name('api.qr.')->group(function () {
         // Transaction QR Processing
         Route::post('/scan-for-transaction', [TransactionController::class, 'scanQR'])->name('scan-for-transaction');
-        Route::post('/validate-transaction-qr', function(Request $request) {
+        Route::post('/validate-transaction-qr', function (Request $request) {
             $request->validate(['qr_content' => 'required|json']);
 
             try {
@@ -603,7 +608,6 @@ Route::middleware('auth')->group(function () {
                     'valid' => (bool) $itemDetail,
                     'transaction_ready' => $itemDetail ? $itemDetail->isTransactionReady() : false
                 ]);
-
             } catch (\Exception $e) {
                 return response()->json([
                     'success' => false,
