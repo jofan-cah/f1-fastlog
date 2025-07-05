@@ -226,18 +226,17 @@ class Item extends Model
 
     // Static method: Generate next item code
     public static function generateItemCode(): string
-    {
-        $lastItem = self::orderBy('item_code', 'desc')->first();
-
-        if (!$lastItem) {
-            return 'ITM001';
+{
+    do {
+        $letters = '';
+        for ($i = 0; $i < 3; $i++) {
+            $letters .= chr(random_int(65, 90)); // ASCII A-Z
         }
+    } while (Item::where('item_id', $letters)->exists());
 
-        $lastNumber = (int) substr($lastItem->item_code, 3);
-        $newNumber = $lastNumber + 1;
+    return $letters;
+}
 
-        return 'ITM' . str_pad($newNumber, 3, '0', STR_PAD_LEFT);
-    }
 
     // Static method: Get common units
     public static function getCommonUnits(): array

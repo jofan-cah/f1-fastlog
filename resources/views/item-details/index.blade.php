@@ -285,7 +285,7 @@
                                         </div>
                                         <div>
                                             <div class="text-sm font-medium text-gray-900">{{ $itemDetail->item->item_name }}</div>
-                                            <div class="text-sm text-gray-500">{{ $itemDetail->item->item_code }}</div>
+                                            <div class="text-sm text-gray-500">{{ $itemDetail->item->item_code }} | {{$itemDetail->item_detail_id}}</div>
                                             <div class="text-xs text-gray-400">{{ $itemDetail->item->category->category_name ?? 'No Category' }}</div>
                                         </div>
                                     </div>

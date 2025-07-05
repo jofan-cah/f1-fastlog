@@ -26,7 +26,7 @@ class CategoryController extends Controller
     public function index(Request $request)
     {
         $query = Category::with(['parent', 'children'])
-                        ->withCount('items');
+            ->withCount('items');
 
         // Filter by parent (untuk show subcategories)
         if ($request->filled('parent')) {
@@ -41,9 +41,9 @@ class CategoryController extends Controller
         // Search
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('category_name', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+                    ->orWhere('description', 'like', "%{$search}%");
             });
         }
 
@@ -103,6 +103,7 @@ class CategoryController extends Controller
 
             $category = Category::create([
                 'category_id' => $categoryId,
+                'code_category' => $request->code_category,
                 'category_name' => $request->category_name,
                 'description' => $request->description,
                 'parent_id' => $request->parent_id ?: null,
@@ -114,7 +115,6 @@ class CategoryController extends Controller
 
             return redirect()->route('categories.index')
                 ->with('success', 'Kategori berhasil ditambahkan!');
-
         } catch (\Exception $e) {
             return back()
                 ->withInput()
@@ -188,7 +188,6 @@ class CategoryController extends Controller
 
             return redirect()->route('categories.index')
                 ->with('success', 'Kategori berhasil diupdate!');
-
         } catch (\Exception $e) {
             return back()
                 ->withInput()
@@ -218,7 +217,6 @@ class CategoryController extends Controller
             $this->logActivity('categories', $categoryId, 'delete', $oldData, null);
 
             return back()->with('success', 'Kategori berhasil dihapus!');
-
         } catch (\Exception $e) {
             return back()->with('error', 'Gagal menghapus kategori: ' . $e->getMessage());
         }
@@ -237,7 +235,6 @@ class CategoryController extends Controller
             $this->logActivity('categories', $category->category_id, $action, $oldData, $category->fresh()->toArray());
 
             return back()->with('success', "Kategori berhasil {$status}!");
-
         } catch (\Exception $e) {
             return back()->with('error', 'Gagal mengubah status kategori: ' . $e->getMessage());
         }

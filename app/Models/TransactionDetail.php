@@ -671,4 +671,46 @@ class TransactionDetail extends Model
             'utilization_efficiency' => 'Requires implementation with usage duration tracking'
         ];
     }
+
+
+    /**
+     * Get transaction warnings
+     */
+    public function getTransactionWarnings()
+    {
+        $warnings = [];
+        $currentStatus = $this->status_before;
+        $expectedStatus = $this->getExpectedStatusAfter();
+
+        // Check for potential issues
+        if ($currentStatus === 'lost' && $expectedStatus !== 'lost') {
+            $warnings[] = 'Attempting to change status of lost item';
+        }
+
+        if ($currentStatus === 'damaged' && !in_array($expectedStatus, ['repair', 'lost'])) {
+            $warnings[] = 'Damaged item should be repaired or marked as lost';
+        }
+
+        if ($this->transaction->transaction_type === 'OUT' && $currentStatus !== 'available') {
+            $warnings[] = 'Item is not available for checkout';
+        }
+
+        if ($this->transaction->transaction_type === 'IN' && $currentStatus === 'available') {
+            $warnings[] = 'Item is already available';
+        }
+
+        return $warnings;
+    }
+
+    /**
+     * Get location change summary
+     */
+    public function getLocationChangeSummary()
+    {
+        return [
+            'from_location' => $this->location_before ?? $this->itemDetail->location ?? 'Unknown',
+            'to_location' => $this->location_after ?? $this->transaction->to_location ?? 'Unknown',
+            'location_changed' => ($this->location_before ?? $this->itemDetail->location) !== ($this->location_after ?? $this->transaction->to_location)
+        ];
+    }
 }

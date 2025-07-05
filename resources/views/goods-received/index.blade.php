@@ -15,11 +15,7 @@
             <p class="text-gray-600 mt-1">Kelola penerimaan barang dari purchase order</p>
         </div>
         <div class="flex flex-col sm:flex-row gap-3">
-            <a href="{{ route('goods-received.create', ['urgent' => true]) }}"
-               class="px-4 py-2 bg-gradient-to-r from-orange-600 to-orange-700 text-white rounded-xl hover:from-orange-700 hover:to-orange-800 transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl">
-                <i class="fas fa-exclamation-triangle"></i>
-                <span>Penerimaan Urgent</span>
-            </a>
+
             <a href="{{ route('goods-received.create') }}"
                class="px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl">
                 <i class="fas fa-plus"></i>

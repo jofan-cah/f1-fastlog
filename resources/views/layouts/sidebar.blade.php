@@ -202,13 +202,13 @@
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
                               {{ request()->routeIs('requests.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
                         <i class="fas fa-plus w-4"></i> Permintaan Barang
-                    </a>
+                    </a> --}}
                     <a href="{{ route('approvals.index') }}"
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
                               {{ request()->routeIs('approvals.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
                         <i class="fas fa-check-circle w-4"></i> Approval Transaksi
                     </a>
-                    <a href="{{ route('transaction-history.index') }}"
+                    {{-- <a href="{{ route('transaction-history.index') }}"
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
                               {{ request()->routeIs('transaction-history.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
                         <i class="fas fa-history w-4"></i> Riwayat Transaksi

@@ -33,7 +33,7 @@
                     Informasi Kategori
                 </h3>
             </div>
-            <div class="p-6 space-y-6">
+            <div class="p-6 space-y-6 " >
                 <!-- Category Name -->
                 <div>
                     <label for="category_name" class="block text-sm font-medium text-gray-700 mb-2">
@@ -48,6 +48,22 @@
                            class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all @error('category_name') border-red-500 @enderror"
                            required>
                     @error('category_name')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+                <div>
+                    <label for="code_category" class="block text-sm font-medium text-gray-700 mb-2">
+                        Kode Kategori <span class="text-red-500">*</span>
+                    </label>
+                    <input type="text"
+                           id="code_category"
+                           name="code_category"
+                           value="{{ old('code_category') }}"
+                           placeholder="Contoh: MDM RTR"
+
+                           class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all @error('code_category') border-red-500 @enderror"
+                           required>
+                    @error('code_category')
                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
@@ -330,6 +346,7 @@
     function categoryCreate() {
         return {
             categoryName: '{{ old('category_name') }}',
+            categoryCode: '{{ old('code_category') }}',
             categoryType: '{{ old('parent_id') ? 'child' : 'root' }}',
             selectedParent: '{{ old('parent_id') }}',
             isActive: '{{ old('is_active', '1') }}',
@@ -349,6 +366,7 @@
 
             resetForm() {
                 this.categoryName = '';
+                this.categoryCode = '';
                 this.categoryType = 'root';
                 this.selectedParent = '';
                 this.isActive = '1';

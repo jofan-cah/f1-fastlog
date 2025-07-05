@@ -223,14 +223,7 @@ class ItemDetail extends Model
         return $query->where('location', 'like', "%{$location}%");
     }
 
-    // Static method: Generate item detail ID
-    public static function generateItemDetailId(): string
-    {
-        $lastDetail = self::orderBy('item_detail_id', 'desc')->first();
-        $lastNumber = $lastDetail ? (int) substr($lastDetail->item_detail_id, 3) : 0;
-        $newNumber = $lastNumber + 1;
-        return 'ITD' . str_pad($newNumber, 8, '0', STR_PAD_LEFT);
-    }
+
 
     // Static method: Generate serial number
     public static function generateSerialNumber(string $itemCode): string
@@ -658,4 +651,60 @@ class ItemDetail extends Model
                 })->toArray()
         ];
     }
+
+    public static function generateItemDetailId($itemId = null): string
+{
+    if ($itemId) {
+        $item = Item::with('category')->find($itemId);
+        $prefix = ($item->category->code_category ?? 'XXX') . ($item->item_code ?? 'XXX');
+    } else {
+        $prefix = 'UNKNOWN';
+    }
+
+    // Cari nomor terakhir dengan prefix yang sama
+    $lastDetail = self::where('item_detail_id', 'like', $prefix . '%')
+        ->orderBy('item_detail_id', 'desc')
+        ->first();
+
+    $nextNumber = 1;
+    if ($lastDetail) {
+        $lastNumber = (int) substr($lastDetail->item_detail_id, -5);
+        $nextNumber = $lastNumber + 1;
+    }
+
+    return $prefix . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
+}
+
+// ================================================================
+// Update di Controller jadi lebih simpel
+// ================================================================
+
+private function generateItemDetailsForReceived(GoodsReceivedDetail $grDetail, array $itemData, array $serialNumbers = [])
+{
+    $quantityReceived = (int)$itemData['quantity_received'];
+    $item = Item::find($itemData['item_id']);
+    $itemCode = $item->item_code;
+
+    $itemsGenerated = 0;
+
+    for ($i = 1; $i <= $quantityReceived; $i++) {
+        $serialNumber = $this->getSerialNumber($serialNumbers, $i - 1, $itemCode, $i);
+
+        ItemDetail::create([
+            'item_detail_id' => ItemDetail::generateItemDetailId($itemData['item_id']),
+            'gr_detail_id' => $grDetail->gr_detail_id,
+            'item_id' => $itemData['item_id'],
+            'serial_number' => $serialNumber,
+            'custom_attributes' => null,
+            'qr_code' => null,
+            'status' => 'available',
+            'location' => 'Warehouse - Stock',
+            'notes' => "Received from GR: {$grDetail->gr_detail_id}",
+        ]);
+
+        $itemsGenerated++;
+    }
+
+    return $itemsGenerated;
+}
 }

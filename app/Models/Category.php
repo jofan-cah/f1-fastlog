@@ -14,6 +14,7 @@ class Category extends Model
 
     protected $fillable = [
         'category_id',
+        'code_category',
         'category_name',
         'description',
         'parent_id',
@@ -23,6 +24,7 @@ class Category extends Model
     protected $casts = [
         'is_active' => 'boolean',
     ];
+    
 
     // Relationship: Category belongs to Parent Category
     public function parent(): BelongsTo

@@ -13,6 +13,22 @@ use Carbon\Carbon;
 
 class CategorySeeder extends Seeder
 {
+
+     private $usedCodes = [];
+
+    /**
+     * Generate unique code category
+     */
+    private function generateUniqueCodeCategory(): string
+    {
+        do {
+            $code = strtoupper(substr(str_shuffle('ABCDEFGHIJKLMNOPQRSTUVWXYZ'), 0, 3));
+        } while (in_array($code, $this->usedCodes));
+
+        $this->usedCodes[] = $code;
+        return $code;
+    }
+
     public function run(): void
     {
         $now = Carbon::now();

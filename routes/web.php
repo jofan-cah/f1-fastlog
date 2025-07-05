@@ -54,6 +54,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
     // Dashboard
+// routes/web.php atau routes/api.php
+Route::post('/api/goods-received/validate-serial-number', [GoodsReceivedController::class, 'validateSerialNumber'])->name('validate-serial-number');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     // Dashboard API endpoints for real-time updates
 // Dashboard API Routes untuk real-time updates
