@@ -411,7 +411,7 @@
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500">
                         <option value="">Pilih Reference Type</option>
                         <option value="ticket">Ticket ID (External API)</option>
-                     
+
                     </select>
                 </div>
 
@@ -1579,7 +1579,7 @@
                         '': 'Pilih reference type terlebih dahulu'
                     };
 
-                    return placeholders[this.form.reference_type] || 'Reference ID';
+                    return placeholders[this.form.reference_type] ;
                 },
 
                 // Form submission

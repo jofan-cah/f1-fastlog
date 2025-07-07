@@ -796,20 +796,20 @@ function approvalCenter() {
         },
 
         // Notification methods
-        showNotification(message, type = 'info') {
-            const notification = {
-                message,
-                type,
-                show: true
-            };
+        // showNotification(message, type = 'info') {
+        //     const notification = {
+        //         message,
+        //         type,
+        //         show: true
+        //     };
 
-            this.notifications.push(notification);
+        //     this.notifications.push(notification);
 
-            // // Auto remove after 5 seconds
-            // setTimeout(() => {
-            //     this.removeNotification(this.notifications.length - 1);
-            // }, 5000);
-        },
+        //     // // Auto remove after 5 seconds
+        //     // setTimeout(() => {
+        //     //     this.removeNotification(this.notifications.length - 1);
+        //     // }, 5000);
+        // },
 
         removeNotification(index) {
             if (this.notifications[index]) {

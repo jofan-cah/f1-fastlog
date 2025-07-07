@@ -201,7 +201,7 @@ class ItemDetailController extends Controller
             }
 
             // Generate simple QR code string
-            $qrCodeString = 'ITD-' . $itemDetail->item_detail_id . '-' . time();
+            $qrCodeString = 'AA-' . $itemDetail->item_detail_id . '-' . time();
 
             // Create QR content with API endpoint for future transactions
             $qrContent = json_encode([
@@ -212,10 +212,10 @@ class ItemDetailController extends Controller
                 'item_code' => $itemDetail->item->item_code,
                 'item_name' => $itemDetail->item->item_name,
                 // 'status' => $itemDetail->status,
-                'generated_at' => now()->toISOString(),
-                'api_url' => route('api.item-details.scan', $itemDetail->item_detail_id),
-                'view_url' => route('item-details.show', $itemDetail->item_detail_id),
-                'transaction_ready' => true
+                // 'generated_at' => now()->toISOString(),
+                // 'api_url' => route('api.item-details.scan', $itemDetail->item_detail_id),
+                // 'view_url' => route('item-details.show', $itemDetail->item_detail_id),
+                // 'transaction_ready' => true
             ]);
 
             // Generate and save QR code image using SVG format

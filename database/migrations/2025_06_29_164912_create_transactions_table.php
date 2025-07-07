@@ -15,7 +15,7 @@ return new class extends Migration
             $table->string('transaction_id', 50)->primary();
             $table->string('transaction_number', 50)->unique();
             $table->string('transaction_type', 20); // Saran: 'in', 'out', 'transfer', 'adjustment', 'return'
-            $table->integer('reference_id')->nullable(); // ID dari sistem lain (misal: ticket system)
+            $table->string('reference_id')->nullable(); // ID dari sistem lain (misal: ticket system)
             $table->string('reference_type', 50)->nullable(); // 'ticket', 'project', 'maintenance', dll
             $table->string('item_id', 50);
             $table->integer('quantity');

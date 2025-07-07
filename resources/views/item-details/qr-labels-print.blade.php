@@ -291,6 +291,7 @@
                 <!-- Serial Number (always shown if enabled) -->
                 @if($printConfig['include_serial'])
                     <div class="item-info serial-number">{{ $item->serial_number }}</div>
+                    <div class="item-info serial-number">{{ $item->item_detail_id }}</div>
                 @endif
 
                 <!-- Item Name (conditional based on size) -->
