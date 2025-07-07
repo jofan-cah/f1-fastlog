@@ -160,6 +160,7 @@
                             @foreach ($statuses as $status)
                                 <option value="{{ $status }}" {{ request('status') == $status ? 'selected' : '' }}>
                                     @switch($status)
+                                        @case('stock') Stock @break
                                         @case('available') Tersedia @break
                                         @case('used') Terpakai @break
                                         @case('damaged') Rusak @break

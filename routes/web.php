@@ -54,20 +54,20 @@ Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
     // Dashboard
-// routes/web.php atau routes/api.php
-Route::post('/api/goods-received/validate-serial-number', [GoodsReceivedController::class, 'validateSerialNumber'])->name('validate-serial-number');
+    // routes/web.php atau routes/api.php
+    Route::post('/api/goods-received/validate-serial-number', [GoodsReceivedController::class, 'validateSerialNumber'])->name('validate-serial-number');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     // Dashboard API endpoints for real-time updates
-// Dashboard API Routes untuk real-time updates
-Route::prefix('dashboard')->name('dashboard.')->group(function () {
-    Route::get('/chart-data', [DashboardController::class, 'getChartData'])->name('chart-data');
-    Route::get('/pending-count', [DashboardController::class, 'getPendingCount'])->name('pending-count');
-    Route::get('/low-stock-count', [DashboardController::class, 'getLowStockCount'])->name('low-stock-count');
-    Route::get('/alerts', [DashboardController::class, 'getAlerts'])->name('alerts');
-    Route::get('/quick-stats', [DashboardController::class, 'getQuickStats'])->name('quick-stats');
-    Route::get('/recent-activities', [DashboardController::class, 'getRecentActivities'])->name('recent-activities');
-});
-// ================================================================
+    // Dashboard API Routes untuk real-time updates
+    Route::prefix('dashboard')->name('dashboard.')->group(function () {
+        Route::get('/chart-data', [DashboardController::class, 'getChartData'])->name('chart-data');
+        Route::get('/pending-count', [DashboardController::class, 'getPendingCount'])->name('pending-count');
+        Route::get('/low-stock-count', [DashboardController::class, 'getLowStockCount'])->name('low-stock-count');
+        Route::get('/alerts', [DashboardController::class, 'getAlerts'])->name('alerts');
+        Route::get('/quick-stats', [DashboardController::class, 'getQuickStats'])->name('quick-stats');
+        Route::get('/recent-activities', [DashboardController::class, 'getRecentActivities'])->name('recent-activities');
+    });
+    // ================================================================
     // USER MANAGEMENT ROUTES
     // ================================================================
 
@@ -161,11 +161,16 @@ Route::prefix('dashboard')->name('dashboard.')->group(function () {
     // Stock Management
     Route::middleware(['auth'])->prefix('stocks')->name('stocks.')->group(function () {
         Route::get('/', [StockController::class, 'index'])->name('index');
+
+        // **NEW: Tambahkan 2 routes ini saja**
+        Route::get('/{stock}/edit', [StockController::class, 'edit'])->name('edit');
+        Route::put('/{stock}', [StockController::class, 'update'])->name('update');
         Route::get('/{stock}', [StockController::class, 'show'])->name('show');
         Route::get('/adjust/form', [StockController::class, 'adjust'])->name('adjust');
         Route::post('/adjustment', [StockController::class, 'adjustment'])->name('adjustment');
         Route::post('/bulk-adjustment', [StockController::class, 'bulkAdjustment'])->name('bulk-adjustment');
     });
+
 
     // Stock API
     Route::middleware('auth')->prefix('api')->name('api.')->group(function () {
@@ -268,6 +273,14 @@ Route::prefix('dashboard')->name('dashboard.')->group(function () {
         // AJAX endpoints for dynamic functionality
         Route::get('/ajax/attribute-templates/{categoryId}', [ItemDetailController::class, 'getAttributeTemplates'])->name('ajax.attribute-templates');
         Route::get('/ajax/locations', [ItemDetailController::class, 'getLocations'])->name('ajax.locations');
+    });
+    Route::prefix('api/item-details')->name('api.item-details.')->group(function () {
+
+        // **NEW: Bulk update status dari stock management dengan auto-sync**
+        Route::post('/bulk-update-status-from-stock', [ItemDetailController::class, 'bulkUpdateStatusFromStock'])->name('bulk-update-status-from-stock');
+
+        // **NEW: Sync API endpoints untuk stock**
+        Route::post('/{stock}/sync-item-details', [StockController::class, 'syncWithItemDetails'])->name('sync-item-details');
     });
 
 

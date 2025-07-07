@@ -242,7 +242,7 @@
                                             <td class="px-6 py-4">
                                                 <input type="number" :name="`items[${index}][unit_price]`"
                                                     x-model="item.unit_price" @input="updateItemTotal(index)"
-                                                    step="0.01" min="0" placeholder="0"
+                                                    step="1" min="0" placeholder="0"
                                                     class="w-32 py-2 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                                             </td>
                                             <td class="px-6 py-4">

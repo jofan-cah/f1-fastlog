@@ -77,6 +77,11 @@ class ItemDetail extends Model
                 'class' => 'bg-purple-100 text-purple-800',
                 'badge_class' => 'badge-info'
             ],
+            'stock' => [
+                'text' => 'Stock',
+                'class' => 'bg-gray-100 text-gray-800',
+                'badge_class' => 'badge-info'
+            ],
         ];
 
         return $statuses[$this->status] ?? $statuses['available'];

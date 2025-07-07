@@ -335,7 +335,7 @@
                                        title="Lihat Detail">
                                         <i class="fas fa-eye"></i>
                                     </a>
-                                    <a href="{{ route('stocks.adjust', ['stock_id' => $stock->stock_id]) }}"
+                                    <a href="{{ route('stocks.edit', $stock->stock_id) }}"
                                        class="text-green-600 hover:text-green-900 p-2 hover:bg-green-50 rounded-lg transition-all duration-200"
                                        title="Adjust Stok">
                                         <i class="fas fa-edit"></i>

@@ -248,7 +248,8 @@ class GoodsReceivedController extends Controller
     //     }
     // }
 
-
+    // Update method store() di GoodsReceivedController.php
+    // Tambahkan bagian ini setelah generateItemDetailsForReceived
 
     public function store(Request $request)
     {
@@ -264,7 +265,6 @@ class GoodsReceivedController extends Controller
             'items.*.batch_number' => 'nullable|string',
             'items.*.expiry_date' => 'nullable|date',
             'items.*.notes' => 'nullable|string',
-            // Validasi untuk serial numbers
             'items.*.serial_numbers' => 'nullable|array',
             'items.*.serial_numbers.*' => 'nullable|string|max:100',
         ], [
@@ -320,14 +320,6 @@ class GoodsReceivedController extends Controller
             }
         });
 
-        // if ($validator->fails()) {
-        //     return response()->json([
-        //         'success' => false,
-        //         'message' => 'Validation failed',
-        //         'errors' => $validator->errors()
-        //     ], 422);
-        // }
-
         try {
             DB::beginTransaction();
 
@@ -343,22 +335,24 @@ class GoodsReceivedController extends Controller
                 'po_id' => $request->po_id,
                 'supplier_id' => $po->supplier_id,
                 'receive_date' => $request->receive_date,
-                'status' => 'partial', // Will be updated based on completion
+                'status' => 'partial',
                 'notes' => $request->notes,
                 'received_by' => Auth::id(),
             ]);
 
             $totalItemsGenerated = 0;
+            $totalQRGenerated = 0;
+            $qrGenerationResults = [];
 
             // Create GR Details and ItemDetails
             foreach ($request->items as $itemData) {
-                // Create GR Detail (simplified - hanya quantity_received)
+                // Create GR Detail
                 $grDetail = GoodsReceivedDetail::create([
                     'gr_detail_id' => GoodsReceivedDetail::generateDetailId(),
                     'gr_id' => $gr->gr_id,
                     'item_id' => $itemData['item_id'],
                     'quantity_received' => $itemData['quantity_received'],
-                    'quantity_to_stock' => $itemData['quantity_received'], // Semua ke stock dulu
+                    'quantity_to_stock' => $itemData['quantity_received'], // Semua ke stock
                     'quantity_to_ready' => 0, // Tidak ada yang langsung ready
                     'unit_price' => $itemData['unit_price'],
                     'batch_number' => $itemData['batch_number'],
@@ -375,11 +369,23 @@ class GoodsReceivedController extends Controller
 
                 $totalItemsGenerated += $itemsGenerated;
 
+                // **NEW: Auto-generate QR codes setelah item details dibuat**
+                $qrResult = $grDetail->autoGenerateQRCodes();
+                $qrGenerationResults[] = [
+                    'gr_detail_id' => $grDetail->gr_detail_id,
+                    'item_code' => Item::find($itemData['item_id'])->item_code ?? 'N/A',
+                    'qr_result' => $qrResult
+                ];
+
+                if ($qrResult['success']) {
+                    $totalQRGenerated += $qrResult['generated_count'];
+                }
+
                 // Update PO detail quantity received
                 $grDetail->updatePODetail();
             }
 
-            // Process stock updates (simplified karena semua ke stock)
+            // Process stock updates
             $gr->processStockUpdates();
 
             // Update PO status
@@ -390,20 +396,38 @@ class GoodsReceivedController extends Controller
                 $gr->update(['status' => 'complete']);
             }
 
-            // Log activity
+            // Log activity dengan info QR generation
             ActivityLog::logActivity('goods_receiveds', $gr->gr_id, 'create', null, array_merge($gr->toArray(), [
-                'total_item_details_generated' => $totalItemsGenerated
+                'total_item_details_generated' => $totalItemsGenerated,
+                'total_qr_codes_generated' => $totalQRGenerated,
+                'qr_generation_results' => $qrGenerationResults
             ]));
 
             DB::commit();
 
+            // Prepare success message dengan info QR
+            $successMessage = "Penerimaan barang berhasil dicatat! ";
+            $successMessage .= "Total {$totalItemsGenerated} item details telah dibuat ";
+
+            if ($totalQRGenerated > 0) {
+                $successMessage .= "dengan {$totalQRGenerated} QR codes yang berhasil digenerate.";
+            } else {
+                $successMessage .= "namun QR codes gagal digenerate. Anda bisa generate ulang nanti.";
+            }
+
             return response()->json([
                 'success' => true,
-                'message' => "Penerimaan barang berhasil dicatat! Total {$totalItemsGenerated} item details telah dibuat dengan serial number.",
+                'message' => $successMessage,
                 'data' => [
                     'gr_id' => $gr->gr_id,
                     'receive_number' => $gr->receive_number,
                     'total_item_details' => $totalItemsGenerated,
+                    'total_qr_generated' => $totalQRGenerated,
+                    'qr_generation_summary' => [
+                        'total_expected' => $totalItemsGenerated,
+                        'total_generated' => $totalQRGenerated,
+                        'success_rate' => $totalItemsGenerated > 0 ? round(($totalQRGenerated / $totalItemsGenerated) * 100, 2) : 0
+                    ],
                     'redirect_url' => route('goods-received.show', $gr)
                 ]
             ]);
@@ -418,6 +442,106 @@ class GoodsReceivedController extends Controller
         }
     }
 
+    // ================================================================
+    // TAMBAHAN: Method untuk regenerate QR codes manual
+    // ================================================================
+
+    /**
+     * API endpoint untuk regenerate QR codes untuk GR tertentu
+     */
+    public function regenerateQRCodes(GoodsReceived $goodsReceived)
+    {
+        try {
+            $goodsReceived->load(['grDetails.itemDetails']);
+
+            $totalExpected = 0;
+            $totalGenerated = 0;
+            $results = [];
+
+            foreach ($goodsReceived->grDetails as $grDetail) {
+                $stats = $grDetail->getQRGenerationStats();
+                $totalExpected += $stats['total_item_details'];
+
+                if ($stats['needs_qr_generation']) {
+                    $result = $grDetail->regenerateQRCodes();
+                    $results[] = [
+                        'gr_detail_id' => $grDetail->gr_detail_id,
+                        'item_name' => $grDetail->item->item_name ?? 'Unknown',
+                        'result' => $result
+                    ];
+
+                    if ($result['success']) {
+                        $totalGenerated += $result['regenerated_count'];
+                    }
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "QR codes regeneration completed. Generated {$totalGenerated} QR codes.",
+                'data' => [
+                    'gr_id' => $goodsReceived->gr_id,
+                    'receive_number' => $goodsReceived->receive_number,
+                    'total_expected' => $totalExpected,
+                    'total_generated' => $totalGenerated,
+                    'details' => $results
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to regenerate QR codes: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get QR generation status untuk GR tertentu
+     */
+    public function getQRStatus(GoodsReceived $goodsReceived)
+    {
+        try {
+            $goodsReceived->load(['grDetails.itemDetails']);
+
+            $totalItems = 0;
+            $totalWithQR = 0;
+            $detailStats = [];
+
+            foreach ($goodsReceived->grDetails as $grDetail) {
+                $stats = $grDetail->getQRGenerationStats();
+                $detailStats[] = [
+                    'gr_detail_id' => $grDetail->gr_detail_id,
+                    'item_code' => $grDetail->item->item_code ?? 'N/A',
+                    'item_name' => $grDetail->item->item_name ?? 'Unknown',
+                    'stats' => $stats
+                ];
+
+                $totalItems += $stats['total_item_details'];
+                $totalWithQR += $stats['with_qr_code'];
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'gr_id' => $goodsReceived->gr_id,
+                    'receive_number' => $goodsReceived->receive_number,
+                    'summary' => [
+                        'total_item_details' => $totalItems,
+                        'total_with_qr' => $totalWithQR,
+                        'total_without_qr' => $totalItems - $totalWithQR,
+                        'completion_rate' => $totalItems > 0 ? round(($totalWithQR / $totalItems) * 100, 2) : 0,
+                        'needs_generation' => ($totalItems - $totalWithQR) > 0
+                    ],
+                    'details' => $detailStats
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get QR status: ' . $e->getMessage()
+            ], 500);
+        }
+    }
     private function generateItemDetailId($itemId): string
     {
         $item = Item::with('category')->find($itemId);
@@ -460,7 +584,7 @@ class GoodsReceivedController extends Controller
             $serialNumber = $this->getSerialNumber($serialNumbers, $i - 1, $itemCode, $i);
 
             // Semua barang yang diterima langsung masuk sebagai available di stock
-            $status = 'available';
+            $status = 'stock';
             $location = 'Warehouse - Stock';
             $notes = "Received from GR: {$grDetail->gr_detail_id}";
 
