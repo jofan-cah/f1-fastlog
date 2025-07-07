@@ -148,8 +148,8 @@ class PurchaseOrder extends Model
     public function isOverdue(): bool
     {
         return $this->expected_date &&
-               $this->expected_date->isPast() &&
-               !in_array($this->status, ['received', 'cancelled']);
+            $this->expected_date->isPast() &&
+            !in_array($this->status, ['received', 'cancelled']);
     }
 
     // Helper method: Get days until expected date
@@ -228,7 +228,7 @@ class PurchaseOrder extends Model
     public function scopeOverdue($query)
     {
         return $query->where('expected_date', '<', now())
-                    ->whereNotIn('status', ['received', 'cancelled']);
+            ->whereNotIn('status', ['received', 'cancelled']);
     }
 
     // Scope: Active POs (not cancelled or completed)
@@ -237,21 +237,27 @@ class PurchaseOrder extends Model
         return $query->whereNotIn('status', ['received', 'cancelled']);
     }
 
-    // Static method: Generate PO number
     public static function generatePONumber(): string
     {
-        $lastPO = self::orderBy('po_number', 'desc')->first();
+        // Format prefix: PO + Tahun + Bulan
+        $prefix = 'PO' . date('Ym'); // YYYYMM
+
+        // Ambil PO terakhir untuk bulan ini
+        $lastPO = self::where('po_number', 'like', $prefix . '%')
+            ->orderBy('po_number', 'desc')
+            ->first();
 
         if (!$lastPO) {
-            return 'PO' . date('Y') . '001';
+            return $prefix . '0001';
         }
 
-        // Extract number from last PO
-        $lastNumber = (int) substr($lastPO->po_number, -3);
+        // Ambil 4 digit terakhir (sequence)
+        $lastNumber = (int) substr($lastPO->po_number, -4);
         $newNumber = $lastNumber + 1;
 
-        return 'PO' . date('Y') . str_pad($newNumber, 3, '0', STR_PAD_LEFT);
+        return $prefix . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
     }
+
 
     // Static method: Get PO statistics
     public static function getStatistics(): array
