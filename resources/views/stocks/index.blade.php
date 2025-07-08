@@ -15,11 +15,11 @@
             <p class="text-gray-600 mt-1">Monitor dan kelola stok barang inventori</p>
         </div>
         <div class="flex flex-col sm:flex-row gap-3">
-            <a href="{{ route('stocks.adjust') }}"
+            {{-- <a href="{{ route('stocks.adjust') }}"
                class="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl">
                 <i class="fas fa-plus-minus"></i>
                 <span>Bulk Adjustment</span>
-            </a>
+            </a> --}}
             <a href="{{ route('stocks.adjust') }}"
                class="px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl hover:from-red-700 hover:to-red-800 transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl">
                 <i class="fas fa-edit"></i>
