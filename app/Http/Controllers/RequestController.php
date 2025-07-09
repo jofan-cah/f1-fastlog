@@ -53,9 +53,9 @@ class RequestController extends Controller
     public function create(Request $request)
     {
         // Get available items by category
-        $categories = Category::whereHas('items.itemDetails', function($query) {
+        $categories = Category::whereHas('items.itemDetails', function ($query) {
             $query->where('status', 'available');
-        })->with(['items.itemDetails' => function($query) {
+        })->with(['items.itemDetails' => function ($query) {
             $query->where('status', 'available')->with('item');
         }])->get();
 
@@ -132,7 +132,6 @@ class RequestController extends Controller
 
             return redirect()->route('requests.index')
                 ->with('success', "Permintaan {$transaction->transaction_number} berhasil dibuat dan menunggu approval");
-
         } catch (\Exception $e) {
             DB::rollBack();
 
@@ -197,7 +196,6 @@ class RequestController extends Controller
                     'message' => $result['message']
                 ], 400);
             }
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -243,14 +241,13 @@ class RequestController extends Controller
 
             return redirect()->route('requests.index')
                 ->with('success', 'Permintaan berhasil dibatalkan');
-
         } catch (\Exception $e) {
             return redirect()->back()
                 ->with('error', 'Gagal membatalkan permintaan');
         }
     }
 
-/**
+    /**
      * Search available items (AJAX) - Enhanced version
      */
     public function searchItems(Request $request)
@@ -265,21 +262,27 @@ class RequestController extends Controller
             $categoryId = $request->input('category_id');
 
             $itemsQuery = ItemDetail::with(['item.category', 'item.stock'])
-                ->whereHas('item', function($q) use ($searchQuery, $categoryId) {
-                    $q->where('item_name', 'like', "%{$searchQuery}%")
-                      ->orWhere('item_code', 'like', "%{$searchQuery}%");
+                ->where(function ($q) use ($searchQuery, $categoryId) {
+                    // Search by item_detail_id (exact match)
+                    $q->where('item_detail_id', $searchQuery)
+                        // Search by serial_number
+                        ->orWhere('serial_number', 'like', "%{$searchQuery}%")
+                        // Search in related item
+                        ->orWhereHas('item', function ($itemQ) use ($searchQuery, $categoryId) {
+                            $itemQ->where('item_name', 'like', "%{$searchQuery}%")
+                                ->orWhere('item_code', 'like', "%{$searchQuery}%");
 
-                    if ($categoryId) {
-                        $q->where('category_id', $categoryId);
-                    }
-                })
-                ->orWhere('serial_number', 'like', "%{$searchQuery}%");
+                            if ($categoryId) {
+                                $itemQ->where('category_id', $categoryId);
+                            }
+                        });
+                });
 
             // Filter by transaction readiness
             $items = $itemsQuery->where('status', '!=', 'lost')
                 ->limit(50)
                 ->get()
-                ->map(function($itemDetail) {
+                ->map(function ($itemDetail) {
                     $statusInfo = $itemDetail->getStatusInfo();
 
                     return [
@@ -304,7 +307,6 @@ class RequestController extends Controller
                 'success' => true,
                 'items' => $items
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -324,14 +326,14 @@ class RequestController extends Controller
 
         try {
             $items = ItemDetail::with(['item.stock'])
-                ->whereHas('item', function($query) use ($request) {
+                ->whereHas('item', function ($query) use ($request) {
                     $query->where('category_id', $request->category_id);
                 })
                 ->where('status', '!=', 'lost') // Exclude lost items
                 ->orderBy('created_at', 'desc')
                 ->limit(100)
                 ->get()
-                ->map(function($itemDetail) {
+                ->map(function ($itemDetail) {
                     $statusInfo = $itemDetail->getStatusInfo();
 
                     return [
@@ -354,7 +356,6 @@ class RequestController extends Controller
                 'success' => true,
                 'items' => $items
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -370,7 +371,7 @@ class RequestController extends Controller
     {
         try {
             $categories = \App\Models\Category::where('is_active', true)
-                ->whereHas('items.itemDetails', function($query) {
+                ->whereHas('items.itemDetails', function ($query) {
                     $query->where('status', '!=', 'lost');
                 })
                 ->orderBy('category_name')
@@ -380,7 +381,6 @@ class RequestController extends Controller
                 'success' => true,
                 'categories' => $categories
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -403,14 +403,14 @@ class RequestController extends Controller
 
             // Get unique item names and codes that match
             $suggestions = ItemDetail::with('item')
-                ->whereHas('item', function($q) use ($query) {
+                ->whereHas('item', function ($q) use ($query) {
                     $q->where('item_name', 'like', "%{$query}%")
-                      ->orWhere('item_code', 'like', "%{$query}%");
+                        ->orWhere('item_code', 'like', "%{$query}%");
                 })
                 ->where('status', '!=', 'lost')
                 ->get()
                 ->groupBy('item_id')
-                ->map(function($group) {
+                ->map(function ($group) {
                     $item = $group->first()->item;
                     return [
                         'item_id' => $item->item_id,
@@ -427,7 +427,6 @@ class RequestController extends Controller
                 'success' => true,
                 'suggestions' => $suggestions
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -484,12 +483,12 @@ class RequestController extends Controller
     public function myItems()
     {
         // Get items currently used by this user
-        $myItems = \App\Models\TransactionDetail::whereHas('transaction', function($query) {
-                $query->where('created_by', auth()->id())
-                      ->where('status', Transaction::STATUS_APPROVED)
-                      ->where('transaction_type', Transaction::TYPE_OUT);
-            })
-            ->whereHas('itemDetail', function($query) {
+        $myItems = \App\Models\TransactionDetail::whereHas('transaction', function ($query) {
+            $query->where('created_by', auth()->id())
+                ->where('status', Transaction::STATUS_APPROVED)
+                ->where('transaction_type', Transaction::TYPE_OUT);
+        })
+            ->whereHas('itemDetail', function ($query) {
                 $query->where('status', 'used');
             })
             ->with([
@@ -497,7 +496,7 @@ class RequestController extends Controller
                 'transaction'
             ])
             ->get()
-            ->map(function($detail) {
+            ->map(function ($detail) {
                 return [
                     'item_detail_id' => $detail->itemDetail->item_detail_id,
                     'serial_number' => $detail->itemDetail->serial_number,
@@ -531,13 +530,13 @@ class RequestController extends Controller
             $itemDetail = ItemDetail::with('item')->findOrFail($request->item_detail_id);
 
             // Validate that user currently has this item
-            $hasItem = \App\Models\TransactionDetail::whereHas('transaction', function($query) {
-                    $query->where('created_by', auth()->id())
-                          ->where('status', Transaction::STATUS_APPROVED)
-                          ->where('transaction_type', Transaction::TYPE_OUT);
-                })
+            $hasItem = \App\Models\TransactionDetail::whereHas('transaction', function ($query) {
+                $query->where('created_by', auth()->id())
+                    ->where('status', Transaction::STATUS_APPROVED)
+                    ->where('transaction_type', Transaction::TYPE_OUT);
+            })
                 ->where('item_detail_id', $request->item_detail_id)
-                ->whereHas('itemDetail', function($query) {
+                ->whereHas('itemDetail', function ($query) {
                     $query->where('status', 'used');
                 })
                 ->exists();
@@ -547,8 +546,7 @@ class RequestController extends Controller
             }
 
             // Determine transaction type based on condition
-            $transactionType = $request->condition === 'good' ? Transaction::TYPE_IN :
-                              ($request->condition === 'repair' ? Transaction::TYPE_REPAIR : Transaction::TYPE_IN);
+            $transactionType = $request->condition === 'good' ? Transaction::TYPE_IN : ($request->condition === 'repair' ? Transaction::TYPE_REPAIR : Transaction::TYPE_IN);
 
             // Create return transaction
             $transaction = Transaction::create([
@@ -577,7 +575,6 @@ class RequestController extends Controller
 
             return redirect()->route('requests.my-items')
                 ->with('success', "Pengembalian {$transaction->transaction_number} berhasil dibuat dan menunggu approval");
-
         } catch (\Exception $e) {
             DB::rollBack();
 
