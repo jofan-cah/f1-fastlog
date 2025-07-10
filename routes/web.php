@@ -249,18 +249,18 @@ Route::middleware('auth')->group(function () {
     // ================================================================
     // PURCHASE ORDER MANAGEMENT
     // ================================================================
-
+    Route::middleware('permission:purchase_orders,create')->group(function () {
+        Route::get('/purchase-orders/create', [PurchaseOrderController::class, 'create'])->name('purchase-orders.create');
+        Route::post('/purchase-orders', [PurchaseOrderController::class, 'store'])->name('purchase-orders.store');
+        Route::post('/purchase-orders/{purchaseOrder}/duplicate', [PurchaseOrderController::class, 'duplicate'])->name('purchase-orders.duplicate');
+    });
     Route::middleware('permission:purchase_orders,read')->group(function () {
         Route::get('/purchase-orders', [PurchaseOrderController::class, 'index'])->name('purchase-orders.index');
         Route::get('/purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'show'])->name('purchase-orders.show');
         Route::get('/purchase-orders/{purchaseOrder}/print', [PurchaseOrderController::class, 'print'])->name('purchase-orders.print');
     });
 
-    Route::middleware('permission:purchase_orders,create')->group(function () {
-        Route::get('/purchase-orders/create', [PurchaseOrderController::class, 'create'])->name('purchase-orders.create');
-        Route::post('/purchase-orders', [PurchaseOrderController::class, 'store'])->name('purchase-orders.store');
-        Route::post('/purchase-orders/{purchaseOrder}/duplicate', [PurchaseOrderController::class, 'duplicate'])->name('purchase-orders.duplicate');
-    });
+
 
     Route::middleware('permission:purchase_orders,update')->group(function () {
         Route::get('/purchase-orders/{purchaseOrder}/edit', [PurchaseOrderController::class, 'edit'])->name('purchase-orders.edit');
