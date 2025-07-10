@@ -93,6 +93,10 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:user_levels,delete')->group(function () {
         Route::delete('/user-levels/{userLevel}', [UserLevelController::class, 'destroy'])->name('user-levels.destroy');
     });
+        Route::middleware('permission:users,create')->group(function () {
+        Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
+        Route::post('/users', [UserController::class, 'store'])->name('users.store');
+    });
 
     // User Management
     Route::middleware('permission:users,read')->group(function () {
@@ -100,10 +104,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/users/{user}', [UserController::class, 'show'])->name('users.show');
     });
 
-    Route::middleware('permission:users,create')->group(function () {
-        Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
-        Route::post('/users', [UserController::class, 'store'])->name('users.store');
-    });
+
 
     Route::middleware('permission:users,update')->group(function () {
         Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
