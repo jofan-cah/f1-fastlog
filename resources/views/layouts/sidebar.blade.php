@@ -21,6 +21,7 @@
     <nav class="p-4 space-y-2 overflow-y-auto h-[calc(100vh-100px)] custom-scrollbar">
 
         <!-- Dashboard - No Dropdown -->
+        @canAccess('dashboard', 'read')
         <div class="space-y-1">
             <a href="{{ route('dashboard') }}"
                class="sidebar-item w-full flex items-center p-3 rounded-xl transition-all duration-200 group
@@ -31,8 +32,10 @@
                 </div>
             </a>
         </div>
+        @endcanAccess
 
         <!-- Manajemen User -->
+        @canAccess('users', 'read')
         <div class="space-y-1">
             @php
                 $userMenuActive = request()->routeIs(['users.*', 'user-levels.*']);
@@ -49,21 +52,27 @@
             </button>
             <div id="users" class="overflow-hidden transition-all duration-300 {{ $userMenuActive ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0' }}">
                 <div class="ml-8 space-y-1">
+                    @canAccess('users', 'read')
                     <a href="{{ route('users.index') }}"
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
                               {{ request()->routeIs('users.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
                         Pengguna
                     </a>
+                    @endcanAccess
+                    @canAccess('user_levels', 'read')
                     <a href="{{ route('user-levels.index') }}"
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
                               {{ request()->routeIs('user-levels.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
                         Level Pengguna
                     </a>
+                    @endcanAccess
                 </div>
             </div>
         </div>
+        @endcanAccess
 
         <!-- Data Master -->
+        @if(auth()->user()->hasPermission('categories', 'read') || auth()->user()->hasPermission('items', 'read') || auth()->user()->hasPermission('suppliers', 'read'))
         <div class="space-y-1">
             @php
                 $masterMenuActive = request()->routeIs(['categories.*', 'items.*', 'suppliers.*']);
@@ -80,26 +89,34 @@
             </button>
             <div id="master" class="overflow-hidden transition-all duration-300 {{ $masterMenuActive ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0' }}">
                 <div class="ml-8 space-y-1">
+                    @canAccess('categories', 'read')
                     <a href="{{ route('categories.index') }}"
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
                               {{ request()->routeIs('categories.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
                         Kategori Barang
                     </a>
+                    @endcanAccess
+                    @canAccess('items', 'read')
                     <a href="{{ route('items.index') }}"
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
                               {{ request()->routeIs('items.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
                         Data Barang
                     </a>
+                    @endcanAccess
+                    @canAccess('suppliers', 'read')
                     <a href="{{ route('suppliers.index') }}"
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
                               {{ request()->routeIs('suppliers.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
                         Data Supplier
                     </a>
+                    @endcanAccess
                 </div>
             </div>
         </div>
+        @endif
 
         <!-- Pembelian -->
+        @if(auth()->user()->hasPermission('purchase_orders', 'read') || auth()->user()->hasPermission('goods_receiveds', 'read'))
         <div class="space-y-1">
             @php
                 $purchaseMenuActive = request()->routeIs(['purchase-orders.*', 'goods-received.*']);
@@ -116,21 +133,27 @@
             </button>
             <div id="purchase" class="overflow-hidden transition-all duration-300 {{ $purchaseMenuActive ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0' }}">
                 <div class="ml-8 space-y-1">
+                    @canAccess('purchase_orders', 'read')
                     <a href="{{ route('purchase-orders.index') }}"
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
                               {{ request()->routeIs('purchase-orders.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
                         Purchase Order (PO)
                     </a>
+                    @endcanAccess
+                    @canAccess('goods_receiveds', 'read')
                     <a href="{{ route('goods-received.index') }}"
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
                               {{ request()->routeIs('goods-received.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
                         Penerimaan Barang
                     </a>
+                    @endcanAccess
                 </div>
             </div>
         </div>
+        @endif
 
         <!-- Inventori -->
+        @canAccess('stocks', 'read')
         <div class="space-y-1">
             @php
                 $inventoryMenuActive = request()->routeIs(['stocks.*', 'item-details.*']);
@@ -147,21 +170,27 @@
             </button>
             <div id="inventory" class="overflow-hidden transition-all duration-300 {{ $inventoryMenuActive ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0' }}">
                 <div class="ml-8 space-y-1">
+                    @canAccess('stocks', 'read')
                     <a href="{{ route('stocks.index') }}"
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
                               {{ request()->routeIs('stocks.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
                         Stok Barang
                     </a>
+                    @endcanAccess
+                    @canAccess('items', 'read')
                     <a href="{{ route('item-details.index') }}"
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
                               {{ request()->routeIs('item-details.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
                         Detail Barang
                     </a>
+                    @endcanAccess
                 </div>
             </div>
         </div>
+        @endcanAccess
 
-<!-- Transaksi -->
+        <!-- Transaksi -->
+        @canAccess('transactions', 'read')
         <div class="space-y-1">
             @php
                 $transactionMenuActive = request()->routeIs(['transactions.*', 'requests.*', 'transaction-history.*', 'approvals.*']);
@@ -198,62 +227,20 @@
                               {{ request()->routeIs('transactions.*') && request()->get('type') == 'LOST' ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
                         <i class="fas fa-exclamation-triangle w-4"></i> Barang Hilang
                     </a>
-                    {{-- <a href="{{ route('requests.index') }}"
-                       class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
-                              {{ request()->routeIs('requests.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
-                        <i class="fas fa-plus w-4"></i> Permintaan Barang
-                    </a> --}}
+                    @canAccess('transactions', 'approve')
                     <a href="{{ route('approvals.index') }}"
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
                               {{ request()->routeIs('approvals.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
                         <i class="fas fa-check-circle w-4"></i> Approval Transaksi
                     </a>
-                    {{-- <a href="{{ route('transaction-history.index') }}"
-                       class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
-                              {{ request()->routeIs('transaction-history.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
-                        <i class="fas fa-history w-4"></i> Riwayat Transaksi
-                    </a> --}}
+                    @endcanAccess
                 </div>
             </div>
         </div>
-
-        <!-- Laporan -->
-        {{-- <div class="space-y-1">
-            @php
-                $reportMenuActive = request()->routeIs(['stock-reports.*', 'transaction-reports.*', 'po-reports.*']);
-                $reportMenuOpen = $reportMenuActive ? 'true' : 'false';
-            @endphp
-            <button onclick="toggleDropdown('reports'); setActiveMenu(this);"
-                    class="sidebar-item w-full flex items-center justify-between p-3 rounded-xl transition-all duration-200 group
-                           {{ $reportMenuActive ? 'bg-red-600/20 text-red-400 border border-red-500/30' : 'text-gray-300 hover:text-white hover:bg-white/10' }}">
-                <div class="flex items-center space-x-3">
-                    <i class="fas fa-chart-bar group-hover:scale-110 transition-transform"></i>
-                    <span class="font-medium">Laporan</span>
-                </div>
-                <i id="reports-icon" class="fas fa-chevron-down transition-transform {{ $reportMenuActive ? 'rotate-180' : '' }}"></i>
-            </button>
-            <div id="reports" class="overflow-hidden transition-all duration-300 {{ $reportMenuActive ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0' }}">
-                <div class="ml-8 space-y-1">
-                    <a href="#"
-                       class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
-                              {{ request()->routeIs('stock-reports.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
-                        Laporan Stok
-                    </a>
-                    <a href="#"
-                       class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
-                              {{ request()->routeIs('transaction-reports.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
-                        Laporan Transaksi
-                    </a>
-                    <a href="#"
-                       class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
-                              {{ request()->routeIs('po-reports.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
-                        Laporan PO
-                    </a>
-                </div>
-            </div>
-        </div> --}}
+        @endcanAccess
 
         <!-- Pengaturan -->
+        @if(auth()->user()->hasPermission('activity_logs', 'read') || auth()->user()->hasPermission('settings', 'read'))
         <div class="space-y-1">
             @php
                 $settingsMenuActive = request()->routeIs(['system-settings.*', 'activity-logs.*', 'backup.*']);
@@ -270,61 +257,17 @@
             </button>
             <div id="settings" class="overflow-hidden transition-all duration-300 {{ $settingsMenuActive ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0' }}">
                 <div class="ml-8 space-y-1">
-                    {{-- <a href="#"
-                       class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
-                              {{ request()->routeIs('system-settings.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
-                        Pengaturan Sistem
-                    </a> --}}
+                    @canAccess('activity_logs', 'read')
                     <a href="{{ route('activity-logs.index') }}"
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
                               {{ request()->routeIs('activity-logs.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
                         Log Aktivitas
                     </a>
-                    {{-- <a href="#"
-                       class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
-                              {{ request()->routeIs('backup.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
-                        Backup Data
-                    </a> --}}
+                    @endcanAccess
                 </div>
             </div>
         </div>
-
-        <!-- Tools -->
-        {{-- <div class="space-y-1">
-            @php
-                $toolsMenuActive = request()->routeIs(['scan-qr.*', 'print-qr.*', 'import-data.*']);
-                $toolsMenuOpen = $toolsMenuActive ? 'true' : 'false';
-            @endphp
-            <button onclick="toggleDropdown('tools'); setActiveMenu(this);"
-                    class="sidebar-item w-full flex items-center justify-between p-3 rounded-xl transition-all duration-200 group
-                           {{ $toolsMenuActive ? 'bg-red-600/20 text-red-400 border border-red-500/30' : 'text-gray-300 hover:text-white hover:bg-white/10' }}">
-                <div class="flex items-center space-x-3">
-                    <i class="fas fa-tools group-hover:scale-110 transition-transform"></i>
-                    <span class="font-medium">Tools</span>
-                </div>
-                <i id="tools-icon" class="fas fa-chevron-down transition-transform {{ $toolsMenuActive ? 'rotate-180' : '' }}"></i>
-            </button>
-            <div id="tools" class="overflow-hidden transition-all duration-300 {{ $toolsMenuActive ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0' }}">
-                <div class="ml-8 space-y-1">
-                    <a href="#"
-                       class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
-                              {{ request()->routeIs('scan-qr.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
-                        Scan QR Code
-                    </a>
-                    <a href="#"
-                       class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
-                              {{ request()->routeIs('print-qr.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
-                        Cetak QR Code
-                    </a>
-                    <a href="#"
-                       class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
-                              {{ request()->routeIs('import-data.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
-                        Import Data
-                    </a>
-                </div>
-            </div>
-        </div> --}}
+        @endif
 
     </nav>
 </div>
-
