@@ -176,17 +176,17 @@ Route::middleware('auth')->group(function () {
     // ================================================================
     // ITEM MANAGEMENT
     // ================================================================
+    Route::middleware('permission:items,create')->group(function () {
+        Route::get('/items/create', [ItemController::class, 'create'])->name('items.create');
+        Route::post('/items', [ItemController::class, 'store'])->name('items.store');
+        Route::post('/items/{item}/generate-qr', [ItemController::class, 'generateQR'])->name('items.generate-qr');
+    });
 
     Route::middleware('permission:items,read')->group(function () {
         Route::get('/items', [ItemController::class, 'index'])->name('items.index');
         Route::get('/items/{item}', [ItemController::class, 'show'])->name('items.show');
     });
 
-    Route::middleware('permission:items,create')->group(function () {
-        Route::get('/items/create', [ItemController::class, 'create'])->name('items.create');
-        Route::post('/items', [ItemController::class, 'store'])->name('items.store');
-        Route::post('/items/{item}/generate-qr', [ItemController::class, 'generateQR'])->name('items.generate-qr');
-    });
 
     Route::middleware('permission:items,update')->group(function () {
         Route::get('/items/{item}/edit', [ItemController::class, 'edit'])->name('items.edit');
