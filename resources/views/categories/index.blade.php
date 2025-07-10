@@ -751,7 +751,11 @@
             },
 
             confirmDelete() {
-                if (this.deleteModal.categoryId && this.deleteModal.childrenCount === 0 && this.deleteModal.itemsCount === 0) {
+                  console.log('confirmDelete called');
+    console.log('categoryId:', this.deleteModal.categoryId);
+    console.log('childrenCount:', this.deleteModal.childrenCount);
+    console.log('itemsCount:', this.deleteModal.itemsCount);
+                if ( this.deleteModal.childrenCount === 0) {
                     // Create and submit delete form
                     const form = document.createElement('form');
                     form.method = 'POST';
@@ -774,6 +778,8 @@
 
                     this.hideDeleteModal();
                     form.submit();
+                }else{
+                     console.log('Conditions not met');
                 }
             },
 
