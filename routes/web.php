@@ -120,16 +120,18 @@ Route::middleware('auth')->group(function () {
     // CATEGORY MANAGEMENT
     // ================================================================
 
+        Route::middleware('permission:categories,create')->group(function () {
+        Route::get('/categories/create', [CategoryController::class, 'create'])->name('categories.create');
+        Route::post('/categories', [CategoryController::class, 'store'])->name('categories.store');
+    });
+
     Route::middleware('permission:categories,read')->group(function () {
         Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
         Route::get('/categories/{category}', [CategoryController::class, 'show'])->name('categories.show');
         Route::get('/categories/api/children/{parent?}', [CategoryController::class, 'getChildren'])->name('categories.children');
     });
 
-    Route::middleware('permission:categories,create')->group(function () {
-        Route::get('/categories/create', [CategoryController::class, 'create'])->name('categories.create');
-        Route::post('/categories', [CategoryController::class, 'store'])->name('categories.store');
-    });
+
 
     Route::middleware('permission:categories,update')->group(function () {
         Route::get('/categories/{category}/edit', [CategoryController::class, 'edit'])->name('categories.edit');
