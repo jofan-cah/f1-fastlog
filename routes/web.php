@@ -326,6 +326,18 @@ Route::middleware('auth')->group(function () {
     // TRANSACTION MANAGEMENT
     // ================================================================
 
+ Route::middleware('permission:transactions,create')->group(function () {
+        Route::get('/transactions/create', [TransactionController::class, 'create'])->name('transactions.create');
+        Route::post('/transactions', [TransactionController::class, 'store'])->name('transactions.store');
+    });
+
+    Route::middleware('permission:transactions,update')->group(function () {
+        Route::get('/transactions/{transaction}/edit', [TransactionController::class, 'edit'])->name('transactions.edit');
+        Route::put('/transactions/{transaction}', [TransactionController::class, 'update'])->name('transactions.update');
+        Route::post('/transactions/{transaction}/cancel', [TransactionController::class, 'cancel'])->name('transactions.cancel');
+    });
+
+
     Route::middleware('permission:transactions,read')->group(function () {
         Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
         Route::get('/transactions/{transaction}', [TransactionController::class, 'show'])->name('transactions.show');
