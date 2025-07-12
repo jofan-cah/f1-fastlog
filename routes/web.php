@@ -295,15 +295,17 @@ Route::middleware('auth')->group(function () {
     // GOODS RECEIVED MANAGEMENT
     // ================================================================
 
-    Route::middleware('permission:goods_receiveds,read')->group(function () {
-        Route::get('/goods-received', [GoodsReceivedController::class, 'index'])->name('goods-received.index');
-        Route::get('/goods-received/{goodsReceived}', [GoodsReceivedController::class, 'show'])->name('goods-received.show');
-    });
+
 
     Route::middleware('permission:goods_receiveds,create')->group(function () {
         Route::get('/goods-received/create', [GoodsReceivedController::class, 'create'])->name('goods-received.create');
         Route::post('/goods-received', [GoodsReceivedController::class, 'store'])->name('goods-received.store');
         Route::post('/api/goods-received/validate-serial-number', [GoodsReceivedController::class, 'validateSerialNumber'])->name('validate-serial-number');
+    });
+
+    Route::middleware('permission:goods_receiveds,read')->group(function () {
+        Route::get('/goods-received', [GoodsReceivedController::class, 'index'])->name('goods-received.index');
+        Route::get('/goods-received/{goodsReceived}', [GoodsReceivedController::class, 'show'])->name('goods-received.show');
     });
 
     Route::middleware('permission:goods_receiveds,update')->group(function () {
