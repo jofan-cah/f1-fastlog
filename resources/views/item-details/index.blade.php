@@ -20,11 +20,11 @@
                     <i class="fas fa-qrcode"></i>
                     <span>Scan QR</span>
                 </button> --}}
-                <a href="{{ route('item-details.create') }}"
+                {{-- <a href="{{ route('item-details.create') }}"
                     class="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl">
                     <i class="fas fa-plus"></i>
                     <span>Tambah Item Detail</span>
-                </a>
+                </a> --}}
             </div>
         </div>
 
