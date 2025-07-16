@@ -522,1176 +522,1313 @@
     <!-- ZXing Browser Library -->
     <script src="https://unpkg.com/@zxing/library@latest"></script>
     <script>
-        function flexibleTransactionCreate() {
-            return {
-                // ================================================================
-                // BASIC PROPERTIES
-                // ================================================================
+       function flexibleTransactionCreate() {
+    return {
+        // ================================================================
+        // CORE PROPERTIES
+        // ================================================================
 
-                // Mode control
-                isMultiMode: false,
+        // Mode control
+        isMultiMode: false,
 
-                // Input method
-                inputMethod: 'manual', // 'qr', 'hardware', 'manual'
+        // Input methods
+        inputMethod: 'manual', // 'qr', 'hardware', 'manual'
 
-                // QR Camera Scanner
-                qrScannerActive: false,
-                codeReader: null,
+        // Selection management
+        selectedItem: null,
+        selectedItems: [],
 
-                // Single mode
-                selectedItem: null,
+        // Search functionality
+        searchQuery: '',
+        searchResults: [],
 
-                // Multi mode
-                selectedItems: [],
+        // Loading states
+        loading: false,
+        loadingTickets: false,
 
-                // Search
-                searchQuery: '',
-                searchResults: [],
+        // ================================================================
+        // QR CAMERA SCANNER
+        // ================================================================
 
-                // API Ticket Integration
-                ticketIds: [],
-                loadingTickets: false,
-                apiError: null,
-                lastFetched: null,
+        qrScannerActive: false,
+        codeReader: null,
 
-                // Form
-                form: {
-                    transaction_type: '{{ request()->get('type') ?? '' }}',
-                    reference_type: '',
-                    reference_id: '',
-                    from_location: '',
-                    to_location: '',
-                    notes: ''
-                },
+        // ================================================================
+        // HARDWARE SCANNER PROPERTIES
+        // ================================================================
 
-                loading: false,
+        // Scanner connection
+        hardwareScannerActive: false,
+        serialPort: null,
+        usbDevice: null,
+        hidDevice: null,
+        scannerType: 'auto', // 'serial', 'usb', 'hid', 'auto'
 
-                // ================================================================
-                // HARDWARE SCANNER PROPERTIES
-                // ================================================================
+        // Scanner status and settings
+        scannerStatus: 'disconnected', // 'disconnected', 'connecting', 'connected', 'scanning', 'error'
+        scannerError: null,
+        scannerSettings: {
+            baudRate: 9600,
+            dataBits: 8,
+            stopBits: 1,
+            parity: 'none',
+            flowControl: 'none'
+        },
 
-                // Hardware scanner properties
-                hardwareScannerActive: false,
-                serialPort: null,
-                usbDevice: null,
-                hidDevice: null,
-                scannerType: 'auto', // 'serial', 'usb', 'hid', 'auto'
+        // Input buffer management
+        scanBuffer: '',
+        lastScannedCode: null,
+        lastKeyTime: null,
+        isScannerInput: false,
+        isProcessingScan: false,
+        scanTimeout: null,
+        scanDebounceTimeout: null,
 
-                // Scanner settings
-                scannerSettings: {
-                    baudRate: 9600,
-                    dataBits: 8,
-                    stopBits: 1,
-                    parity: 'none',
-                    flowControl: 'none'
-                },
+        // Supported scanners
+        supportedScanners: [
+            { name: 'Generic USB HID Scanner', type: 'hid', vendorId: null },
+            { name: 'Honeywell Voyager 1400g', type: 'hid', vendorId: 0x0c2e },
+            { name: 'Symbol/Zebra LS2208', type: 'hid', vendorId: 0x05e0 },
+            { name: 'Datalogic QuickScan', type: 'hid', vendorId: 0x05f9 },
+            { name: 'Code CR1000', type: 'hid', vendorId: 0x1659 },
+            { name: 'Generic Serial Scanner', type: 'serial', vendorId: null },
+            { name: 'Generic USB Serial Scanner', type: 'usb', vendorId: null }
+        ],
 
-                // Scanner status
-                scannerStatus: 'disconnected', // 'disconnected', 'connecting', 'connected', 'scanning', 'error'
-                scannerError: null,
-                lastScannedCode: null,
-                scanBuffer: '',
-                scanTimeout: null,
+        // ================================================================
+        // API INTEGRATION
+        // ================================================================
 
-                // Supported scanner models
-                supportedScanners: [{
-                        name: 'Generic USB HID Scanner',
-                        type: 'hid',
-                        vendorId: null
-                    },
-                    {
-                        name: 'Honeywell Voyager 1400g',
-                        type: 'hid',
-                        vendorId: 0x0c2e
-                    },
-                    {
-                        name: 'Symbol/Zebra LS2208',
-                        type: 'hid',
-                        vendorId: 0x05e0
-                    },
-                    {
-                        name: 'Datalogic QuickScan',
-                        type: 'hid',
-                        vendorId: 0x05f9
-                    },
-                    {
-                        name: 'Code CR1000',
-                        type: 'hid',
-                        vendorId: 0x1659
-                    },
-                    {
-                        name: 'Generic Serial Scanner',
-                        type: 'serial',
-                        vendorId: null
-                    },
-                    {
-                        name: 'Generic USB Serial Scanner',
-                        type: 'usb',
-                        vendorId: null
-                    }
-                ],
+        ticketIds: [],
+        apiError: null,
+        lastFetched: null,
 
-                // ================================================================
-                // INITIALIZATION
-                // ================================================================
+        // ================================================================
+        // FORM DATA
+        // ================================================================
 
-                init() {
-                    console.log('=== FLEXIBLE TRANSACTION CREATE INIT ===');
+        form: {
+            transaction_type: '',
+            reference_type: '',
+            reference_id: '',
+            from_location: '',
+            to_location: '',
+            notes: ''
+        },
 
-                    // Initialize QR Camera Scanner
-                    this.codeReader = new ZXing.BrowserQRCodeReader();
+        // ================================================================
+        // INITIALIZATION
+        // ================================================================
 
-                    // Initialize hardware scanner detection
-                    this.initHardwareScanner();
+        async init() {
+            console.log('=== FLEXIBLE TRANSACTION CREATE INITIALIZATION ===');
 
-                    // Listen for keyboard input (for USB HID scanners)
-                    this.initKeyboardListener();
+            try {
+                // Set initial transaction type from URL
+                this.form.transaction_type = document.querySelector('input[name="transaction_type"]')?.value || '';
 
-                    // Listen for page unload to cleanup
-                    window.addEventListener('beforeunload', () => {
-                        this.cleanup();
-                    });
-                },
+                // Initialize QR Camera Scanner
+                this.initQRScanner();
 
-                cleanup() {
-                    this.stopQRScanner();
-                    this.disconnectHardwareScanner();
-                },
+                // Initialize hardware scanner with delay
+                await this.initHardwareScanner();
 
-                // ================================================================
-                // HARDWARE SCANNER INITIALIZATION
-                // ================================================================
+                // Setup event listeners
+                this.setupEventListeners();
 
-                async initHardwareScanner() {
-                    console.log('🔍 Initializing hardware scanner detection...');
+                console.log('✅ Initialization completed successfully');
 
-                    // Check browser support
-                    this.checkBrowserSupport();
+            } catch (error) {
+                console.error('❌ Initialization error:', error);
+                this.showNotification('Initialization error: ' + error.message, 'error');
+            }
+        },
 
-                    // Auto-detect connected scanners
-                    await this.autoDetectScanners();
-                },
+        initQRScanner() {
+            try {
+                this.codeReader = new ZXing.BrowserQRCodeReader();
+                console.log('✅ QR Scanner initialized');
+            } catch (error) {
+                console.error('❌ QR Scanner initialization failed:', error);
+                this.showNotification('QR Scanner tidak tersedia', 'warning');
+            }
+        },
 
-                checkBrowserSupport() {
-                    const support = {
-                        webSerial: 'serial' in navigator,
-                        webUSB: 'usb' in navigator,
-                        webHID: 'hid' in navigator
-                    };
+        async initHardwareScanner() {
+            console.log('🔍 Initializing hardware scanner...');
 
-                    console.log('🌐 Browser support:', support);
+            // Check browser support
+            if (!this.checkBrowserSupport()) {
+                return;
+            }
 
-                    if (!support.webSerial && !support.webUSB && !support.webHID) {
-                        console.warn('⚠️ No hardware scanner APIs supported in this browser');
-                        this.scannerError = 'Browser tidak mendukung koneksi hardware scanner';
-                        return false;
-                    }
+            // Add delay to ensure DOM readiness
+            await new Promise(resolve => setTimeout(resolve, 500));
 
-                    return true;
-                },
+            // Auto-detect scanners
+            await this.autoDetectScanners();
+        },
 
-                async autoDetectScanners() {
-                    try {
-                        // Try to detect HID scanners first (most common)
-                        if ('hid' in navigator) {
-                            await this.detectHIDScanners();
-                        }
+        setupEventListeners() {
+            // Keyboard listener for HID scanners
+            this.initKeyboardListener();
 
-                        // Try to detect USB scanners
-                        if ('usb' in navigator) {
-                            await this.detectUSBScanners();
-                        }
+            // Cleanup on page unload
+            window.addEventListener('beforeunload', () => {
+                this.cleanup();
+            });
 
-                        console.log('📡 Scanner auto-detection completed');
+            // Document visibility change (tab switch detection)
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    this.pauseScanners();
+                } else {
+                    this.resumeScanners();
+                }
+            });
+        },
 
-                    } catch (error) {
-                        console.error('❌ Scanner detection error:', error);
-                        this.scannerError = 'Gagal mendeteksi scanner: ' + error.message;
-                    }
-                },
+        // ================================================================
+        // BROWSER SUPPORT & DETECTION
+        // ================================================================
 
-                async detectHIDScanners() {
-                    try {
-                        const devices = await navigator.hid.getDevices();
-                        const scanners = devices.filter(device => this.isBarcodeScannerDevice(device));
+        checkBrowserSupport() {
+            const support = {
+                webSerial: 'serial' in navigator,
+                webUSB: 'usb' in navigator,
+                webHID: 'hid' in navigator
+            };
 
-                        if (scanners.length > 0) {
-                            console.log('✅ Found HID scanners:', scanners);
-                            this.hidDevice = scanners[0];
-                            this.scannerType = 'hid';
-                            this.scannerStatus = 'connected';
-                        } else {
-                            console.log('ℹ️ No HID scanners found');
-                        }
+            console.log('🌐 Browser support:', support);
 
-                    } catch (error) {
-                        console.error('❌ HID detection error:', error);
-                    }
-                },
+            if (!support.webSerial && !support.webUSB && !support.webHID) {
+                console.warn('⚠️ No hardware scanner APIs supported');
+                this.scannerError = 'Browser tidak mendukung koneksi hardware scanner';
+                return false;
+            }
 
-                async detectUSBScanners() {
-                    try {
-                        const devices = await navigator.usb.getDevices();
-                        const scanners = devices.filter(device => this.isBarcodeScannerDevice(device));
+            return true;
+        },
 
-                        if (scanners.length > 0) {
-                            console.log('✅ Found USB scanners:', scanners);
-                            this.usbDevice = scanners[0];
-                            this.scannerType = 'usb';
-                            this.scannerStatus = 'connected';
-                        } else {
-                            console.log('ℹ️ No USB scanners found');
-                        }
+        async autoDetectScanners() {
+            try {
+                // Try HID first (most common)
+                if ('hid' in navigator) {
+                    await this.detectHIDScanners();
+                }
 
-                    } catch (error) {
-                        console.error('❌ USB detection error:', error);
-                    }
-                },
+                // Try USB
+                if ('usb' in navigator && this.scannerStatus === 'disconnected') {
+                    await this.detectUSBScanners();
+                }
 
-                isBarcodeScannerDevice(device) {
-                    // Check if device is likely a barcode scanner
-                    const scannerVendorIds = [0x0c2e, 0x05e0, 0x05f9, 0x1659, 0x1a86, 0x04b4];
-                    const scannerKeywords = ['scanner', 'barcode', 'qr', 'code', 'reader', 'honeywell', 'symbol', 'zebra',
-                        'datalogic'
-                    ];
+                console.log('📡 Scanner detection completed');
 
-                    // Check vendor ID
-                    if (device.vendorId && scannerVendorIds.includes(device.vendorId)) {
-                        return true;
-                    }
+            } catch (error) {
+                console.error('❌ Scanner detection error:', error);
+                this.scannerError = 'Gagal mendeteksi scanner: ' + error.message;
+            }
+        },
 
-                    // Check product name
-                    if (device.productName) {
-                        const productName = device.productName.toLowerCase();
-                        return scannerKeywords.some(keyword => productName.includes(keyword));
-                    }
+        async detectHIDScanners() {
+            try {
+                const devices = await navigator.hid.getDevices();
+                const scanners = devices.filter(device => this.isBarcodeScannerDevice(device));
 
-                    // Check by usage (HID specific)
-                    if (device.collections) {
-                        return device.collections.some(collection =>
-                            collection.usage === 0x05 || // Generic Desktop
-                            collection.usage === 0x06 || // Keyboard
-                            collection.usagePage === 0x08 // LED
-                        );
-                    }
-
-                    return false;
-                },
-
-                // ================================================================
-                // KEYBOARD INPUT LISTENER (USB HID Scanners)
-                // ================================================================
-
-                initKeyboardListener() {
-                    // Most USB barcode scanners work as HID keyboard devices
-                    document.addEventListener('keydown', (event) => {
-                        if (this.hardwareScannerActive && this.scannerType === 'hid') {
-                            this.handleKeyboardInput(event);
-                        }
-                    });
-
-                    // Also listen for paste events (some scanners might paste data)
-                    document.addEventListener('paste', (event) => {
-                        if (this.hardwareScannerActive && this.scannerType === 'hid') {
-                            event.preventDefault();
-                            const pasteData = event.clipboardData.getData('text');
-                            if (pasteData.trim()) {
-                                this.handleHardwareScan(pasteData.trim());
-                            }
-                        }
-                    });
-                },
-
-                handleKeyboardInput(event) {
-                    // Prevent default behavior for scanner input
-                    if (this.hardwareScannerActive) {
-                        // Check if this looks like scanner input (rapid typing)
-                        const currentTime = Date.now();
-                        if (!this.lastKeyTime) {
-                            this.lastKeyTime = currentTime;
-                        } else {
-                            const timeDiff = currentTime - this.lastKeyTime;
-                            if (timeDiff < 50) { // Very fast typing, likely scanner
-                                this.isScannerInput = true;
-                            }
-                            this.lastKeyTime = currentTime;
-                        }
-                    }
-
-                    // Barcode scanners typically send data very quickly followed by Enter
-                    if (event.key === 'Enter') {
-                        if (this.scanBuffer.trim() && this.hardwareScannerActive) {
-                            console.log('📱 Hardware scanner input:', this.scanBuffer);
-                            this.handleHardwareScan(this.scanBuffer.trim());
-                            this.scanBuffer = '';
-                            this.isScannerInput = false;
-                            event.preventDefault();
-                        }
-                        return;
-                    }
-
-                    // Accumulate characters (ignore special keys)
-                    if (event.key.length === 1 && this.hardwareScannerActive) {
-                        this.scanBuffer += event.key;
-
-                        // Clear buffer after timeout (in case scan was interrupted)
-                        if (this.scanTimeout) {
-                            clearTimeout(this.scanTimeout);
-                        }
-
-                        this.scanTimeout = setTimeout(() => {
-                            this.scanBuffer = '';
-                            this.isScannerInput = false;
-                        }, 1000);
-                    }
-                },
-
-                // ================================================================
-                // MANUAL HARDWARE SCANNER CONNECTION
-                // ================================================================
-
-                async connectHardwareScanner() {
-                    this.scannerStatus = 'connecting';
-                    this.scannerError = null;
-                    this.loading = true;
-
-                    try {
-                        switch (this.scannerType) {
-                            case 'serial':
-                                await this.connectSerialScanner();
-                                break;
-                            case 'usb':
-                                await this.connectUSBScanner();
-                                break;
-                            case 'hid':
-                                await this.connectHIDScanner();
-                                break;
-                            default:
-                                await this.autoConnectScanner();
-                        }
-
-                    } catch (error) {
-                        console.error('❌ Scanner connection error:', error);
-                        this.scannerError = 'Gagal terhubung ke scanner: ' + error.message;
-                        this.scannerStatus = 'error';
-                    } finally {
-                        this.loading = false;
-                    }
-                },
-
-                async connectSerialScanner() {
-                    if (!('serial' in navigator)) {
-                        throw new Error('Web Serial API tidak didukung browser ini');
-                    }
-
-                    this.serialPort = await navigator.serial.requestPort();
-                    await this.serialPort.open(this.scannerSettings);
-
-                    // Start listening for data
-                    this.startSerialListener();
-
+                if (scanners.length > 0) {
+                    console.log('✅ Found HID scanners:', scanners);
+                    this.hidDevice = scanners[0];
+                    this.scannerType = 'hid';
                     this.scannerStatus = 'connected';
-                    console.log('✅ Serial scanner connected');
-                },
+                }
 
-                async connectUSBScanner() {
-                    if (!('usb' in navigator)) {
-                        throw new Error('Web USB API tidak didukung browser ini');
-                    }
+            } catch (error) {
+                console.error('❌ HID detection error:', error);
+            }
+        },
 
-                    this.usbDevice = await navigator.usb.requestDevice({
-                        filters: this.supportedScanners
-                            .filter(s => s.type === 'usb' && s.vendorId)
-                            .map(s => ({
-                                vendorId: s.vendorId
-                            }))
-                    });
+        async detectUSBScanners() {
+            try {
+                const devices = await navigator.usb.getDevices();
+                const scanners = devices.filter(device => this.isBarcodeScannerDevice(device));
 
-                    await this.usbDevice.open();
-                    await this.usbDevice.selectConfiguration(1);
-
-                    // Start listening for data
-                    this.startUSBListener();
-
+                if (scanners.length > 0) {
+                    console.log('✅ Found USB scanners:', scanners);
+                    this.usbDevice = scanners[0];
+                    this.scannerType = 'usb';
                     this.scannerStatus = 'connected';
-                    console.log('✅ USB scanner connected');
-                },
+                }
 
-                async connectHIDScanner() {
-                    if (!('hid' in navigator)) {
-                        throw new Error('Web HID API tidak didukung browser ini');
+            } catch (error) {
+                console.error('❌ USB detection error:', error);
+            }
+        },
+
+        isBarcodeScannerDevice(device) {
+            const scannerVendorIds = [0x0c2e, 0x05e0, 0x05f9, 0x1659, 0x1a86, 0x04b4];
+            const scannerKeywords = ['scanner', 'barcode', 'qr', 'code', 'reader', 'honeywell', 'symbol', 'zebra', 'datalogic'];
+
+            // Check vendor ID
+            if (device.vendorId && scannerVendorIds.includes(device.vendorId)) {
+                return true;
+            }
+
+            // Check product name
+            if (device.productName) {
+                const productName = device.productName.toLowerCase();
+                return scannerKeywords.some(keyword => productName.includes(keyword));
+            }
+
+            // Check HID usage
+            if (device.collections) {
+                return device.collections.some(collection =>
+                    collection.usage === 0x05 || // Generic Desktop
+                    collection.usage === 0x06 || // Keyboard
+                    collection.usagePage === 0x08 // LED
+                );
+            }
+
+            return false;
+        },
+
+        // ================================================================
+        // KEYBOARD INPUT HANDLER (HID SCANNERS)
+        // ================================================================
+
+        initKeyboardListener() {
+            // Reset tracking variables
+            this.resetScanBuffer();
+
+            // Keydown listener
+            document.addEventListener('keydown', (event) => {
+                if (this.hardwareScannerActive && this.scannerType === 'hid') {
+                    this.handleKeyboardInput(event);
+                }
+            });
+
+            // Paste listener
+            document.addEventListener('paste', (event) => {
+                if (this.hardwareScannerActive && this.scannerType === 'hid') {
+                    event.preventDefault();
+                    const pasteData = event.clipboardData.getData('text');
+                    if (pasteData.trim() && !this.isProcessingScan) {
+                        console.log('📋 Paste detected:', pasteData);
+                        this.handleHardwareScan(pasteData.trim());
                     }
+                }
+            });
+        },
 
-                    // Request HID device if not already detected
-                    if (!this.hidDevice) {
-                        const devices = await navigator.hid.requestDevice({
-                            filters: this.supportedScanners
-                                .filter(s => s.type === 'hid' && s.vendorId)
-                                .map(s => ({
-                                    vendorId: s.vendorId
-                                }))
-                        });
+        handleKeyboardInput(event) {
+            // Skip if already processing
+            if (this.isProcessingScan) {
+                event.preventDefault();
+                return;
+            }
 
-                        if (devices.length > 0) {
-                            this.hidDevice = devices[0];
-                        }
+            const currentTime = Date.now();
+
+            // Detect rapid typing (scanner behavior)
+            if (!this.lastKeyTime) {
+                this.lastKeyTime = currentTime;
+                this.scanBuffer = '';
+            } else {
+                const timeDiff = currentTime - this.lastKeyTime;
+                if (timeDiff < 50) {
+                    this.isScannerInput = true;
+                } else if (timeDiff > 500) {
+                    this.scanBuffer = '';
+                    this.isScannerInput = false;
+                }
+                this.lastKeyTime = currentTime;
+            }
+
+            // Handle Enter (scan completion)
+            if (event.key === 'Enter') {
+                if (this.scanBuffer.trim() && this.hardwareScannerActive) {
+                    console.log('📱 Complete scan detected:', this.scanBuffer);
+
+                    this.isProcessingScan = true;
+                    const scanData = this.scanBuffer.trim();
+
+                    // Small delay for stability
+                    setTimeout(() => {
+                        this.handleHardwareScan(scanData);
+                        this.resetScanBuffer();
+                    }, 50);
+
+                    event.preventDefault();
+                }
+                return;
+            }
+
+            // Handle character input
+            if (event.key.length === 1 && this.hardwareScannerActive) {
+                if (this.isScannerInput) {
+                    event.preventDefault();
+                }
+
+                this.scanBuffer += event.key;
+
+                // Clear buffer timeout
+                if (this.scanTimeout) {
+                    clearTimeout(this.scanTimeout);
+                }
+
+                this.scanTimeout = setTimeout(() => {
+                    console.log('⏰ Scan timeout, clearing buffer');
+                    this.resetScanBuffer();
+                }, 2000);
+            }
+        },
+
+        resetScanBuffer() {
+            this.scanBuffer = '';
+            this.isScannerInput = false;
+            this.isProcessingScan = false;
+            this.lastKeyTime = null;
+
+            if (this.scanTimeout) {
+                clearTimeout(this.scanTimeout);
+                this.scanTimeout = null;
+            }
+        },
+
+        // ================================================================
+        // HARDWARE SCANNER CONNECTION
+        // ================================================================
+
+        async connectHardwareScanner() {
+            this.scannerStatus = 'connecting';
+            this.scannerError = null;
+            this.loading = true;
+
+            try {
+                switch (this.scannerType) {
+                    case 'serial':
+                        await this.connectSerialScanner();
+                        break;
+                    case 'usb':
+                        await this.connectUSBScanner();
+                        break;
+                    case 'hid':
+                        await this.connectHIDScanner();
+                        break;
+                    default:
+                        await this.autoConnectScanner();
+                }
+
+            } catch (error) {
+                console.error('❌ Scanner connection error:', error);
+                this.scannerError = 'Gagal terhubung: ' + error.message;
+                this.scannerStatus = 'error';
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async connectSerialScanner() {
+            if (!('serial' in navigator)) {
+                throw new Error('Web Serial API tidak didukung');
+            }
+
+            this.serialPort = await navigator.serial.requestPort();
+            await this.serialPort.open(this.scannerSettings);
+            this.startSerialListener();
+            this.scannerStatus = 'connected';
+            console.log('✅ Serial scanner connected');
+        },
+
+        async connectUSBScanner() {
+            if (!('usb' in navigator)) {
+                throw new Error('Web USB API tidak didukung');
+            }
+
+            this.usbDevice = await navigator.usb.requestDevice({
+                filters: this.supportedScanners
+                    .filter(s => s.type === 'usb' && s.vendorId)
+                    .map(s => ({ vendorId: s.vendorId }))
+            });
+
+            await this.usbDevice.open();
+            await this.usbDevice.selectConfiguration(1);
+            this.startUSBListener();
+            this.scannerStatus = 'connected';
+            console.log('✅ USB scanner connected');
+        },
+
+        async connectHIDScanner() {
+            if (!('hid' in navigator)) {
+                throw new Error('Web HID API tidak didukung');
+            }
+
+            if (!this.hidDevice) {
+                const devices = await navigator.hid.requestDevice({
+                    filters: this.supportedScanners
+                        .filter(s => s.type === 'hid' && s.vendorId)
+                        .map(s => ({ vendorId: s.vendorId }))
+                });
+
+                if (devices.length > 0) {
+                    this.hidDevice = devices[0];
+                }
+            }
+
+            if (this.hidDevice && !this.hidDevice.opened) {
+                await this.hidDevice.open();
+                this.startHIDListener();
+            }
+
+            this.scannerStatus = 'connected';
+            console.log('✅ HID scanner ready');
+        },
+
+        async autoConnectScanner() {
+            const methods = ['hid', 'usb', 'serial'];
+
+            for (const method of methods) {
+                try {
+                    this.scannerType = method;
+
+                    switch (method) {
+                        case 'hid': await this.connectHIDScanner(); return;
+                        case 'usb': await this.connectUSBScanner(); return;
+                        case 'serial': await this.connectSerialScanner(); return;
                     }
+                } catch (error) {
+                    console.log(`❌ ${method} failed:`, error.message);
+                    continue;
+                }
+            }
 
-                    if (this.hidDevice) {
-                        if (!this.hidDevice.opened) {
-                            await this.hidDevice.open();
-                        }
+            throw new Error('Tidak dapat terhubung dengan metode apapun');
+        },
 
-                        // Start listening for HID input reports
-                        this.startHIDListener();
+        // ================================================================
+        // DATA LISTENERS
+        // ================================================================
+
+        async startSerialListener() {
+            if (!this.serialPort?.readable) return;
+
+            const reader = this.serialPort.readable.getReader();
+
+            try {
+                while (this.serialPort.readable) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    const text = new TextDecoder().decode(value);
+                    if (text.trim()) {
+                        this.handleHardwareScan(text.trim());
                     }
+                }
+            } catch (error) {
+                console.error('❌ Serial read error:', error);
+            } finally {
+                reader.releaseLock();
+            }
+        },
 
-                    // HID scanners usually work automatically as keyboard input
-                    this.scannerStatus = 'connected';
-                    console.log('✅ HID scanner ready');
-                },
+        async startUSBListener() {
+            if (!this.usbDevice) return;
 
-                async autoConnectScanner() {
-                    // Try different connection methods automatically
-                    const methods = ['hid', 'usb', 'serial'];
+            try {
+                while (this.usbDevice.opened) {
+                    const result = await this.usbDevice.transferIn(1, 64);
 
-                    for (const method of methods) {
-                        try {
-                            this.scannerType = method;
-
-                            switch (method) {
-                                case 'hid':
-                                    await this.connectHIDScanner();
-                                    return;
-                                case 'usb':
-                                    await this.connectUSBScanner();
-                                    return;
-                                case 'serial':
-                                    await this.connectSerialScanner();
-                                    return;
-                            }
-                        } catch (error) {
-                            console.log(`❌ ${method} connection failed:`, error.message);
-                            continue;
-                        }
-                    }
-
-                    throw new Error('Tidak dapat terhubung dengan metode apapun');
-                },
-
-                // ================================================================
-                // DATA LISTENERS
-                // ================================================================
-
-                async startSerialListener() {
-                    if (!this.serialPort || !this.serialPort.readable) return;
-
-                    const reader = this.serialPort.readable.getReader();
-
-                    try {
-                        while (this.serialPort.readable) {
-                            const {
-                                value,
-                                done
-                            } = await reader.read();
-                            if (done) break;
-
-                            const text = new TextDecoder().decode(value);
-                            this.handleHardwareScan(text.trim());
-                        }
-                    } catch (error) {
-                        console.error('❌ Serial read error:', error);
-                    } finally {
-                        reader.releaseLock();
-                    }
-                },
-
-                async startUSBListener() {
-                    if (!this.usbDevice) return;
-
-                    try {
-                        while (this.usbDevice.opened) {
-                            const result = await this.usbDevice.transferIn(1, 64);
-
-                            if (result.data && result.data.byteLength > 0) {
-                                const text = new TextDecoder().decode(result.data);
-                                this.handleHardwareScan(text.trim());
-                            }
-                        }
-                    } catch (error) {
-                        console.error('❌ USB read error:', error);
-                    }
-                },
-
-                async startHIDListener() {
-                    if (!this.hidDevice) return;
-
-                    this.hidDevice.addEventListener('inputreport', (event) => {
-                        const {
-                            data,
-                            device,
-                            reportId
-                        } = event;
-
-                        // Convert data to text
-                        const text = new TextDecoder().decode(data);
+                    if (result.data?.byteLength > 0) {
+                        const text = new TextDecoder().decode(result.data);
                         if (text.trim()) {
                             this.handleHardwareScan(text.trim());
                         }
-                    });
-                },
-
-                // ================================================================
-                // HARDWARE SCANNER CONTROL
-                // ================================================================
-
-                toggleHardwareScanner() {
-                    if (this.hardwareScannerActive) {
-                        this.stopHardwareScanner();
-                    } else {
-                        this.startHardwareScanner();
                     }
-                },
+                }
+            } catch (error) {
+                console.error('❌ USB read error:', error);
+            }
+        },
 
-                async startHardwareScanner() {
-                    try {
-                        if (this.scannerStatus === 'disconnected') {
-                            await this.connectHardwareScanner();
+        startHIDListener() {
+            if (!this.hidDevice) return;
+
+            this.hidDevice.addEventListener('inputreport', (event) => {
+                const { data } = event;
+                const text = new TextDecoder().decode(data);
+                if (text.trim()) {
+                    this.handleHardwareScan(text.trim());
+                }
+            });
+        },
+
+        // ================================================================
+        // SCANNER CONTROL
+        // ================================================================
+
+        toggleHardwareScanner() {
+            if (this.hardwareScannerActive) {
+                this.stopHardwareScanner();
+            } else {
+                this.startHardwareScanner();
+            }
+        },
+
+        async startHardwareScanner() {
+            try {
+                console.log('🚀 Starting hardware scanner...');
+
+                if (this.scannerStatus === 'disconnected') {
+                    await this.connectHardwareScanner();
+                }
+
+                this.resetScanBuffer();
+                this.hardwareScannerActive = true;
+                this.scannerStatus = 'scanning';
+                this.lastScannedCode = null;
+
+                console.log('✅ Hardware scanner activated');
+                this.showNotification('Scanner aktif - siap menerima input', 'success');
+                this.playBeepSound();
+
+            } catch (error) {
+                console.error('❌ Failed to start scanner:', error);
+                this.showNotification('Gagal mengaktifkan scanner: ' + error.message, 'error');
+                this.hardwareScannerActive = false;
+                this.scannerStatus = 'error';
+            }
+        },
+
+        stopHardwareScanner() {
+            this.hardwareScannerActive = false;
+            this.scannerStatus = this.scannerStatus === 'scanning' ? 'connected' : this.scannerStatus;
+            this.resetScanBuffer();
+            console.log('⏹️ Hardware scanner stopped');
+        },
+
+        disconnectHardwareScanner() {
+            this.stopHardwareScanner();
+
+            // Close connections
+            if (this.serialPort?.readable) {
+                this.serialPort.close();
+                this.serialPort = null;
+            }
+
+            if (this.usbDevice?.opened) {
+                this.usbDevice.close();
+                this.usbDevice = null;
+            }
+
+            if (this.hidDevice?.opened) {
+                this.hidDevice.close();
+                this.hidDevice = null;
+            }
+
+            this.scannerStatus = 'disconnected';
+            this.scannerError = null;
+            console.log('🔌 Hardware scanner disconnected');
+        },
+
+        // ================================================================
+        // QR CAMERA SCANNER
+        // ================================================================
+
+        toggleQRScanner() {
+            if (this.qrScannerActive) {
+                this.stopQRScanner();
+            } else {
+                this.startQRScanner();
+            }
+        },
+
+        async startQRScanner() {
+            try {
+                console.log('📹 Starting QR camera scanner...');
+
+                const videoElement = document.getElementById('flexible-qr-scanner');
+                if (!videoElement) {
+                    throw new Error('Video element not found');
+                }
+
+                videoElement.srcObject = null;
+
+                await this.codeReader.decodeFromVideoDevice(
+                    undefined,
+                    videoElement,
+                    (result, error) => {
+                        if (result && !this.isProcessingScan) {
+                            console.log('📹 QR detected:', result.text);
+                            this.isProcessingScan = true;
+
+                            setTimeout(() => {
+                                this.handleQRScan(result.text);
+                            }, 100);
                         }
 
-                        this.hardwareScannerActive = true;
-                        this.scannerStatus = 'scanning';
-                        this.scanBuffer = '';
-                        this.lastScannedCode = null;
-
-                        console.log('🚀 Hardware scanner activated');
-                        this.showNotification('Scanner aktif - siap menerima input', 'success');
-
-                    } catch (error) {
-                        console.error('❌ Failed to start hardware scanner:', error);
-                        this.showNotification('Gagal mengaktifkan scanner: ' + error.message, 'error');
-                    }
-                },
-
-                stopHardwareScanner() {
-                    this.hardwareScannerActive = false;
-                    this.scannerStatus = this.scannerStatus === 'scanning' ? 'connected' : this.scannerStatus;
-                    this.scanBuffer = '';
-
-                    if (this.scanTimeout) {
-                        clearTimeout(this.scanTimeout);
-                        this.scanTimeout = null;
-                    }
-
-                    console.log('⏹️ Hardware scanner stopped');
-                },
-
-                disconnectHardwareScanner() {
-                    this.stopHardwareScanner();
-
-                    // Close connections
-                    if (this.serialPort && this.serialPort.readable) {
-                        this.serialPort.close();
-                        this.serialPort = null;
-                    }
-
-                    if (this.usbDevice && this.usbDevice.opened) {
-                        this.usbDevice.close();
-                        this.usbDevice = null;
-                    }
-
-                    if (this.hidDevice && this.hidDevice.opened) {
-                        this.hidDevice.close();
-                        this.hidDevice = null;
-                    }
-
-                    this.scannerStatus = 'disconnected';
-                    this.scannerError = null;
-
-                    console.log('🔌 Hardware scanner disconnected');
-                },
-
-                // ================================================================
-                // HARDWARE SCAN PROCESSING
-                // ================================================================
-
-                async handleHardwareScan(scanData) {
-                    console.log('📡 Hardware scan received:', scanData);
-
-                    this.lastScannedCode = scanData;
-
-                    try {
-                        // Try to parse as JSON first (for QR codes)
-                        let qrData;
-                        try {
-                            qrData = JSON.parse(scanData);
-
-                            if (qrData.type === 'item_detail' && qrData.item_detail_id) {
-                                // Process QR code
-                                await this.processQRData(qrData);
-                                return;
-                            }
-                        } catch (parseError) {
-                            // Not JSON, treat as barcode
+                        if (error && error.name !== 'NotFoundException') {
+                            console.warn('QR Scanner warning:', error.name);
                         }
-
-                        // Process as barcode/text
-                        await this.processBarcodeData(scanData);
-
-                    } catch (error) {
-                        console.error('❌ Hardware scan processing error:', error);
-                        this.showNotification('Error processing scan: ' + error.message, 'error');
                     }
-                },
+                );
 
-                async processQRData(qrData) {
-                    console.log('📱 Processing QR data:', qrData);
+                this.qrScannerActive = true;
+                console.log('✅ QR Camera Scanner started');
 
-                    // Create item object from QR
-                    const item = {
-                        item_detail_id: qrData.item_detail_id,
-                        item_name: qrData.item_name,
-                        item_code: qrData.item_code,
-                        serial_number: qrData.serial_number,
-                        item_id: qrData.item_id,
-                        current_status: 'available',
-                        location: 'Warehouse'
-                    };
+            } catch (error) {
+                console.error('❌ QR Scanner error:', error);
+                this.showNotification('Camera error: ' + error.message, 'error');
+                this.qrScannerActive = false;
+            }
+        },
 
-                    // Add to selection
-                    this.addItemToSelection(item);
+        stopQRScanner() {
+            if (this.codeReader && this.qrScannerActive) {
+                this.codeReader.reset();
+                this.qrScannerActive = false;
+                console.log('📹 QR Camera Scanner stopped');
+            }
+        },
 
-                    // Show success feedback
-                    this.showScanSuccess(`QR Code: ${item.item_name}`);
-                },
+        async handleQRScan(qrText) {
+            try {
+                let qrData;
+                try {
+                    qrData = JSON.parse(qrText);
+                } catch (parseError) {
+                    throw new Error('QR Code format tidak valid');
+                }
 
-                async processBarcodeData(barcodeData) {
-                    console.log('📊 Processing barcode data:', barcodeData);
+                if (qrData.type !== 'item_detail' || !qrData.item_detail_id) {
+                    throw new Error('QR Code bukan untuk item detail');
+                }
 
-                    try {
-                        // Search for item by barcode/serial number
-                        const response = await fetch('/api/items/search-by-barcode?' + new URLSearchParams({
-                            barcode: barcodeData
-                        }));
+                const item = {
+                    item_detail_id: qrData.item_detail_id,
+                    item_name: qrData.item_name,
+                    item_code: qrData.item_code,
+                    serial_number: qrData.serial_number,
+                    item_id: qrData.item_id,
+                    current_status: 'available',
+                    location: 'Warehouse'
+                };
 
-                        const data = await response.json();
+                this.addItemToSelection(item);
 
-                        if (data.success && data.item) {
-                            this.addItemToSelection(data.item);
-                            this.showScanSuccess(`Barcode: ${data.item.item_name}`);
-                        } else {
-                            throw new Error('Item tidak ditemukan untuk barcode: ' + barcodeData);
-                        }
-
-                    } catch (error) {
-                        console.error('❌ Barcode lookup error:', error);
-
-                        // Show barcode input dialog as fallback
-                        this.showBarcodeInputDialog(barcodeData);
-                    }
-                },
-
-                showScanSuccess(message) {
-                    this.showNotification('✅ ' + message, 'success');
-                    this.playBeepSound();
-                },
-
-                showBarcodeInputDialog(barcodeData) {
-                    const action = confirm(
-                        `Barcode terdeteksi: ${barcodeData}\n\n` +
-                        'Item tidak ditemukan di database.\n\n' +
-                        'Apakah Anda ingin mencari manual?'
-                    );
-
-                    if (action) {
-                        this.inputMethod = 'manual';
-                        this.searchQuery = barcodeData;
-                        this.searchItems();
-                    }
-                },
-
-                playBeepSound() {
-                    try {
-                        // Simple beep sound for scan feedback
-                        const audioContext = new(window.AudioContext || window.webkitAudioContext)();
-                        const oscillator = audioContext.createOscillator();
-                        const gainNode = audioContext.createGain();
-
-                        oscillator.connect(gainNode);
-                        gainNode.connect(audioContext.destination);
-
-                        oscillator.frequency.value = 800;
-                        oscillator.type = 'square';
-
-                        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-
-                        oscillator.start(audioContext.currentTime);
-                        oscillator.stop(audioContext.currentTime + 0.1);
-                    } catch (error) {
-                        // Ignore audio errors
-                    }
-                },
-
-                showNotification(message, type = 'info') {
-                    // Create notification element
-                    const notification = document.createElement('div');
-                    const colors = {
-                        success: 'bg-green-500',
-                        error: 'bg-red-500',
-                        warning: 'bg-yellow-500',
-                        info: 'bg-blue-500'
-                    };
-
-                    notification.className =
-                        `fixed top-4 right-4 ${colors[type]} text-white px-4 py-2 rounded-lg shadow-lg z-50 transform transition-transform duration-300`;
-                    notification.textContent = message;
-                    notification.style.transform = 'translateX(100%)';
-
-                    document.body.appendChild(notification);
-
-                    // Animate in
-                    setTimeout(() => {
-                        notification.style.transform = 'translateX(0)';
-                    }, 10);
-
-                    // Remove after delay
-                    setTimeout(() => {
-                        notification.style.transform = 'translateX(100%)';
-                        setTimeout(() => {
-                            if (notification.parentNode) {
-                                notification.parentNode.removeChild(notification);
-                            }
-                        }, 300);
-                    }, 3000);
-                },
-
-                // ================================================================
-                // SCANNER STATUS HELPERS
-                // ================================================================
-
-                getScannerStatusClass() {
-                    const classes = {
-                        'disconnected': 'text-gray-500',
-                        'connecting': 'text-yellow-500',
-                        'connected': 'text-blue-500',
-                        'scanning': 'text-green-500',
-                        'error': 'text-red-500'
-                    };
-
-                    return classes[this.scannerStatus] || 'text-gray-500';
-                },
-
-                getScannerStatusText() {
-                    const texts = {
-                        'disconnected': 'Tidak Terhubung',
-                        'connecting': 'Menghubungkan...',
-                        'connected': 'Terhubung',
-                        'scanning': 'Aktif Scanning',
-                        'error': 'Error'
-                    };
-
-                    return texts[this.scannerStatus] || 'Unknown';
-                },
-
-                getScannerTypeText() {
-                    const types = {
-                        'hid': 'USB HID (Keyboard)',
-                        'usb': 'USB Direct',
-                        'serial': 'Serial Port',
-                        'auto': 'Auto Detect'
-                    };
-
-                    return types[this.scannerType] || 'Unknown';
-                },
-
-                // ================================================================
-                // EXISTING METHODS (Mode control, QR Scanner, etc.)
-                // ================================================================
-
-                // Mode control
-                toggleMode() {
-                    this.isMultiMode = !this.isMultiMode;
-                    this.clearSelection();
+                if (!this.isMultiMode) {
                     this.stopQRScanner();
-                    this.stopHardwareScanner();
-                    console.log('Mode switched to:', this.isMultiMode ? 'Multi' : 'Single');
-                },
+                }
 
-                // Selection management
-                hasSelectedItems() {
-                    return this.isMultiMode ? this.selectedItems.length > 0 : this.selectedItem !== null;
-                },
+                this.showScanSuccess(`QR Camera: ${item.item_name}`);
 
-                clearSelection() {
-                    this.selectedItem = null;
-                    this.selectedItems = [];
-                    this.searchQuery = '';
-                    this.searchResults = [];
-                },
+            } catch (error) {
+                console.error('❌ QR processing error:', error);
+                this.showNotification('QR Error: ' + error.message, 'error');
+            } finally {
+                this.isProcessingScan = false;
+            }
+        },
 
-                clearAllItems() {
-                    if (confirm('Hapus semua barang dari daftar?')) {
-                        this.selectedItems = [];
-                    }
-                },
+        // ================================================================
+        // SCAN DATA PROCESSING
+        // ================================================================
 
-                removeItem(index) {
-                    this.selectedItems.splice(index, 1);
-                },
+        async handleHardwareScan(scanData) {
+            // Skip empty or duplicate scans
+            if (!scanData || scanData === this.lastScannedCode) {
+                console.log('⚠️ Skipping empty/duplicate scan');
+                this.isProcessingScan = false;
+                return;
+            }
 
-                isItemAlreadySelected(item) {
-                    if (this.isMultiMode) {
-                        return this.selectedItems.some(selected => selected.item_detail_id === item.item_detail_id);
-                    } else {
-                        return this.selectedItem && this.selectedItem.item_detail_id === item.item_detail_id;
-                    }
-                },
+            console.log('📡 Processing hardware scan:', scanData);
+            this.lastScannedCode = scanData;
 
-                addItemToSelection(item) {
-                    if (this.isMultiMode) {
-                        // Multi mode: add to array if not already selected
-                        if (!this.isItemAlreadySelected(item)) {
-                            this.selectedItems.push(item);
-                            console.log('Added item to multi selection:', item.item_name);
-                        } else {
-                            this.showNotification('Item sudah ada dalam daftar!', 'warning');
-                        }
-                    } else {
-                        // Single mode: replace current selection
-                        this.selectedItem = item;
-                        this.form.from_location = item.location || '';
-                        console.log('Selected single item:', item.item_name);
-                    }
+            try {
+                if (this.scanDebounceTimeout) {
+                    clearTimeout(this.scanDebounceTimeout);
+                }
 
-                    // Clear search
-                    this.searchQuery = '';
-                    this.searchResults = [];
-                },
+                await this.processScanData(scanData);
 
-                // QR Camera Scanner
-                toggleQRScanner() {
-                    if (this.qrScannerActive) {
-                        this.stopQRScanner();
-                    } else {
-                        this.startQRScanner();
-                    }
-                },
-
-                async startQRScanner() {
-                    try {
-                        const videoElement = document.getElementById('flexible-qr-scanner');
-
-                        await this.codeReader.decodeFromVideoDevice(
-                            undefined,
-                            videoElement,
-                            (result, error) => {
-                                if (result) {
-                                    console.log('QR detected:', result.text);
-                                    this.handleQRScan(result.text);
-                                }
-                            }
-                        );
-
-                        this.qrScannerActive = true;
-                        console.log('QR Camera Scanner started');
-
-                    } catch (error) {
-                        console.error('QR Scanner error:', error);
-                        this.showNotification('Camera error: ' + error.message, 'error');
-                    }
-                },
-
-                stopQRScanner() {
-                    if (this.codeReader && this.qrScannerActive) {
-                        this.codeReader.reset();
-                        this.qrScannerActive = false;
-                        console.log('QR Camera Scanner stopped');
-                    }
-                },
-
-                async handleQRScan(qrText) {
-                    try {
-                        // Parse QR data
-                        let qrData;
-                        try {
-                            qrData = JSON.parse(qrText);
-                        } catch (parseError) {
-                            throw new Error('QR Code format tidak valid');
-                        }
-
-                        if (qrData.type !== 'item_detail' || !qrData.item_detail_id) {
-                            throw new Error('QR Code bukan untuk item detail');
-                        }
-
-                        // Create item object from QR
-                        const item = {
-                            item_detail_id: qrData.item_detail_id,
-                            item_name: qrData.item_name,
-                            item_code: qrData.item_code,
-                            serial_number: qrData.serial_number,
-                            item_id: qrData.item_id,
-                            current_status: 'available',
-                            location: 'Warehouse'
-                        };
-
-                        // Add to selection based on mode
-                        this.addItemToSelection(item);
-
-                        // In single mode, stop scanner after successful scan
-                        if (!this.isMultiMode) {
-                            this.stopQRScanner();
-                        }
-
-                        this.showScanSuccess(`QR Camera: ${item.item_name}`);
-
-                    } catch (error) {
-                        console.error('QR processing error:', error);
-                        this.showNotification('QR Code Error: ' + error.message, 'error');
-                    }
-                },
-
-                // Manual search methods
-                async searchItems() {
-                    if (this.searchQuery.length < 2) {
-                        this.searchResults = [];
-                        return;
-                    }
-
-                    try {
-                        const response = await fetch('/api/requests/search-items?' + new URLSearchParams({
-                            query: this.searchQuery
-                        }));
-
-                        const data = await response.json();
-
-                        if (data.success) {
-                            this.searchResults = data.items;
-                        } else {
-                            this.searchResults = [];
-                        }
-                    } catch (error) {
-                        console.error('Search error:', error);
-                        this.searchResults = [];
-                    }
-                },
-
-                // API Ticket Integration
-                async fetchTicketIds() {
-                    this.loadingTickets = true;
-                    this.apiError = null;
-
-                    try {
-                        console.log('Fetching ticket IDs from API...');
-
-                        const response = await fetch('https://befast.fiberone.net.id/api/tickets/active-ids', {
-                            method: 'GET',
-                            headers: {
-                                'Accept': 'application/json',
-                                'Content-Type': 'application/json',
-                            },
-                            // Add timeout
-                            signal: AbortSignal.timeout(10000) // 10 seconds timeout
-                        });
-
-                        if (!response.ok) {
-                            throw new Error(`API Error: ${response.status} ${response.statusText}`);
-                        }
-
-                        const data = await response.json();
-
-                        // Validate response is array
-                        if (!Array.isArray(data)) {
-                            throw new Error('Invalid API response format');
-                        }
-
-                        this.ticketIds = data;
-                        this.lastFetched = new Date().toLocaleTimeString('id-ID', {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                        });
-
-                        console.log(`✅ Loaded ${this.ticketIds.length} ticket IDs:`, this.ticketIds);
-
-                    } catch (error) {
-                        console.error('❌ Failed to fetch ticket IDs:', error);
-                        this.apiError = error.message;
-                        this.ticketIds = [];
-
-                        // Fallback ke manual input jika API gagal
-                        this.showTicketApiError(error.message);
-                    } finally {
-                        this.loadingTickets = false;
-                    }
-                },
-
-                showTicketApiError(errorMessage) {
-                    console.warn('API Ticket Error:', errorMessage);
-
-                    // Auto-switch ke manual input jika API fail
-                    setTimeout(() => {
-                        if (this.ticketIds.length === 0) {
-                            this.form.reference_type = 'manual';
-                            this.showNotification(
-                                '❌ Gagal memuat ticket dari API. Silakan input manual atau pilih tipe reference lain.',
-                                'warning');
-                        }
-                    }, 2000);
-                },
-
-                handleReferenceTypeChange() {
-                    // Reset reference_id when type changes
-                    this.form.reference_id = '';
-                    this.apiError = null;
-
-                    // Auto-fetch tickets jika pilih type ticket
-                    if (this.form.reference_type === 'ticket') {
-                        // Only fetch if not already loaded or if last fetch was > 5 minutes ago
-                        const shouldFetch = this.ticketIds.length === 0 ||
-                            !this.lastFetched ||
-                            this.isDataStale();
-
-                        if (shouldFetch) {
-                            this.fetchTicketIds();
-                        }
-                    }
-                },
-
-                isDataStale() {
-                    if (!this.lastFetched) return true;
-
-                    const now = new Date();
-                    const lastFetch = new Date();
-                    const [hours, minutes] = this.lastFetched.split(':');
-                    lastFetch.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-
-                    // Consider data stale after 5 minutes
-                    return (now - lastFetch) > 5 * 60 * 1000;
-                },
-
-                getReferenceIdPlaceholder() {
-                    const placeholders = {
-                        'po': 'Nomor Purchase Order',
-                        'gr': 'Nomor Goods Received',
-                        'maintenance': 'ID Maintenance Request',
-                        'project': 'Kode Project',
-                        'manual': 'Input manual reference ID',
-                        '': 'Pilih reference type terlebih dahulu'
-                    };
-
-                    return placeholders[this.form.reference_type] ;
-                },
-
-                // Form submission
-                async submitFlexibleTransaction() {
-                    if (!this.hasSelectedItems() || !this.form.transaction_type) {
-                        this.showNotification('Pilih barang dan tipe transaksi terlebih dahulu', 'warning');
-                        return;
-                    }
-
-                    this.loading = true;
-
-                    try {
-                        let payload;
-
-                        if (this.isMultiMode) {
-                            // Multi-item payload
-                            payload = {
-                                transaction_type: this.form.transaction_type,
-                                reference_type: this.form.reference_type || null,
-                                reference_id: this.form.reference_id || null,
-                                from_location: this.form.from_location || null,
-                                to_location: this.form.to_location || null,
-                                notes: this.form.notes || null,
-                                items: this.selectedItems.map(item => ({
-                                    item_detail_id: item.item_detail_id,
-                                    notes: null
-                                }))
-                            };
-                        } else {
-                            // Single-item payload
-                            payload = {
-                                transaction_type: this.form.transaction_type,
-                                reference_type: this.form.reference_type || null,
-                                reference_id: this.form.reference_id || null,
-                                from_location: this.form.from_location || null,
-                                to_location: this.form.to_location || null,
-                                notes: this.form.notes || null,
-                                item_detail_id: this.selectedItem.item_detail_id
-                            };
-                        }
-
-                        console.log('Submitting flexible transaction:', payload);
-
-                        const response = await fetch('{{ route('transactions.store') }}', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                                'Accept': 'application/json'
-                            },
-                            body: JSON.stringify(payload)
-                        });
-
-                        const data = await response.json();
-                        console.log('Response:', data);
-
-                        if (response.ok && data.success) {
-                            const itemsCount = data.transaction?.items_count || 1;
-                            const transactionType = data.transaction?.type || 'single';
-
-                            let successMessage = '✅ Transaksi berhasil dibuat!\n\n';
-                            successMessage += `Transaction ID: ${data.transaction.transaction_id}\n`;
-                            successMessage += `Type: ${transactionType.toUpperCase()}\n`;
-                            successMessage += `Items: ${itemsCount} barang\n`;
-
-                            // Show reference info if available
-                            if (this.form.reference_id) {
-                                successMessage += `Reference: ${this.form.reference_id}\n`;
-                            }
-
-                            successMessage += '\n' + data.message;
-
-                            alert(successMessage);
-
-                            // Cleanup before redirect
-                            this.cleanup();
-
-                            // Redirect to transactions list
-                            window.location.href = '{{ route('transactions.index') }}';
-                        } else {
-                            this.showNotification('❌ Error: ' + (data.message || 'Failed to create transaction'),
-                                'error');
-                        }
-
-                    } catch (error) {
-                        console.error('Submit error:', error);
-                        this.showNotification('❌ Error: ' + error.message, 'error');
-                    } finally {
-                        this.loading = false;
-                    }
-                },
-
-                resetForm() {
-                    this.clearSelection();
-                    this.stopQRScanner();
-                    this.stopHardwareScanner();
-
-                    this.form = {
-                        transaction_type: '',
-                        reference_type: '',
-                        reference_id: '',
-                        from_location: '',
-                        to_location: '',
-                        notes: ''
-                    };
-
-                    // Clear API data
-                    this.apiError = null;
+            } catch (error) {
+                console.error('❌ Scan processing error:', error);
+                this.showNotification('Error: ' + error.message, 'error');
+            } finally {
+                this.scanDebounceTimeout = setTimeout(() => {
+                    this.isProcessingScan = false;
                     this.lastScannedCode = null;
+                }, 1000);
+            }
+        },
 
-                    this.showNotification('Form telah direset', 'info');
+        async processScanData(scanData) {
+            console.log('🔄 Processing scan data:', scanData);
+
+            // Try JSON parsing (QR codes)
+            try {
+                const qrData = JSON.parse(scanData);
+                if (qrData.type === 'item_detail' && qrData.item_detail_id) {
+                    console.log('📱 QR data detected');
+                    await this.processQRData(qrData);
+                    return;
+                }
+            } catch (parseError) {
+                console.log('📊 Processing as barcode');
+            }
+
+            // Process as barcode
+            await this.processBarcodeData(scanData);
+        },
+
+        async processQRData(qrData) {
+            console.log('📱 Processing QR data:', qrData);
+
+            if (!qrData.item_detail_id || !qrData.item_name) {
+                throw new Error('QR data incomplete');
+            }
+
+            const item = {
+                item_detail_id: qrData.item_detail_id,
+                item_name: qrData.item_name || 'Unknown Item',
+                item_code: qrData.item_code || 'N/A',
+                serial_number: qrData.serial_number || 'N/A',
+                item_id: qrData.item_id || null,
+                current_status: qrData.current_status || 'available',
+                location: qrData.location || 'Warehouse'
+            };
+
+            this.addItemToSelection(item);
+            this.showScanSuccess(`QR Code: ${item.item_name}`);
+        },
+
+        async processBarcodeData(barcodeData) {
+            console.log('📊 Processing barcode:', barcodeData);
+
+            try {
+                this.loading = true;
+
+                const response = await fetch('/api/items/search-by-barcode?' + new URLSearchParams({
+                    barcode: barcodeData,
+                    include_details: 'true'
+                }), {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    },
+                    signal: AbortSignal.timeout(5000)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.success && data.item) {
+                    if (!data.item.item_detail_id) {
+                        throw new Error('Invalid item data');
+                    }
+
+                    this.addItemToSelection(data.item);
+                    this.showScanSuccess(`Barcode: ${data.item.item_name}`);
+                } else {
+                    throw new Error(data.message || 'Item tidak ditemukan');
+                }
+
+            } catch (error) {
+                console.error('❌ Barcode error:', error);
+
+                const errorMsg = error.name === 'AbortError' ?
+                    'Request timeout' : error.message;
+
+                this.showNotification('Barcode Error: ' + errorMsg, 'error');
+                this.showBarcodeInputDialog(barcodeData);
+
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        showBarcodeInputDialog(barcodeData) {
+            const action = confirm(
+                `Barcode: ${barcodeData}\n\nItem tidak ditemukan.\nCari manual?`
+            );
+
+            if (action) {
+                this.inputMethod = 'manual';
+                this.searchQuery = barcodeData;
+                this.searchItems();
+            }
+        },
+
+        // ================================================================
+        // MANUAL SEARCH
+        // ================================================================
+
+        async searchItems() {
+            if (this.searchQuery.length < 2) {
+                this.searchResults = [];
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/requests/search-items?' + new URLSearchParams({
+                    query: this.searchQuery
+                }));
+
+                const data = await response.json();
+                this.searchResults = data.success ? data.items : [];
+
+            } catch (error) {
+                console.error('❌ Search error:', error);
+                this.searchResults = [];
+            }
+        },
+
+        // ================================================================
+        // SELECTION MANAGEMENT
+        // ================================================================
+
+        toggleMode() {
+            this.isMultiMode = !this.isMultiMode;
+            this.clearSelection();
+            this.stopQRScanner();
+            this.stopHardwareScanner();
+            console.log('Mode switched:', this.isMultiMode ? 'Multi' : 'Single');
+        },
+
+        hasSelectedItems() {
+            return this.isMultiMode ? this.selectedItems.length > 0 : this.selectedItem !== null;
+        },
+
+        clearSelection() {
+            this.selectedItem = null;
+            this.selectedItems = [];
+            this.searchQuery = '';
+            this.searchResults = [];
+        },
+
+        clearAllItems() {
+            if (confirm('Hapus semua barang?')) {
+                this.selectedItems = [];
+            }
+        },
+
+        removeItem(index) {
+            this.selectedItems.splice(index, 1);
+        },
+
+        isItemAlreadySelected(item) {
+            if (this.isMultiMode) {
+                return this.selectedItems.some(selected =>
+                    selected.item_detail_id === item.item_detail_id);
+            } else {
+                return this.selectedItem?.item_detail_id === item.item_detail_id;
+            }
+        },
+
+        addItemToSelection(item) {
+            if (this.isMultiMode) {
+                if (!this.isItemAlreadySelected(item)) {
+                    this.selectedItems.push(item);
+                    console.log('✅ Added to multi selection:', item.item_name);
+                } else {
+                    this.showNotification('Item sudah ada!', 'warning');
+                }
+            } else {
+                this.selectedItem = item;
+                this.form.from_location = item.location || '';
+                console.log('✅ Selected single item:', item.item_name);
+            }
+
+            this.searchQuery = '';
+            this.searchResults = [];
+        },
+
+        // ================================================================
+        // API INTEGRATION
+        // ================================================================
+
+        async fetchTicketIds() {
+            this.loadingTickets = true;
+            this.apiError = null;
+
+            try {
+                console.log('🎫 Fetching ticket IDs from API...');
+
+                const response = await fetch('https://befast.fiberone.net.id/api/tickets/active-ids', {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                    },
+                    signal: AbortSignal.timeout(10000)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status} ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                if (!Array.isArray(data)) {
+                    throw new Error('Invalid API response format');
+                }
+
+                this.ticketIds = data;
+                this.lastFetched = new Date().toLocaleTimeString('id-ID', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                console.log(`✅ Loaded ${this.ticketIds.length} ticket IDs`);
+
+            } catch (error) {
+                console.error('❌ Failed to fetch tickets:', error);
+                this.apiError = error.message;
+                this.ticketIds = [];
+                this.showTicketApiError(error.message);
+            } finally {
+                this.loadingTickets = false;
+            }
+        },
+
+        showTicketApiError(errorMessage) {
+            console.warn('API Ticket Error:', errorMessage);
+
+            setTimeout(() => {
+                if (this.ticketIds.length === 0) {
+                    this.showNotification(
+                        '❌ Gagal memuat ticket dari API. Input manual atau pilih tipe lain.',
+                        'warning'
+                    );
+                }
+            }, 2000);
+        },
+
+        handleReferenceTypeChange() {
+            this.form.reference_id = '';
+            this.apiError = null;
+
+            if (this.form.reference_type === 'ticket') {
+                const shouldFetch = this.ticketIds.length === 0 ||
+                    !this.lastFetched ||
+                    this.isDataStale();
+
+                if (shouldFetch) {
+                    this.fetchTicketIds();
                 }
             }
+        },
+
+        isDataStale() {
+            if (!this.lastFetched) return true;
+
+            const now = new Date();
+            const lastFetch = new Date();
+            const [hours, minutes] = this.lastFetched.split(':');
+            lastFetch.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+
+            return (now - lastFetch) > 5 * 60 * 1000; // 5 minutes
+        },
+
+        getReferenceIdPlaceholder() {
+            const placeholders = {
+                'po': 'Nomor Purchase Order',
+                'gr': 'Nomor Goods Received',
+                'maintenance': 'ID Maintenance Request',
+                'project': 'Kode Project',
+                'manual': 'Input manual reference ID',
+                '': 'Pilih reference type terlebih dahulu'
+            };
+
+            return placeholders[this.form.reference_type] || placeholders[''];
+        },
+
+        // ================================================================
+        // FORM SUBMISSION
+        // ================================================================
+
+        async submitFlexibleTransaction() {
+            if (!this.hasSelectedItems() || !this.form.transaction_type) {
+                this.showNotification('Pilih barang dan tipe transaksi', 'warning');
+                return;
+            }
+
+            this.loading = true;
+
+            try {
+                let payload;
+
+                if (this.isMultiMode) {
+                    payload = {
+                        transaction_type: this.form.transaction_type,
+                        reference_type: this.form.reference_type || null,
+                        reference_id: this.form.reference_id || null,
+                        from_location: this.form.from_location || null,
+                        to_location: this.form.to_location || null,
+                        notes: this.form.notes || null,
+                        items: this.selectedItems.map(item => ({
+                            item_detail_id: item.item_detail_id,
+                            notes: null
+                        }))
+                    };
+                } else {
+                    payload = {
+                        transaction_type: this.form.transaction_type,
+                        reference_type: this.form.reference_type || null,
+                        reference_id: this.form.reference_id || null,
+                        from_location: this.form.from_location || null,
+                        to_location: this.form.to_location || null,
+                        notes: this.form.notes || null,
+                        item_detail_id: this.selectedItem.item_detail_id
+                    };
+                }
+
+                console.log('📤 Submitting transaction:', payload);
+
+                const response = await fetch(window.location.origin + '/transactions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                console.log('📥 Response:', data);
+
+                if (response.ok && data.success) {
+                    const itemsCount = data.transaction?.items_count || 1;
+                    const transactionType = data.transaction?.type || 'single';
+
+                    let successMessage = '✅ Transaksi berhasil dibuat!\n\n';
+                    successMessage += `Transaction ID: ${data.transaction.transaction_id}\n`;
+                    successMessage += `Type: ${transactionType.toUpperCase()}\n`;
+                    successMessage += `Items: ${itemsCount} barang\n`;
+
+                    if (this.form.reference_id) {
+                        successMessage += `Reference: ${this.form.reference_id}\n`;
+                    }
+
+                    successMessage += '\n' + data.message;
+
+                    alert(successMessage);
+                    this.cleanup();
+                    window.location.href = window.location.origin + '/transactions';
+                } else {
+                    this.showNotification('❌ Error: ' + (data.message || 'Failed to create transaction'), 'error');
+                }
+
+            } catch (error) {
+                console.error('❌ Submit error:', error);
+                this.showNotification('❌ Error: ' + error.message, 'error');
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        resetForm() {
+            this.clearSelection();
+            this.stopQRScanner();
+            this.stopHardwareScanner();
+
+            this.form = {
+                transaction_type: '',
+                reference_type: '',
+                reference_id: '',
+                from_location: '',
+                to_location: '',
+                notes: ''
+            };
+
+            this.apiError = null;
+            this.lastScannedCode = null;
+            this.showNotification('Form telah direset', 'info');
+        },
+
+        // ================================================================
+        // UTILITY FUNCTIONS
+        // ================================================================
+
+        getScannerStatusClass() {
+            const classes = {
+                'disconnected': 'text-gray-500',
+                'connecting': 'text-yellow-500',
+                'connected': 'text-blue-500',
+                'scanning': 'text-green-500',
+                'error': 'text-red-500'
+            };
+
+            return classes[this.scannerStatus] || 'text-gray-500';
+        },
+
+        getScannerStatusText() {
+            const texts = {
+                'disconnected': 'Tidak Terhubung',
+                'connecting': 'Menghubungkan...',
+                'connected': 'Terhubung',
+                'scanning': 'Aktif Scanning',
+                'error': 'Error'
+            };
+
+            return texts[this.scannerStatus] || 'Unknown';
+        },
+
+        getScannerTypeText() {
+            const types = {
+                'hid': 'USB HID (Keyboard)',
+                'usb': 'USB Direct',
+                'serial': 'Serial Port',
+                'auto': 'Auto Detect'
+            };
+
+            return types[this.scannerType] || 'Unknown';
+        },
+
+        showScanSuccess(message) {
+            this.showNotification('✅ ' + message, 'success');
+            this.playBeepSound();
+        },
+
+        playBeepSound() {
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.frequency.value = 800;
+                oscillator.type = 'square';
+
+                gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.1);
+            } catch (error) {
+                // Ignore audio errors
+            }
+        },
+
+        showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            const colors = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                warning: 'bg-yellow-500',
+                info: 'bg-blue-500'
+            };
+
+            notification.className =
+                `fixed top-4 right-4 ${colors[type]} text-white px-4 py-2 rounded-lg shadow-lg z-50 transform transition-transform duration-300`;
+            notification.textContent = message;
+            notification.style.transform = 'translateX(100%)';
+
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.style.transform = 'translateX(0)';
+            }, 10);
+
+            setTimeout(() => {
+                notification.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        },
+
+        // ================================================================
+        // LIFECYCLE MANAGEMENT
+        // ================================================================
+
+        pauseScanners() {
+            if (this.qrScannerActive) {
+                this.stopQRScanner();
+                this.wasQRActive = true;
+            }
+
+            if (this.hardwareScannerActive) {
+                this.stopHardwareScanner();
+                this.wasHardwareActive = true;
+            }
+        },
+
+        resumeScanners() {
+            if (this.wasQRActive) {
+                this.startQRScanner();
+                this.wasQRActive = false;
+            }
+
+            if (this.wasHardwareActive) {
+                this.startHardwareScanner();
+                this.wasHardwareActive = false;
+            }
+        },
+
+        cleanup() {
+            console.log('🧹 Cleaning up scanners...');
+
+            this.stopQRScanner();
+            this.disconnectHardwareScanner();
+
+            // Clear timeouts
+            if (this.scanTimeout) {
+                clearTimeout(this.scanTimeout);
+            }
+
+            if (this.scanDebounceTimeout) {
+                clearTimeout(this.scanDebounceTimeout);
+            }
+
+            // Reset states
+            this.resetScanBuffer();
+            this.lastScannedCode = null;
+
+            console.log('✅ Cleanup completed');
+        },
+
+        // ================================================================
+        // DEBUG FUNCTIONS
+        // ================================================================
+
+        debugScannerStatus() {
+            console.log('🔍 Scanner Debug Info:', {
+                hardwareScannerActive: this.hardwareScannerActive,
+                qrScannerActive: this.qrScannerActive,
+                scannerStatus: this.scannerStatus,
+                scannerType: this.scannerType,
+                scanBuffer: this.scanBuffer,
+                isProcessingScan: this.isProcessingScan,
+                lastScannedCode: this.lastScannedCode,
+                selectedItemsCount: this.isMultiMode ? this.selectedItems.length : (this.selectedItem ? 1 : 0),
+                inputMethod: this.inputMethod,
+                isMultiMode: this.isMultiMode
+            });
+        },
+
+        clearScanBuffer() {
+            console.log('🧹 Manually clearing scan buffer');
+            this.resetScanBuffer();
+            this.showNotification('Buffer cleared', 'info');
+        },
+
+        testBeep() {
+            this.playBeepSound();
+            this.showNotification('Test beep played', 'info');
+        },
+
+        testNotification(type = 'info') {
+            this.showNotification(`Test ${type} notification`, type);
         }
-    </script>
+    }
+}  </script>
+@endpush
