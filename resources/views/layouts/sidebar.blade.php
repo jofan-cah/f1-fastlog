@@ -83,7 +83,7 @@
                            {{ $masterMenuActive ? 'bg-red-600/20 text-red-400 border border-red-500/30' : 'text-gray-300 hover:text-white hover:bg-white/10' }}">
                 <div class="flex items-center space-x-3">
                     <i class="fas fa-database group-hover:scale-110 transition-transform"></i>
-                    <span class="font-medium">Data Master</span>
+                    <span class="font-medium">Data Barang</span>
                 </div>
                 <i id="master-icon" class="fas fa-chevron-down transition-transform {{ $masterMenuActive ? 'rotate-180' : '' }}"></i>
             </button>
@@ -100,7 +100,7 @@
                     <a href="{{ route('items.index') }}"
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
                               {{ request()->routeIs('items.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
-                        Data Barang
+                        Jenis Barang
                     </a>
                     @endcanAccess
                     @canAccess('suppliers', 'read')
