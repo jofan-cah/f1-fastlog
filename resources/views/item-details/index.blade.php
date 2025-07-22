@@ -356,7 +356,7 @@
                                         </button>
 
                                         <!-- Show QR Code -->
-                                        <button @click="showQRModal('{{ $itemDetail->qr_code ?: 'Not generated yet' }}', '{{ addslashes($itemDetail->serial_number) }}', '{{ $itemDetail->item_detail_id }}')"
+                                        {{-- <button @click="showQRModal('{{ $itemDetail->qr_code ?: 'Not generated yet' }}', '{{ addslashes($itemDetail->serial_number) }}', '{{ $itemDetail->item_detail_id }}')"
                                             class="text-purple-600 hover:text-purple-900 p-2 hover:bg-purple-50 rounded-lg transition-all duration-200"
                                             title="Show QR Code">
                                             <i class="fas fa-qrcode"></i>
@@ -399,7 +399,7 @@
                                                     </a>
                                                 </div>
                                             </div>
-                                        </div>
+                                        </div> --}}
                                     </div>
                                 </td>
                             </tr>
