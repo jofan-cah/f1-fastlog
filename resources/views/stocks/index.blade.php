@@ -20,11 +20,11 @@
                 <i class="fas fa-plus-minus"></i>
                 <span>Bulk Adjustment</span>
             </a> --}}
-            <a href="{{ route('stocks.adjust') }}"
+            {{-- <a href="{{ route('stocks.adjust') }}"
                class="px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl hover:from-red-700 hover:to-red-800 transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl">
                 <i class="fas fa-edit"></i>
                 <span>Adjust Stok</span>
-            </a>
+            </a> --}}
         </div>
     </div>
 
@@ -340,16 +340,16 @@
                                        title="Adjust Stok">
                                         <i class="fas fa-edit"></i>
                                     </a>
-                                    <button @click="showQuickAdjustModal('{{ $stock->stock_id }}', '{{ addslashes($stock->item->item_name) }}', {{ $stock->quantity_available }}, {{ $stock->quantity_used }}, '{{ $stock->item->unit }}')"
+                                    {{-- <button @click="showQuickAdjustModal('{{ $stock->stock_id }}', '{{ addslashes($stock->item->item_name) }}', {{ $stock->quantity_available }}, {{ $stock->quantity_used }}, '{{ $stock->item->unit }}')"
                                             class="text-purple-600 hover:text-purple-900 p-2 hover:bg-purple-50 rounded-lg transition-all duration-200"
                                             title="Quick Adjust">
                                         <i class="fas fa-plus-minus"></i>
-                                    </button>
-                                    <button @click="showStockHistoryModal('{{ $stock->stock_id }}', '{{ addslashes($stock->item->item_name) }}')"
+                                    </button> --}}
+                                    {{-- <button @click="showStockHistoryModal('{{ $stock->stock_id }}', '{{ addslashes($stock->item->item_name) }}')"
                                             class="text-indigo-600 hover:text-indigo-900 p-2 hover:bg-indigo-50 rounded-lg transition-all duration-200"
                                             title="Lihat History">
                                         <i class="fas fa-history"></i>
-                                    </button>
+                                    </button> --}}
                                 </div>
                             </td>
                         </tr>
