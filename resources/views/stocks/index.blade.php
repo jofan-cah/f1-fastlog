@@ -202,7 +202,7 @@
                         <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             <a href="{{ route('stocks.index', array_merge(request()->query(), ['sort' => 'quantity_available', 'direction' => $sortField == 'quantity_available' && $sortDirection == 'asc' ? 'desc' : 'asc'])) }}"
                                class="flex items-center space-x-1 hover:text-gray-700">
-                                <span>Stok Tersedia</span>
+                                <span>Stok Gudang</span>
                                 @if($sortField == 'quantity_available')
                                     <i class="fas fa-sort-{{ $sortDirection == 'asc' ? 'up' : 'down' }} text-red-500"></i>
                                 @else
@@ -213,7 +213,7 @@
                         <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             <a href="{{ route('stocks.index', array_merge(request()->query(), ['sort' => 'quantity_used', 'direction' => $sortField == 'quantity_used' && $sortDirection == 'asc' ? 'desc' : 'asc'])) }}"
                                class="flex items-center space-x-1 hover:text-gray-700">
-                                <span>Stok Terpakai</span>
+                                <span>Stok Siap Pakai</span>
                                 @if($sortField == 'quantity_used')
                                     <i class="fas fa-sort-{{ $sortDirection == 'asc' ? 'up' : 'down' }} text-red-500"></i>
                                 @else
