@@ -29,7 +29,7 @@
     </div>
 
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
             <div class="flex items-center">
                 <div class="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center">
@@ -52,7 +52,7 @@
                 </div>
             </div>
         </div>
-        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+        {{-- <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
             <div class="flex items-center">
                 <div class="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
                     <i class="fas fa-thumbs-up text-white text-lg"></i>
@@ -62,7 +62,7 @@
                     <p class="text-2xl font-bold text-gray-900">{{ $summary['sufficient_items'] }}</p>
                 </div>
             </div>
-        </div>
+        </div> --}}
         <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
             <div class="flex items-center">
                 <div class="w-12 h-12 bg-gradient-to-br from-yellow-600 to-yellow-700 rounded-xl flex items-center justify-center">

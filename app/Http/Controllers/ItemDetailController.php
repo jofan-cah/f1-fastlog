@@ -23,25 +23,22 @@ class ItemDetailController extends Controller
     }
 
     // Tampilkan daftar item details
+    //misal ini index saya nambahin per page
     public function index(Request $request)
     {
         $query = ItemDetail::with(['item.category', 'goodsReceivedDetail.goodsReceived']);
-
         // Filter by item
         if ($request->filled('item_id')) {
             $query->byItem($request->item_id);
         }
-
         // Filter by status
         if ($request->filled('status')) {
             $query->byStatus($request->status);
         }
-
         // Filter by location
         if ($request->filled('location')) {
             $query->byLocation($request->location);
         }
-
         // Search by serial number
         if ($request->filled('search')) {
             $search = $request->search;
@@ -54,17 +51,27 @@ class ItemDetailController extends Controller
                     });
             });
         }
+        // Custom pagination - get per_page value from request or default to 20
+        $perPage = $request->input('per_page', 25);
 
-        $itemDetails = $query->orderBy('created_at', 'desc')->paginate(20);
+        // Validate per_page value to prevent abuse
+        $allowedPerPage = [ 25, 50, 100, 1000];
+        if (!in_array($perPage, $allowedPerPage)) {
+            $perPage = 25; // fallback to default
+        }
+        $itemDetails = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
+        // Append query parameters to pagination links
+        $itemDetails->appends($request->query());
         // Filter options
         $items = Item::active()->orderBy('item_name')->get();
-        $statuses = ['available', 'used', 'damaged', 'maintenance', 'reserved','stock'];
+        $statuses = ['available', 'used', 'damaged', 'maintenance', 'reserved', 'stock'];
         $locations = ItemDetail::distinct('location')->pluck('location')->filter();
 
-        return view('item-details.index', compact('itemDetails', 'items', 'statuses', 'locations'));
+        // Per page options
+        $perPageOptions = [ 25, 50,100, 1000];
+        return view('item-details.index', compact('itemDetails', 'items', 'statuses', 'locations', 'perPageOptions', 'perPage'));
     }
-
     // Tampilkan detail item
     public function show(ItemDetail $itemDetail)
     {
@@ -915,140 +922,138 @@ class ItemDetailController extends Controller
         return view('item-details.qr-labels-print', compact('itemDetails', 'printConfig', 'dimensions'));
     }
 
-public function bulkUpdateStatusFromStock(Request $request)
-{
-    $validator = Validator::make($request->all(), [
-        'changes' => 'required|array|min:1',
-        'changes.*.item_detail_id' => 'required|string|exists:item_details,item_detail_id',
-        'changes.*.status' => 'required|in:available,used,damaged,maintenance,reserved,stock',
-        'changes.*.location' => 'nullable|string|max:100',
-        'changes.*.notes' => 'nullable|string|max:500',
-    ]);
+    public function bulkUpdateStatusFromStock(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'changes' => 'required|array|min:1',
+            'changes.*.item_detail_id' => 'required|string|exists:item_details,item_detail_id',
+            'changes.*.status' => 'required|in:available,used,damaged,maintenance,reserved,stock',
+            'changes.*.location' => 'nullable|string|max:100',
+            'changes.*.notes' => 'nullable|string|max:500',
+        ]);
 
-    if ($validator->fails()) {
-        return response()->json([
-            'success' => false,
-            'errors' => $validator->errors()
-        ], 422);
-    }
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
 
-    try {
-        DB::beginTransaction();
+        try {
+            DB::beginTransaction();
 
-        $changes = $request->changes;
-        $updatedCount = 0;
-        $stocksSynced = [];
-        $errors = [];
-        $affectedStockIds = []; // Track unique stock IDs
+            $changes = $request->changes;
+            $updatedCount = 0;
+            $stocksSynced = [];
+            $errors = [];
+            $affectedStockIds = []; // Track unique stock IDs
 
-        foreach ($changes as $change) {
-            try {
-                $itemDetail = ItemDetail::with('item.stock')->find($change['item_detail_id']);
+            foreach ($changes as $change) {
+                try {
+                    $itemDetail = ItemDetail::with('item.stock')->find($change['item_detail_id']);
 
-                if (!$itemDetail) {
+                    if (!$itemDetail) {
+                        $errors[] = [
+                            'item_detail_id' => $change['item_detail_id'],
+                            'error' => 'Item detail not found'
+                        ];
+                        continue;
+                    }
+
+                    $oldStatus = $itemDetail->status;
+                    $newStatus = $change['status'];
+
+                    // Update item detail
+                    $itemDetail->update([
+                        'status' => $newStatus,
+                        'location' => $change['location'] ?? $itemDetail->location,
+                        'notes' => $change['notes'] ?? $itemDetail->notes,
+                    ]);
+
+                    $updatedCount++;
+
+                    // **Collect affected stock IDs untuk sync batch**
+                    $stock = $itemDetail->item->stock;
+                    if ($stock && !in_array($stock->stock_id, $affectedStockIds)) {
+                        $affectedStockIds[] = $stock->stock_id;
+                    }
+
+                    // Log activity
+                    ActivityLog::logActivity('item_details', $itemDetail->item_detail_id, 'bulk_status_update_from_stock', [
+                        'old_status' => $oldStatus
+                    ], [
+                        'new_status' => $newStatus,
+                        'location' => $change['location'],
+                        'notes' => $change['notes'],
+                        'bulk_operation' => true,
+                        'from_stock_management' => true
+                    ]);
+                } catch (\Exception $e) {
                     $errors[] = [
                         'item_detail_id' => $change['item_detail_id'],
-                        'error' => 'Item detail not found'
+                        'error' => $e->getMessage()
                     ];
-                    continue;
                 }
-
-                $oldStatus = $itemDetail->status;
-                $newStatus = $change['status'];
-
-                // Update item detail
-                $itemDetail->update([
-                    'status' => $newStatus,
-                    'location' => $change['location'] ?? $itemDetail->location,
-                    'notes' => $change['notes'] ?? $itemDetail->notes,
-                ]);
-
-                $updatedCount++;
-
-                // **Collect affected stock IDs untuk sync batch**
-                $stock = $itemDetail->item->stock;
-                if ($stock && !in_array($stock->stock_id, $affectedStockIds)) {
-                    $affectedStockIds[] = $stock->stock_id;
-                }
-
-                // Log activity
-                ActivityLog::logActivity('item_details', $itemDetail->item_detail_id, 'bulk_status_update_from_stock', [
-                    'old_status' => $oldStatus
-                ], [
-                    'new_status' => $newStatus,
-                    'location' => $change['location'],
-                    'notes' => $change['notes'],
-                    'bulk_operation' => true,
-                    'from_stock_management' => true
-                ]);
-
-            } catch (\Exception $e) {
-                $errors[] = [
-                    'item_detail_id' => $change['item_detail_id'],
-                    'error' => $e->getMessage()
-                ];
             }
-        }
 
-        // **CRITICAL: Sync semua affected stocks setelah semua item details diupdate**
-        foreach ($affectedStockIds as $stockId) {
-            try {
-                $stock = Stock::find($stockId);
-                if ($stock) {
-                    $syncResult = $stock->syncWithItemDetails();
-                    if ($syncResult['success']) {
-                        $stocksSynced[] = $stockId;
+            // **CRITICAL: Sync semua affected stocks setelah semua item details diupdate**
+            foreach ($affectedStockIds as $stockId) {
+                try {
+                    $stock = Stock::find($stockId);
+                    if ($stock) {
+                        $syncResult = $stock->syncWithItemDetails();
+                        if ($syncResult['success']) {
+                            $stocksSynced[] = $stockId;
 
-                        // Log stock sync
-                        Log::info('Stock auto-synced after bulk item detail update', [
-                            'stock_id' => $stockId,
-                            'sync_result' => $syncResult['changes'],
-                            'triggered_by' => 'bulk_update_status_from_stock'
-                        ]);
+                            // Log stock sync
+                            Log::info('Stock auto-synced after bulk item detail update', [
+                                'stock_id' => $stockId,
+                                'sync_result' => $syncResult['changes'],
+                                'triggered_by' => 'bulk_update_status_from_stock'
+                            ]);
+                        }
                     }
+                } catch (\Exception $e) {
+                    Log::error('Failed to sync stock after bulk update', [
+                        'stock_id' => $stockId,
+                        'error' => $e->getMessage()
+                    ]);
                 }
-            } catch (\Exception $e) {
-                Log::error('Failed to sync stock after bulk update', [
-                    'stock_id' => $stockId,
-                    'error' => $e->getMessage()
-                ]);
             }
-        }
 
-        DB::commit();
+            DB::commit();
 
-        return response()->json([
-            'success' => true,
-            'message' => "Berhasil update {$updatedCount} item details. Stock " . count($stocksSynced) . " item telah disinkronkan.",
-            'data' => [
-                'updated_count' => $updatedCount,
-                'stocks_synced_count' => count($stocksSynced),
-                'stocks_synced' => $stocksSynced,
-                'affected_stock_ids' => $affectedStockIds,
-                'errors_count' => count($errors),
-                'errors' => $errors,
-                'debug_info' => [
-                    'total_changes_requested' => count($changes),
-                    'successful_updates' => $updatedCount,
-                    'unique_stocks_affected' => count($affectedStockIds),
-                    'stocks_successfully_synced' => count($stocksSynced)
+            return response()->json([
+                'success' => true,
+                'message' => "Berhasil update {$updatedCount} item details. Stock " . count($stocksSynced) . " item telah disinkronkan.",
+                'data' => [
+                    'updated_count' => $updatedCount,
+                    'stocks_synced_count' => count($stocksSynced),
+                    'stocks_synced' => $stocksSynced,
+                    'affected_stock_ids' => $affectedStockIds,
+                    'errors_count' => count($errors),
+                    'errors' => $errors,
+                    'debug_info' => [
+                        'total_changes_requested' => count($changes),
+                        'successful_updates' => $updatedCount,
+                        'unique_stocks_affected' => count($affectedStockIds),
+                        'stocks_successfully_synced' => count($stocksSynced)
+                    ]
                 ]
-            ]
-        ]);
+            ]);
+        } catch (\Exception $e) {
+            DB::rollback();
 
-    } catch (\Exception $e) {
-        DB::rollback();
+            Log::error('Bulk update status from stock failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->all()
+            ]);
 
-        Log::error('Bulk update status from stock failed', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
-            'request_data' => $request->all()
-        ]);
-
-        return response()->json([
-            'success' => false,
-            'message' => 'Gagal bulk update: ' . $e->getMessage()
-        ], 500);
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal bulk update: ' . $e->getMessage()
+            ], 500);
+        }
     }
-}
 }

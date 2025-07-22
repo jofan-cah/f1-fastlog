@@ -32,7 +32,8 @@
         <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
             <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
                 <div class="flex items-center">
-                    <div class="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center">
+                    <div
+                        class="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center">
                         <i class="fas fa-boxes text-white text-lg"></i>
                     </div>
                     <div class="ml-4">
@@ -44,19 +45,22 @@
 
             <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
                 <div class="flex items-center">
-                    <div class="w-12 h-12 bg-gradient-to-br from-green-600 to-green-700 rounded-xl flex items-center justify-center">
+                    <div
+                        class="w-12 h-12 bg-gradient-to-br from-green-600 to-green-700 rounded-xl flex items-center justify-center">
                         <i class="fas fa-check-circle text-white text-lg"></i>
                     </div>
                     <div class="ml-4">
                         <p class="text-sm font-medium text-gray-600">Tersedia</p>
-                        <p class="text-2xl font-bold text-gray-900">{{ $itemDetails->where('status', 'available')->count() }}</p>
+                        <p class="text-2xl font-bold text-gray-900">
+                            {{ $itemDetails->where('status', 'available')->count() }}</p>
                     </div>
                 </div>
             </div>
 
             <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
                 <div class="flex items-center">
-                    <div class="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center">
+                    <div
+                        class="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center">
                         <i class="fas fa-tools text-white text-lg"></i>
                     </div>
                     <div class="ml-4">
@@ -68,24 +72,28 @@
 
             <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
                 <div class="flex items-center">
-                    <div class="w-12 h-12 bg-gradient-to-br from-red-600 to-red-700 rounded-xl flex items-center justify-center">
+                    <div
+                        class="w-12 h-12 bg-gradient-to-br from-red-600 to-red-700 rounded-xl flex items-center justify-center">
                         <i class="fas fa-exclamation-triangle text-white text-lg"></i>
                     </div>
                     <div class="ml-4">
                         <p class="text-sm font-medium text-gray-600">Rusak</p>
-                        <p class="text-2xl font-bold text-gray-900">{{ $itemDetails->where('status', 'damaged')->count() }}</p>
+                        <p class="text-2xl font-bold text-gray-900">{{ $itemDetails->where('status', 'damaged')->count() }}
+                        </p>
                     </div>
                 </div>
             </div>
 
             <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
                 <div class="flex items-center">
-                    <div class="w-12 h-12 bg-gradient-to-br from-yellow-600 to-yellow-700 rounded-xl flex items-center justify-center">
+                    <div
+                        class="w-12 h-12 bg-gradient-to-br from-yellow-600 to-yellow-700 rounded-xl flex items-center justify-center">
                         <i class="fas fa-wrench text-white text-lg"></i>
                     </div>
                     <div class="ml-4">
                         <p class="text-sm font-medium text-gray-600">Maintenance</p>
-                        <p class="text-2xl font-bold text-gray-900">{{ $itemDetails->where('status', 'maintenance')->count() }}</p>
+                        <p class="text-2xl font-bold text-gray-900">
+                            {{ $itemDetails->where('status', 'maintenance')->count() }}</p>
                     </div>
                 </div>
             </div>
@@ -101,8 +109,7 @@
                     <span class="text-blue-900 font-medium">
                         <span x-text="selectedItems.length"></span> item dipilih
                     </span>
-                    <button @click="clearSelection()"
-                        class="text-blue-700 hover:text-blue-900 text-sm underline">
+                    <button @click="clearSelection()" class="text-blue-700 hover:text-blue-900 text-sm underline">
                         Clear selection
                     </button>
                 </div>
@@ -150,6 +157,17 @@
                             @endforeach
                         </select>
                     </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Per Halaman</label>
+                        <select name="per_page"
+                            class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                            @foreach ($perPageOptions as $option)
+                                <option value="{{ $option }}" {{ $perPage == $option ? 'selected' : '' }}>
+                                    {{ $option }} items
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
 
                     <!-- Status Filter -->
                     <div>
@@ -160,13 +178,32 @@
                             @foreach ($statuses as $status)
                                 <option value="{{ $status }}" {{ request('status') == $status ? 'selected' : '' }}>
                                     @switch($status)
-                                        @case('stock') Stock @break
-                                        @case('available') Tersedia @break
-                                        @case('used') Terpakai @break
-                                        @case('damaged') Rusak @break
-                                        @case('maintenance') Maintenance @break
-                                        @case('reserved') Reserved @break
-                                        @default {{ ucfirst($status) }}
+                                        @case('stock')
+                                            Stock
+                                        @break
+
+                                        @case('available')
+                                            Tersedia
+                                        @break
+
+                                        @case('used')
+                                            Terpakai
+                                        @break
+
+                                        @case('damaged')
+                                            Rusak
+                                        @break
+
+                                        @case('maintenance')
+                                            Maintenance
+                                        @break
+
+                                        @case('reserved')
+                                            Reserved
+                                        @break
+
+                                        @default
+                                            {{ ucfirst($status) }}
                                     @endswitch
                                 </option>
                             @endforeach
@@ -180,7 +217,8 @@
                             class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
                             <option value="">Semua Lokasi</option>
                             @foreach ($locations as $location)
-                                <option value="{{ $location }}" {{ request('location') == $location ? 'selected' : '' }}>
+                                <option value="{{ $location }}"
+                                    {{ request('location') == $location ? 'selected' : '' }}>
                                     {{ $location }}
                                 </option>
                             @endforeach
@@ -207,6 +245,18 @@
                             class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
                     </div>
                 </div>
+                <!-- TAMBAHKAN: Per Page Filter -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Per Halaman</label>
+                    <select name="per_page"
+                        class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                        @foreach ($perPageOptions as $option)
+                            <option value="{{ $option }}" {{ $perPage == $option ? 'selected' : '' }}>
+                                {{ $option }} items
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
 
                 <!-- Filter Buttons -->
                 <div class="flex flex-wrap gap-3 pt-2">
@@ -226,15 +276,19 @@
 
         <!-- Item Details Table -->
         <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                <div class="flex items-center justify-between">
-                    <h3 class="text-lg font-semibold text-gray-900 flex items-center">
-                        <i class="fas fa-boxes mr-2 text-blue-600"></i>
-                        Daftar Item Details
-                    </h3>
-                    <span class="text-sm text-gray-600">Total: {{ $itemDetails->total() }} items</span>
-                </div>
+           <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+        <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                <i class="fas fa-boxes mr-2 text-blue-600"></i>
+                Daftar Item Details
+            </h3>
+            <div class="flex items-center space-x-4 text-sm text-gray-600">
+                <span>Total: {{ $itemDetails->total() }} items</span>
+                <span class="text-gray-400">|</span>
+                <span>Menampilkan: {{ $perPage }} per halaman</span>
             </div>
+        </div>
+    </div>
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead class="bg-gray-50 border-b border-gray-200">
@@ -272,8 +326,7 @@
                             <tr class="hover:bg-gray-50 transition-colors duration-200">
                                 <!-- Checkbox -->
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <input type="checkbox"
-                                        value="{{ $itemDetail->item_detail_id }}"
+                                    <input type="checkbox" value="{{ $itemDetail->item_detail_id }}"
                                         x-model="selectedItems"
                                         class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
                                 </td>
@@ -281,13 +334,17 @@
                                 <!-- Item Info -->
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="flex items-center space-x-3">
-                                        <div class="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center">
+                                        <div
+                                            class="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center">
                                             <i class="fas fa-box text-white text-lg"></i>
                                         </div>
                                         <div>
-                                            <div class="text-sm font-medium text-gray-900">{{ $itemDetail->item->item_name }}</div>
-                                            <div class="text-sm text-gray-500">{{ $itemDetail->item->item_code }} | {{$itemDetail->item_detail_id}}</div>
-                                            <div class="text-xs text-gray-400">{{ $itemDetail->item->category->category_name ?? 'No Category' }}</div>
+                                            <div class="text-sm font-medium text-gray-900">
+                                                {{ $itemDetail->item->item_name }}</div>
+                                            <div class="text-sm text-gray-500">{{ $itemDetail->item->item_code }} |
+                                                {{ $itemDetail->item_detail_id }}</div>
+                                            <div class="text-xs text-gray-400">
+                                                {{ $itemDetail->item->category->category_name ?? 'No Category' }}</div>
                                         </div>
                                     </div>
                                 </td>
@@ -295,16 +352,23 @@
                                 <!-- Serial / QR -->
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="text-sm text-gray-900 font-mono">{{ $itemDetail->serial_number }}</div>
-                                    <div class="text-sm text-gray-500 font-mono">{{ $itemDetail->qr_code ?: 'Not generated' }}</div>
+                                    <div class="text-sm text-gray-500 font-mono">
+                                        {{ $itemDetail->qr_code ?: 'Not generated' }}</div>
                                 </td>
 
                                 <!-- Status -->
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $statusInfo['class'] }}">
-                                        <span class="w-1.5 h-1.5 rounded-full mr-1.5
-                                            {{ $itemDetail->status == 'available' ? 'bg-green-400' :
-                                               ($itemDetail->status == 'damaged' ? 'bg-red-400' :
-                                               ($itemDetail->status == 'maintenance' ? 'bg-yellow-400' : 'bg-blue-400')) }}"></span>
+                                    <span
+                                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $statusInfo['class'] }}">
+                                        <span
+                                            class="w-1.5 h-1.5 rounded-full mr-1.5
+                                            {{ $itemDetail->status == 'available'
+                                                ? 'bg-green-400'
+                                                : ($itemDetail->status == 'damaged'
+                                                    ? 'bg-red-400'
+                                                    : ($itemDetail->status == 'maintenance'
+                                                        ? 'bg-yellow-400'
+                                                        : 'bg-blue-400')) }}"></span>
                                         {{ $statusInfo['text'] }}
                                     </span>
                                 </td>
@@ -318,7 +382,10 @@
 
                                 <!-- PO / Received Date -->
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    @if($itemDetail->goodsReceivedDetail && $itemDetail->goodsReceivedDetail->goodsReceived && $itemDetail->goodsReceivedDetail->goodsReceived->purchaseOrder)
+                                    @if (
+                                        $itemDetail->goodsReceivedDetail &&
+                                            $itemDetail->goodsReceivedDetail->goodsReceived &&
+                                            $itemDetail->goodsReceivedDetail->goodsReceived->purchaseOrder)
                                         <div class="text-sm font-medium text-gray-900">
                                             {{ $itemDetail->goodsReceivedDetail->goodsReceived->purchaseOrder->po_number }}
                                         </div>
@@ -349,7 +416,8 @@
                                         </a>
 
                                         <!-- Quick Status Update (Modal) -->
-                                        <button @click="showUpdateStatusModal('{{ $itemDetail->item_detail_id }}', '{{ addslashes($itemDetail->serial_number) }}', '{{ $itemDetail->status }}', '{{ addslashes($itemDetail->location ?? '') }}')"
+                                        <button
+                                            @click="showUpdateStatusModal('{{ $itemDetail->item_detail_id }}', '{{ addslashes($itemDetail->serial_number) }}', '{{ $itemDetail->status }}', '{{ addslashes($itemDetail->location ?? '') }}')"
                                             class="text-green-600 hover:text-green-900 p-2 hover:bg-green-50 rounded-lg transition-all duration-200"
                                             title="Quick Status Update">
                                             <i class="fas fa-sync-alt"></i>
@@ -409,7 +477,8 @@
                                     <div class="flex flex-col items-center justify-center">
                                         <i class="fas fa-boxes text-4xl text-gray-300 mb-4"></i>
                                         <h3 class="text-lg font-medium text-gray-900 mb-2">Tidak ada Item Detail</h3>
-                                        <p class="text-gray-500 mb-4">Belum ada item detail yang terdaftar dalam sistem.</p>
+                                        <p class="text-gray-500 mb-4">Belum ada item detail yang terdaftar dalam sistem.
+                                        </p>
                                         <a href="{{ route('item-details.create') }}"
                                             class="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200">
                                             Tambah Item Detail Pertama
@@ -424,397 +493,409 @@
         </div>
 
         <!-- Pagination -->
-        @if ($itemDetails->hasPages())
-            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-                <div class="flex items-center justify-between">
-                    <div class="text-sm text-gray-700">
-                        Menampilkan {{ $itemDetails->firstItem() }} sampai {{ $itemDetails->lastItem() }}
-                        dari {{ $itemDetails->total() }} hasil
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        {{ $itemDetails->appends(request()->query())->links('pagination::tailwind') }}
-                    </div>
-                </div>
+        <!-- Pagination -->
+@if ($itemDetails->hasPages())
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+        <div class="flex items-center justify-between">
+            <div class="text-sm text-gray-700">
+                Menampilkan {{ $itemDetails->firstItem() }} sampai {{ $itemDetails->lastItem() }}
+                dari {{ $itemDetails->total() }} hasil
+                <span class="text-gray-500">({{ $perPage }} per halaman)</span>
             </div>
-        @endif
+            <div class="flex items-center space-x-2">
+                {{ $itemDetails->appends(request()->query())->links('pagination::tailwind') }}
+            </div>
+        </div>
+    </div>
+@endif
 
         <!-- Keep existing modals from the original view -->
         <!-- ... (Include all the modal code from the original here) ... -->
-{{-- resources/views/item-details/partials/modals.blade.php --}}
+        {{-- resources/views/item-details/partials/modals.blade.php --}}
 
-<!-- Bulk Print Modal -->
-<div x-show="bulkPrintModal.show" x-transition:enter="transition ease-out duration-300"
-    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-    x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100"
-    x-transition:leave-end="opacity-0" @click.self="hideBulkPrintModal()"
-    @keydown.escape.window="hideBulkPrintModal()"
-    class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" style="display: none;">
-    <div x-show="bulkPrintModal.show" x-transition:enter="transition ease-out duration-300 transform"
-        x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
-        x-transition:leave="transition ease-in duration-200 transform"
-        x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
-        class="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
-        <div class="p-6">
-            <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i class="fas fa-print text-2xl text-purple-600"></i>
+        <!-- Bulk Print Modal -->
+        <div x-show="bulkPrintModal.show" x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0" @click.self="hideBulkPrintModal()"
+            @keydown.escape.window="hideBulkPrintModal()"
+            class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" style="display: none;">
+            <div x-show="bulkPrintModal.show" x-transition:enter="transition ease-out duration-300 transform"
+                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-200 transform"
+                x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                class="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
+                <div class="p-6">
+                    <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-print text-2xl text-purple-600"></i>
+                    </div>
+
+                    <h3 class="text-xl font-bold text-gray-900 text-center mb-2">Print QR Labels</h3>
+                    <p class="text-gray-600 text-center mb-6">
+                        Konfigurasi print untuk <span x-text="selectedItems.length"
+                            class="font-semibold text-gray-900"></span> items
+                    </p>
+
+                    <form @submit.prevent="processBulkPrint()">
+                        <!-- Label Size -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Ukuran Label</label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <label class="cursor-pointer">
+                                    <input type="radio" x-model="bulkPrintModal.labelSize" value="sfp"
+                                        class="sr-only peer" checked>
+                                    <div
+                                        class="p-3 border-2 border-gray-200 rounded-lg peer-checked:border-purple-500 peer-checked:bg-purple-50 hover:border-gray-300 transition-colors">
+                                        <div class="text-sm font-medium text-gray-900">SFP/Media Converter</div>
+                                        <div class="text-xs text-gray-500">1cm x 3cm (Sangat Kecil)</div>
+                                    </div>
+                                </label>
+                                <label class="cursor-pointer">
+                                    <input type="radio" x-model="bulkPrintModal.labelSize" value="small"
+                                        class="sr-only peer">
+                                    <div
+                                        class="p-3 border-2 border-gray-200 rounded-lg peer-checked:border-purple-500 peer-checked:bg-purple-50 hover:border-gray-300 transition-colors">
+                                        <div class="text-sm font-medium text-gray-900">Small</div>
+                                        <div class="text-xs text-gray-500">2cm x 4cm</div>
+                                    </div>
+                                </label>
+                                <label class="cursor-pointer">
+                                    <input type="radio" x-model="bulkPrintModal.labelSize" value="medium"
+                                        class="sr-only peer">
+                                    <div
+                                        class="p-3 border-2 border-gray-200 rounded-lg peer-checked:border-purple-500 peer-checked:bg-purple-50 hover:border-gray-300 transition-colors">
+                                        <div class="text-sm font-medium text-gray-900">Medium</div>
+                                        <div class="text-xs text-gray-500">3cm x 5cm</div>
+                                    </div>
+                                </label>
+                                <label class="cursor-pointer">
+                                    <input type="radio" x-model="bulkPrintModal.labelSize" value="large"
+                                        class="sr-only peer">
+                                    <div
+                                        class="p-3 border-2 border-gray-200 rounded-lg peer-checked:border-purple-500 peer-checked:bg-purple-50 hover:border-gray-300 transition-colors">
+                                        <div class="text-sm font-medium text-gray-900">Large</div>
+                                        <div class="text-xs text-gray-500">4cm x 6cm</div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Labels Per Row -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Labels Per Row</label>
+                            <select x-model="bulkPrintModal.labelsPerRow"
+                                class="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                                <option value="2">2 Labels</option>
+                                <option value="3">3 Labels</option>
+                                <option value="4">4 Labels</option>
+                                <option value="5">5 Labels</option>
+                                <option value="6">6 Labels</option>
+                            </select>
+                        </div>
+
+                        <!-- Print Options -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Print Options</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center">
+                                    <input type="checkbox" x-model="bulkPrintModal.includeItemName"
+                                        class="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500">
+                                    <span class="ml-2 text-sm text-gray-700">Include Item Name</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" x-model="bulkPrintModal.includeSerial"
+                                        class="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500">
+                                    <span class="ml-2 text-sm text-gray-700">Include Serial Number</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" x-model="bulkPrintModal.includePO"
+                                        class="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500">
+                                    <span class="ml-2 text-sm text-gray-700">Include PO Number</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="flex flex-col sm:flex-row gap-3 pt-4">
+                            <button type="button" @click="hideBulkPrintModal()"
+                                class="flex-1 px-4 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-all duration-200 flex items-center justify-center space-x-2">
+                                <i class="fas fa-times"></i>
+                                <span>Batal</span>
+                            </button>
+                            <button type="submit" :disabled="bulkPrintModal.loading"
+                                class="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl disabled:opacity-50">
+                                <i class="fas fa-print" :class="{ 'animate-spin fa-spinner': bulkPrintModal.loading }"></i>
+                                <span x-text="bulkPrintModal.loading ? 'Processing...' : 'Print Labels'"></span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
+        </div>
 
-            <h3 class="text-xl font-bold text-gray-900 text-center mb-2">Print QR Labels</h3>
-            <p class="text-gray-600 text-center mb-6">
-                Konfigurasi print untuk <span x-text="selectedItems.length" class="font-semibold text-gray-900"></span> items
-            </p>
+        <!-- Bulk Update Status Modal -->
+        <div x-show="bulkUpdateStatusModal.show" x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0" @click.self="hideBulkUpdateStatusModal()"
+            @keydown.escape.window="hideBulkUpdateStatusModal()"
+            class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" style="display: none;">
+            <div x-show="bulkUpdateStatusModal.show" x-transition:enter="transition ease-out duration-300 transform"
+                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-200 transform"
+                x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                class="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
+                <div class="p-6">
+                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-edit text-2xl text-green-600"></i>
+                    </div>
 
-            <form @submit.prevent="processBulkPrint()">
-                <!-- Label Size -->
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Ukuran Label</label>
-                    <div class="grid grid-cols-2 gap-3">
-                        <label class="cursor-pointer">
-                            <input type="radio" x-model="bulkPrintModal.labelSize" value="sfp"
-                                class="sr-only peer" checked>
-                            <div class="p-3 border-2 border-gray-200 rounded-lg peer-checked:border-purple-500 peer-checked:bg-purple-50 hover:border-gray-300 transition-colors">
-                                <div class="text-sm font-medium text-gray-900">SFP/Media Converter</div>
-                                <div class="text-xs text-gray-500">1cm x 3cm (Sangat Kecil)</div>
+                    <h3 class="text-xl font-bold text-gray-900 text-center mb-2">Bulk Update Status</h3>
+                    <p class="text-gray-600 text-center mb-6">
+                        Update status untuk <span x-text="selectedItems.length"
+                            class="font-semibold text-gray-900"></span> items
+                    </p>
+
+                    <form @submit.prevent="processBulkUpdateStatus()">
+                        <!-- New Status -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Status Baru</label>
+                            <select x-model="bulkUpdateStatusModal.newStatus"
+                                class="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                required>
+                                <option value="">Pilih Status Baru</option>
+                                <option value="available">Tersedia</option>
+                                <option value="used">Terpakai</option>
+                                <option value="damaged">Rusak</option>
+                                <option value="maintenance">Maintenance</option>
+                                <option value="reserved">Reserved</option>
+                            </select>
+                        </div>
+
+                        <!-- Location -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Lokasi Baru
+                                <span class="text-gray-400 font-normal">(Opsional)</span>
+                            </label>
+                            <input type="text" x-model="bulkUpdateStatusModal.location"
+                                placeholder="Masukkan lokasi baru (kosongkan jika tidak diubah)..."
+                                class="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                        </div>
+
+                        <!-- Notes -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Catatan
+                                <span class="text-gray-400 font-normal">(Opsional)</span>
+                            </label>
+                            <textarea x-model="bulkUpdateStatusModal.notes" placeholder="Tambahkan catatan untuk perubahan status..."
+                                class="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                rows="3"></textarea>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="flex flex-col sm:flex-row gap-3 pt-4">
+                            <button type="button" @click="hideBulkUpdateStatusModal()"
+                                class="flex-1 px-4 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-all duration-200 flex items-center justify-center space-x-2">
+                                <i class="fas fa-times"></i>
+                                <span>Batal</span>
+                            </button>
+                            <button type="submit"
+                                :disabled="bulkUpdateStatusModal.loading || !bulkUpdateStatusModal.newStatus"
+                                class="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl disabled:opacity-50">
+                                <i class="fas fa-save"
+                                    :class="{ 'animate-spin fa-spinner': bulkUpdateStatusModal.loading }"></i>
+                                <span x-text="bulkUpdateStatusModal.loading ? 'Updating...' : 'Update Status'"></span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Update Status Modal (Single Item) -->
+        <div x-show="updateStatusModal.show" x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0" @click.self="hideUpdateStatusModal()"
+            @keydown.escape.window="hideUpdateStatusModal()"
+            class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" style="display: none;">
+            <div x-show="updateStatusModal.show" x-transition:enter="transition ease-out duration-300 transform"
+                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-200 transform"
+                x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                <div class="p-6">
+                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-sync-alt text-2xl text-green-600"></i>
+                    </div>
+
+                    <h3 class="text-xl font-bold text-gray-900 text-center mb-2">Quick Status Update</h3>
+                    <p class="text-gray-600 text-center mb-6">
+                        Update status untuk item <span x-text="updateStatusModal.serialNumber"
+                            class="font-semibold text-gray-900"></span>
+                    </p>
+
+                    <form @submit.prevent="confirmUpdateStatus()">
+                        <!-- Current Status -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Status Saat Ini</label>
+                            <div class="p-3 bg-gray-50 rounded-lg">
+                                <span x-text="getStatusText(updateStatusModal.currentStatus)"
+                                    :class="getStatusClass(updateStatusModal.currentStatus)"
+                                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium">
+                                </span>
                             </div>
-                        </label>
-                        <label class="cursor-pointer">
-                            <input type="radio" x-model="bulkPrintModal.labelSize" value="small"
-                                class="sr-only peer">
-                            <div class="p-3 border-2 border-gray-200 rounded-lg peer-checked:border-purple-500 peer-checked:bg-purple-50 hover:border-gray-300 transition-colors">
-                                <div class="text-sm font-medium text-gray-900">Small</div>
-                                <div class="text-xs text-gray-500">2cm x 4cm</div>
+                        </div>
+
+                        <!-- New Status Selection -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Status Baru</label>
+                            <select x-model="updateStatusModal.newStatus"
+                                class="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                required>
+                                <option value="">Pilih Status Baru</option>
+                                <option value="available">Tersedia</option>
+                                <option value="used">Terpakai</option>
+                                <option value="damaged">Rusak</option>
+                                <option value="maintenance">Maintenance</option>
+                                <option value="reserved">Reserved</option>
+                            </select>
+                        </div>
+
+                        <!-- Location -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Lokasi</label>
+                            <input type="text" x-model="updateStatusModal.location"
+                                placeholder="Masukkan lokasi item..."
+                                class="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                        </div>
+
+                        <!-- Notes -->
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Catatan
+                                <span class="text-gray-400 font-normal">(Opsional)</span>
+                            </label>
+                            <textarea x-model="updateStatusModal.notes" placeholder="Tambahkan catatan perubahan status..."
+                                class="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                rows="3"></textarea>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="flex flex-col sm:flex-row gap-3 pt-4">
+                            <button type="button" @click="hideUpdateStatusModal()"
+                                class="flex-1 px-4 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-all duration-200 flex items-center justify-center space-x-2">
+                                <i class="fas fa-times"></i>
+                                <span>Batal</span>
+                            </button>
+                            <button type="submit" :disabled="updateStatusModal.loading || !updateStatusModal.newStatus"
+                                class="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl disabled:opacity-50">
+                                <i class="fas fa-save"
+                                    :class="{ 'animate-spin fa-spinner': updateStatusModal.loading }"></i>
+                                <span x-text="updateStatusModal.loading ? 'Menyimpan...' : 'Update Status'"></span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- QR Code Modal -->
+        <div x-show="qrModal.show" x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0" @click.self="hideQRModal()" @keydown.escape.window="hideQRModal()"
+            class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" style="display: none;">
+            <div x-show="qrModal.show" x-transition:enter="transition ease-out duration-300 transform"
+                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-200 transform"
+                x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                class="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+                <div class="p-6 text-center">
+                    <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-qrcode text-2xl text-purple-600"></i>
+                    </div>
+
+                    <h3 class="text-xl font-bold text-gray-900 mb-2">QR Code</h3>
+                    <p class="text-gray-600 mb-6">
+                        QR Code untuk item <span x-text="qrModal.serialNumber" class="font-semibold text-gray-900"></span>
+                    </p>
+
+                    <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                        <div class="text-lg font-mono bg-white p-3 rounded border break-all" x-text="qrModal.qrCode">
+                        </div>
+                    </div>
+
+                    <div class="text-sm text-gray-500 mb-4">
+                        <template x-if="qrModal.qrCode === 'Not generated yet'">
+                            <div class="text-orange-600">
+                                <i class="fas fa-exclamation-triangle mr-1"></i>
+                                QR Code belum digenerate. Klik "Generate QR Code" untuk membuat.
                             </div>
-                        </label>
-                        <label class="cursor-pointer">
-                            <input type="radio" x-model="bulkPrintModal.labelSize" value="medium"
-                                class="sr-only peer">
-                            <div class="p-3 border-2 border-gray-200 rounded-lg peer-checked:border-purple-500 peer-checked:bg-purple-50 hover:border-gray-300 transition-colors">
-                                <div class="text-sm font-medium text-gray-900">Medium</div>
-                                <div class="text-xs text-gray-500">3cm x 5cm</div>
-                            </div>
-                        </label>
-                        <label class="cursor-pointer">
-                            <input type="radio" x-model="bulkPrintModal.labelSize" value="large"
-                                class="sr-only peer">
-                            <div class="p-3 border-2 border-gray-200 rounded-lg peer-checked:border-purple-500 peer-checked:bg-purple-50 hover:border-gray-300 transition-colors">
-                                <div class="text-sm font-medium text-gray-900">Large</div>
-                                <div class="text-xs text-gray-500">4cm x 6cm</div>
-                            </div>
-                        </label>
+                        </template>
+                    </div>
+
+                    <div class="flex gap-3">
+                        <button @click="hideQRModal()"
+                            class="flex-1 px-4 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-all duration-200">
+                            Tutup
+                        </button>
+                        <template x-if="qrModal.qrCode === 'Not generated yet'">
+                            <button @click="generateQRCodeFromModal()"
+                                class="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all duration-200">
+                                Generate QR
+                            </button>
+                        </template>
                     </div>
                 </div>
+            </div>
+        </div>
 
-                <!-- Labels Per Row -->
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Labels Per Row</label>
-                    <select x-model="bulkPrintModal.labelsPerRow"
-                        class="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                        <option value="2">2 Labels</option>
-                        <option value="3">3 Labels</option>
-                        <option value="4">4 Labels</option>
-                        <option value="5">5 Labels</option>
-                        <option value="6">6 Labels</option>
-                    </select>
-                </div>
-
-                <!-- Print Options -->
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Print Options</label>
-                    <div class="space-y-2">
-                        <label class="flex items-center">
-                            <input type="checkbox" x-model="bulkPrintModal.includeItemName"
-                                class="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500">
-                            <span class="ml-2 text-sm text-gray-700">Include Item Name</span>
-                        </label>
-                        <label class="flex items-center">
-                            <input type="checkbox" x-model="bulkPrintModal.includeSerial"
-                                class="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500">
-                            <span class="ml-2 text-sm text-gray-700">Include Serial Number</span>
-                        </label>
-                        <label class="flex items-center">
-                            <input type="checkbox" x-model="bulkPrintModal.includePO"
-                                class="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500">
-                            <span class="ml-2 text-sm text-gray-700">Include PO Number</span>
-                        </label>
+        <!-- QR Scan Modal -->
+        <div x-show="qrScanModal.show" x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0" @click.self="hideQRScanModal()" @keydown.escape.window="hideQRScanModal()"
+            class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" style="display: none;">
+            <div x-show="qrScanModal.show" x-transition:enter="transition ease-out duration-300 transform"
+                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-200 transform"
+                x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                class="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+                <div class="p-6">
+                    <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-camera text-2xl text-purple-600"></i>
                     </div>
+
+                    <h3 class="text-xl font-bold text-gray-900 text-center mb-2">Scan QR Code</h3>
+                    <p class="text-gray-600 text-center mb-6">Masukkan atau scan QR code untuk mencari item</p>
+
+                    <form @submit.prevent="scanQR()">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">QR Code</label>
+                            <input type="text" x-model="qrScanModal.qrCode" placeholder="Masukkan QR code..."
+                                class="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                required>
+                        </div>
+
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <button type="button" @click="hideQRScanModal()"
+                                class="flex-1 px-4 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-all duration-200 flex items-center justify-center space-x-2">
+                                <i class="fas fa-times"></i>
+                                <span>Batal</span>
+                            </button>
+                            <button type="submit" :disabled="qrScanModal.loading"
+                                class="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl disabled:opacity-50">
+                                <i class="fas fa-search" :class="{ 'animate-spin fa-spinner': qrScanModal.loading }"></i>
+                                <span x-text="qrScanModal.loading ? 'Mencari...' : 'Scan'"></span>
+                            </button>
+                        </div>
+                    </form>
                 </div>
-
-                <!-- Action Buttons -->
-                <div class="flex flex-col sm:flex-row gap-3 pt-4">
-                    <button type="button" @click="hideBulkPrintModal()"
-                        class="flex-1 px-4 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-all duration-200 flex items-center justify-center space-x-2">
-                        <i class="fas fa-times"></i>
-                        <span>Batal</span>
-                    </button>
-                    <button type="submit" :disabled="bulkPrintModal.loading"
-                        class="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl disabled:opacity-50">
-                        <i class="fas fa-print" :class="{ 'animate-spin fa-spinner': bulkPrintModal.loading }"></i>
-                        <span x-text="bulkPrintModal.loading ? 'Processing...' : 'Print Labels'"></span>
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- Bulk Update Status Modal -->
-<div x-show="bulkUpdateStatusModal.show" x-transition:enter="transition ease-out duration-300"
-    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-    x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100"
-    x-transition:leave-end="opacity-0" @click.self="hideBulkUpdateStatusModal()"
-    @keydown.escape.window="hideBulkUpdateStatusModal()"
-    class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" style="display: none;">
-    <div x-show="bulkUpdateStatusModal.show" x-transition:enter="transition ease-out duration-300 transform"
-        x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
-        x-transition:leave="transition ease-in duration-200 transform"
-        x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
-        class="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
-        <div class="p-6">
-            <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i class="fas fa-edit text-2xl text-green-600"></i>
-            </div>
-
-            <h3 class="text-xl font-bold text-gray-900 text-center mb-2">Bulk Update Status</h3>
-            <p class="text-gray-600 text-center mb-6">
-                Update status untuk <span x-text="selectedItems.length" class="font-semibold text-gray-900"></span> items
-            </p>
-
-            <form @submit.prevent="processBulkUpdateStatus()">
-                <!-- New Status -->
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Status Baru</label>
-                    <select x-model="bulkUpdateStatusModal.newStatus"
-                        class="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                        required>
-                        <option value="">Pilih Status Baru</option>
-                        <option value="available">Tersedia</option>
-                        <option value="used">Terpakai</option>
-                        <option value="damaged">Rusak</option>
-                        <option value="maintenance">Maintenance</option>
-                        <option value="reserved">Reserved</option>
-                    </select>
-                </div>
-
-                <!-- Location -->
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Lokasi Baru
-                        <span class="text-gray-400 font-normal">(Opsional)</span>
-                    </label>
-                    <input type="text" x-model="bulkUpdateStatusModal.location"
-                        placeholder="Masukkan lokasi baru (kosongkan jika tidak diubah)..."
-                        class="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                </div>
-
-                <!-- Notes -->
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Catatan
-                        <span class="text-gray-400 font-normal">(Opsional)</span>
-                    </label>
-                    <textarea x-model="bulkUpdateStatusModal.notes" placeholder="Tambahkan catatan untuk perubahan status..."
-                        class="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                        rows="3"></textarea>
-                </div>
-
-                <!-- Action Buttons -->
-                <div class="flex flex-col sm:flex-row gap-3 pt-4">
-                    <button type="button" @click="hideBulkUpdateStatusModal()"
-                        class="flex-1 px-4 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-all duration-200 flex items-center justify-center space-x-2">
-                        <i class="fas fa-times"></i>
-                        <span>Batal</span>
-                    </button>
-                    <button type="submit" :disabled="bulkUpdateStatusModal.loading || !bulkUpdateStatusModal.newStatus"
-                        class="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl disabled:opacity-50">
-                        <i class="fas fa-save" :class="{ 'animate-spin fa-spinner': bulkUpdateStatusModal.loading }"></i>
-                        <span x-text="bulkUpdateStatusModal.loading ? 'Updating...' : 'Update Status'"></span>
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- Update Status Modal (Single Item) -->
-<div x-show="updateStatusModal.show" x-transition:enter="transition ease-out duration-300"
-    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-    x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100"
-    x-transition:leave-end="opacity-0" @click.self="hideUpdateStatusModal()"
-    @keydown.escape.window="hideUpdateStatusModal()"
-    class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" style="display: none;">
-    <div x-show="updateStatusModal.show" x-transition:enter="transition ease-out duration-300 transform"
-        x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
-        x-transition:leave="transition ease-in duration-200 transform"
-        x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
-        class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-        <div class="p-6">
-            <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i class="fas fa-sync-alt text-2xl text-green-600"></i>
-            </div>
-
-            <h3 class="text-xl font-bold text-gray-900 text-center mb-2">Quick Status Update</h3>
-            <p class="text-gray-600 text-center mb-6">
-                Update status untuk item <span x-text="updateStatusModal.serialNumber" class="font-semibold text-gray-900"></span>
-            </p>
-
-            <form @submit.prevent="confirmUpdateStatus()">
-                <!-- Current Status -->
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Status Saat Ini</label>
-                    <div class="p-3 bg-gray-50 rounded-lg">
-                        <span x-text="getStatusText(updateStatusModal.currentStatus)"
-                            :class="getStatusClass(updateStatusModal.currentStatus)"
-                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium">
-                        </span>
-                    </div>
-                </div>
-
-                <!-- New Status Selection -->
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Status Baru</label>
-                    <select x-model="updateStatusModal.newStatus"
-                        class="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                        required>
-                        <option value="">Pilih Status Baru</option>
-                        <option value="available">Tersedia</option>
-                        <option value="used">Terpakai</option>
-                        <option value="damaged">Rusak</option>
-                        <option value="maintenance">Maintenance</option>
-                        <option value="reserved">Reserved</option>
-                    </select>
-                </div>
-
-                <!-- Location -->
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Lokasi</label>
-                    <input type="text" x-model="updateStatusModal.location"
-                        placeholder="Masukkan lokasi item..."
-                        class="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                </div>
-
-                <!-- Notes -->
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Catatan
-                        <span class="text-gray-400 font-normal">(Opsional)</span>
-                    </label>
-                    <textarea x-model="updateStatusModal.notes" placeholder="Tambahkan catatan perubahan status..."
-                        class="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                        rows="3"></textarea>
-                </div>
-
-                <!-- Action Buttons -->
-                <div class="flex flex-col sm:flex-row gap-3 pt-4">
-                    <button type="button" @click="hideUpdateStatusModal()"
-                        class="flex-1 px-4 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-all duration-200 flex items-center justify-center space-x-2">
-                        <i class="fas fa-times"></i>
-                        <span>Batal</span>
-                    </button>
-                    <button type="submit" :disabled="updateStatusModal.loading || !updateStatusModal.newStatus"
-                        class="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl disabled:opacity-50">
-                        <i class="fas fa-save" :class="{ 'animate-spin fa-spinner': updateStatusModal.loading }"></i>
-                        <span x-text="updateStatusModal.loading ? 'Menyimpan...' : 'Update Status'"></span>
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- QR Code Modal -->
-<div x-show="qrModal.show" x-transition:enter="transition ease-out duration-300"
-    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-    x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100"
-    x-transition:leave-end="opacity-0" @click.self="hideQRModal()" @keydown.escape.window="hideQRModal()"
-    class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" style="display: none;">
-    <div x-show="qrModal.show" x-transition:enter="transition ease-out duration-300 transform"
-        x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
-        x-transition:leave="transition ease-in duration-200 transform"
-        x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
-        class="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-        <div class="p-6 text-center">
-            <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i class="fas fa-qrcode text-2xl text-purple-600"></i>
-            </div>
-
-            <h3 class="text-xl font-bold text-gray-900 mb-2">QR Code</h3>
-            <p class="text-gray-600 mb-6">
-                QR Code untuk item <span x-text="qrModal.serialNumber" class="font-semibold text-gray-900"></span>
-            </p>
-
-            <div class="bg-gray-50 rounded-lg p-4 mb-4">
-                <div class="text-lg font-mono bg-white p-3 rounded border break-all" x-text="qrModal.qrCode"></div>
-            </div>
-
-            <div class="text-sm text-gray-500 mb-4">
-                <template x-if="qrModal.qrCode === 'Not generated yet'">
-                    <div class="text-orange-600">
-                        <i class="fas fa-exclamation-triangle mr-1"></i>
-                        QR Code belum digenerate. Klik "Generate QR Code" untuk membuat.
-                    </div>
-                </template>
-            </div>
-
-            <div class="flex gap-3">
-                <button @click="hideQRModal()"
-                    class="flex-1 px-4 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-all duration-200">
-                    Tutup
-                </button>
-                <template x-if="qrModal.qrCode === 'Not generated yet'">
-                    <button @click="generateQRCodeFromModal()"
-                        class="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all duration-200">
-                        Generate QR
-                    </button>
-                </template>
             </div>
         </div>
-    </div>
-</div>
-
-<!-- QR Scan Modal -->
-<div x-show="qrScanModal.show" x-transition:enter="transition ease-out duration-300"
-    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-    x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100"
-    x-transition:leave-end="opacity-0" @click.self="hideQRScanModal()" @keydown.escape.window="hideQRScanModal()"
-    class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" style="display: none;">
-    <div x-show="qrScanModal.show" x-transition:enter="transition ease-out duration-300 transform"
-        x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
-        x-transition:leave="transition ease-in duration-200 transform"
-        x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
-        class="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-        <div class="p-6">
-            <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i class="fas fa-camera text-2xl text-purple-600"></i>
-            </div>
-
-            <h3 class="text-xl font-bold text-gray-900 text-center mb-2">Scan QR Code</h3>
-            <p class="text-gray-600 text-center mb-6">Masukkan atau scan QR code untuk mencari item</p>
-
-            <form @submit.prevent="scanQR()">
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">QR Code</label>
-                    <input type="text" x-model="qrScanModal.qrCode"
-                        placeholder="Masukkan QR code..."
-                        class="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        required>
-                </div>
-
-                <div class="flex flex-col sm:flex-row gap-3">
-                    <button type="button" @click="hideQRScanModal()"
-                        class="flex-1 px-4 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-all duration-200 flex items-center justify-center space-x-2">
-                        <i class="fas fa-times"></i>
-                        <span>Batal</span>
-                    </button>
-                    <button type="submit" :disabled="qrScanModal.loading"
-                        class="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl disabled:opacity-50">
-                        <i class="fas fa-search" :class="{ 'animate-spin fa-spinner': qrScanModal.loading }"></i>
-                        <span x-text="qrScanModal.loading ? 'Mencari...' : 'Scan'"></span>
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 
         <!-- Success/Error Messages -->
         @if (session('success'))
@@ -862,11 +943,20 @@
 
 @push('scripts')
     <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const perPageSelect = document.querySelector('select[name="per_page"]');
+            if (perPageSelect) {
+                perPageSelect.addEventListener('change', function() {
+                    this.closest('form').submit();
+                });
+            }
+        });
+
         function itemDetailManager() {
             return {
                 selectedItems: [],
                 allItemIds: [
-                    @foreach($itemDetails as $item)
+                    @foreach ($itemDetails as $item)
                         '{{ $item->item_detail_id }}',
                     @endforeach
                 ],
@@ -949,7 +1039,7 @@
                     try {
                         const form = document.createElement('form');
                         form.method = 'POST';
-                        form.action = '{{ route("item-details.bulk-print-labels") }}';
+                        form.action = '{{ route('item-details.bulk-print-labels') }}';
                         form.target = '_blank';
                         form.style.display = 'none';
 
@@ -1031,11 +1121,12 @@
                     this.bulkUpdateStatusModal.loading = true;
 
                     try {
-                        const response = await fetch('{{ route("item-details.bulk-update-status") }}', {
+                        const response = await fetch('{{ route('item-details.bulk-update-status') }}', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute(
+                                    'content')
                             },
                             body: JSON.stringify({
                                 item_detail_ids: this.selectedItems,
@@ -1107,7 +1198,8 @@
                             method: 'PATCH',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute(
+                                    'content')
                             },
                             body: JSON.stringify({
                                 status: this.updateStatusModal.newStatus,
@@ -1185,11 +1277,12 @@
                     this.qrScanModal.loading = true;
 
                     try {
-                        const response = await fetch('{{ route("item-details.scan-qr") }}', {
+                        const response = await fetch('{{ route('item-details.scan-qr') }}', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute(
+                                    'content')
                             },
                             body: JSON.stringify({
                                 qr_code: this.qrScanModal.qrCode
@@ -1219,7 +1312,8 @@
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute(
+                                    'content')
                             }
                         });
 
@@ -1250,7 +1344,8 @@
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute(
+                                    'content')
                             }
                         });
 
@@ -1275,7 +1370,8 @@
                             method: 'GET',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute(
+                                    'content')
                             }
                         });
 
@@ -1354,6 +1450,7 @@
                 opacity: 0;
                 transform: translateY(10px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -1390,6 +1487,7 @@
                 opacity: 0;
                 transform: translateY(-10px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -1425,7 +1523,7 @@
             left: -100%;
             width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
             transition: left 0.5s;
         }
 
