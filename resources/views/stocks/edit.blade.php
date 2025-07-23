@@ -129,7 +129,7 @@
                                 <option value="">Quick Select...</option>
                                 <option value="all_stock">Semua Stock</option>
                                 <option value="all_available">Semua Available</option>
-                                <option value="range">Range SN...</option>
+                             
                             </select>
                         </div>
                     </div>
