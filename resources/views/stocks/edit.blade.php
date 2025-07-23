@@ -80,206 +80,277 @@
                             @endforeach
                         </ul>
                     </div>
-                    <div class="mt-4">
-                        <button @click="autoSync()"
-                                class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm transition-colors">
-                            <i class="fas fa-sync mr-2"></i>
-                            Auto-Sync Sekarang
-                        </button>
-                    </div>
                 </div>
             </div>
         </div>
     @endif
 
     <!-- Edit Form -->
-    <form method="POST" action="{{ route('stocks.update', $stock) }}" x-ref="editForm" @submit="validateForm">
+    <form method="POST" action="{{ route('stocks.update', $stock) }}" x-ref="editForm" @submit="handleSubmit">
         @csrf
         @method('PUT')
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Left Column - Item Details Management -->
+            <!-- Main Panel - Item Management -->
             <div class="lg:col-span-2 space-y-6">
-                <!-- Item Details Drag & Drop Interface -->
+                <!-- Quick Filters & Search -->
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                            <i class="fas fa-search mr-2 text-blue-600"></i>
+                            Filter & Search
+                        </h3>
+                        <div class="text-sm text-gray-600">
+                            Total: {{ $stock->item->itemDetails->count() }} items
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- Search -->
+                        <div>
+                            <input type="text"
+                                   x-model="searchQuery"
+                                   placeholder="Cari serial number..."
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+
+                        <!-- Status Filter -->
+                        <div>
+                            <select x-model="statusFilter" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                                <option value="">Semua Status</option>
+                                <option value="stock">Stock (Gudang)</option>
+                                <option value="available">Available (Siap Pakai)</option>
+                            </select>
+                        </div>
+
+                        <!-- Quick Select -->
+                        <div>
+                            <select @change="quickSelect($event.target.value)" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                                <option value="">Quick Select...</option>
+                                <option value="all_stock">Semua Stock</option>
+                                <option value="all_available">Semua Available</option>
+                                <option value="range">Range SN...</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Item Grid -->
                 <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
                     <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                        <h3 class="text-lg font-semibold text-gray-900 flex items-center">
-                            <i class="fas fa-exchange-alt mr-2 text-blue-600"></i>
-                            Kelola Item Details
-                        </h3>
-                        <p class="text-sm text-gray-600 mt-1">
-                            Drag & drop item details untuk mengubah status dan update stock
-                        </p>
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                                <i class="fas fa-list mr-2 text-blue-600"></i>
+                                Item Details (<span x-text="filteredItems.length"></span>)
+                            </h3>
+
+                            <!-- Select All -->
+                            <label class="flex items-center">
+                                <input type="checkbox"
+                                       :checked="selectedItems.length === filteredItems.length && filteredItems.length > 0"
+                                       @change="toggleSelectAll()"
+                                       class="mr-2 rounded">
+                                <span class="text-sm">
+                                    Select All
+                                    <span x-show="selectedItems.length > 0"
+                                          class="text-blue-600">
+                                        (<span x-text="selectedItems.length"></span> terpilih)
+                                    </span>
+                                </span>
+                            </label>
+                        </div>
                     </div>
+
+                    <!-- Items Grid -->
                     <div class="p-6">
-                        <!-- Drag & Drop Containers -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <!-- Stock (Gudang) Column -->
-                            <div class="space-y-4">
-                                <div class="flex items-center justify-between">
-                                    <h4 class="text-lg font-semibold text-gray-900 flex items-center">
-                                        <i class="fas fa-warehouse mr-2 text-blue-600"></i>
-                                        Stock (Gudang)
-                                    </h4>
-                                    <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium"
-                                          x-text="stockItems.length + ' items'"></span>
+                        <!-- Bulk Action Bar -->
+                        <div x-show="selectedItems.length > 0"
+                             x-transition
+                             class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                            <div class="flex items-center justify-between">
+                                <div class="text-sm font-medium text-blue-900">
+                                    <span x-text="selectedItems.length"></span> items terpilih
                                 </div>
-
-                                <div class="min-h-[400px] bg-blue-50 border-2 border-dashed border-blue-300 rounded-xl p-4"
-                                     @drop="handleDrop($event, 'stock')"
-                                     @dragover.prevent
-                                     @dragenter.prevent>
-
-                                    <template x-for="item in stockItems" :key="item.item_detail_id">
-                                        <div class="bg-white border border-blue-200 rounded-lg p-3 mb-3 cursor-move shadow-sm hover:shadow-md transition-all"
-                                             draggable="true"
-                                             @dragstart="handleDragStart($event, item)"
-                                             x-data="{ isHovering: false }"
-                                             @mouseenter="isHovering = true"
-                                             @mouseleave="isHovering = false">
-
-                                            <div class="flex items-center justify-between">
-                                                <div>
-                                                    <div class="font-medium text-gray-900" x-text="item.serial_number"></div>
-                                                    <div class="text-sm text-gray-500" x-text="item.item_detail_id"></div>
-                                                    <div class="text-xs text-gray-400" x-text="item.location || 'No location'"></div>
-                                                </div>
-                                                <div class="flex items-center space-x-2">
-                                                    <i class="fas fa-grip-vertical text-gray-400"
-                                                       :class="{ 'text-blue-600': isHovering }"></i>
-                                                    <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                                                        Stock
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </template>
-
-                                    <div x-show="stockItems.length === 0"
-                                         class="text-center text-gray-500 py-8">
-                                        <i class="fas fa-box-open text-4xl mb-4"></i>
-                                        <p>Tidak ada item di gudang</p>
-                                        <p class="text-sm">Drop item di sini untuk pindah ke gudang</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Available (Siap Pakai) Column -->
-                            <div class="space-y-4">
-                                <div class="flex items-center justify-between">
-                                    <h4 class="text-lg font-semibold text-gray-900 flex items-center">
-                                        <i class="fas fa-hand-holding mr-2 text-green-600"></i>
-                                        Available (Siap Pakai)
-                                    </h4>
-                                    <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium"
-                                          x-text="availableItems.length + ' items'"></span>
-                                </div>
-
-                                <div class="min-h-[400px] bg-green-50 border-2 border-dashed border-green-300 rounded-xl p-4"
-                                     @drop="handleDrop($event, 'available')"
-                                     @dragover.prevent
-                                     @dragenter.prevent>
-
-                                    <template x-for="item in availableItems" :key="item.item_detail_id">
-                                        <div class="bg-white border border-green-200 rounded-lg p-3 mb-3 cursor-move shadow-sm hover:shadow-md transition-all"
-                                             draggable="true"
-                                             @dragstart="handleDragStart($event, item)"
-                                             x-data="{ isHovering: false }"
-                                             @mouseenter="isHovering = true"
-                                             @mouseleave="isHovering = false">
-
-                                            <div class="flex items-center justify-between">
-                                                <div>
-                                                    <div class="font-medium text-gray-900" x-text="item.serial_number"></div>
-                                                    <div class="text-sm text-gray-500" x-text="item.item_detail_id"></div>
-                                                    <div class="text-xs text-gray-400" x-text="item.location || 'No location'"></div>
-                                                </div>
-                                                <div class="flex items-center space-x-2">
-                                                    <i class="fas fa-grip-vertical text-gray-400"
-                                                       :class="{ 'text-green-600': isHovering }"></i>
-                                                    <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
-                                                        Available
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </template>
-
-                                    <div x-show="availableItems.length === 0"
-                                         class="text-center text-gray-500 py-8">
-                                        <i class="fas fa-hand-holding text-4xl mb-4"></i>
-                                        <p>Tidak ada item siap pakai</p>
-                                        <p class="text-sm">Drop item di sini untuk siap pakai</p>
-                                    </div>
+                                <div class="flex space-x-2">
+                                    <button type="button" @click="bulkToggleStatus()"
+                                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm transition-colors">
+                                        <i class="fas fa-exchange-alt mr-2"></i>
+                                        Toggle Status
+                                    </button>
+                                    <button type="button" @click="clearSelection()"
+                                            class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm transition-colors">
+                                        <i class="fas fa-times mr-2"></i>
+                                        Clear
+                                    </button>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Action Buttons -->
-                        <div class="flex flex-col sm:flex-row gap-3 mt-6 pt-6 border-t">
-                            <button type="button"
-                                    @click="saveChanges()"
-                                    :disabled="!hasChanges"
-                                    class="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                                <i class="fas fa-save"></i>
-                                <span>Simpan Perubahan</span>
-                                <span x-show="hasChanges"
-                                      class="px-2 py-1 bg-blue-800 rounded-full text-xs"
-                                      x-text="changedItems.length + ' item'"></span>
-                            </button>
+                        <!-- Items Grid -->
+                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 max-h-96 overflow-y-auto">
+                            <template x-for="item in filteredItems" :key="item.item_detail_id">
+                                <div class="border border-gray-200 rounded-lg p-3 transition-all"
+                                     :class="selectedItems.includes(item.item_detail_id) ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:shadow-md'">
 
-                            <button type="button"
-                                    @click="resetChanges()"
-                                    :disabled="!hasChanges"
-                                    class="px-4 py-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-xl hover:from-gray-700 hover:to-gray-800 transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                                <i class="fas fa-undo"></i>
-                                <span>Reset</span>
-                            </button>
+                                    <!-- Header dengan Checkbox dan Status -->
+                                    <div class="flex items-center justify-between mb-2">
+                                        <input type="checkbox"
+                                               :checked="selectedItems.includes(item.item_detail_id)"
+                                               @change="toggleSelection(item.item_detail_id)"
+                                               class="rounded">
+                                        <span :class="item.status === 'stock' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'"
+                                              class="px-2 py-1 rounded-full text-xs font-medium"
+                                              x-text="item.status === 'stock' ? 'Stock' : 'Available'"></span>
+                                    </div>
 
-                            <button type="button"
-                                    @click="previewChanges()"
-                                    :disabled="!hasChanges"
-                                    class="px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                                <i class="fas fa-eye"></i>
-                                <span>Preview</span>
-                            </button>
+                                    <!-- Serial Number -->
+                                    <div class="font-medium text-sm text-gray-900 mb-1" x-text="item.serial_number"></div>
+                                    <div class="text-xs text-gray-500 mb-2" x-text="item.location || 'No location'"></div>
+
+                                    <!-- Toggle Button -->
+                                    <button type="button"
+                                            @click="toggleItemStatus(item)"
+                                            :class="item.status === 'stock' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'"
+                                            class="w-full px-2 py-1 text-white rounded text-xs transition-colors">
+                                        <i class="fas" :class="item.status === 'stock' ? 'fa-hand-holding' : 'fa-warehouse'" class="mr-1"></i>
+                                        <span x-text="item.status === 'stock' ? 'To Available' : 'To Stock'"></span>
+                                    </button>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Empty State -->
+                        <div x-show="filteredItems.length === 0" class="text-center py-8 text-gray-500">
+                            <i class="fas fa-search text-4xl mb-4"></i>
+                            <p>Tidak ada item ditemukan</p>
+                            <p class="text-sm">Coba ubah filter atau pencarian</p>
                         </div>
                     </div>
                 </div>
 
                 <!-- Changes Summary -->
-                <div x-show="hasChanges"
-                     x-transition:enter="transition ease-out duration-300"
-                     x-transition:enter-start="opacity-0 transform translate-y-4"
-                     x-transition:enter-end="opacity-100 transform translate-y-0"
+                <div x-show="changedItems.length > 0"
+                     x-transition
                      class="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
                     <h4 class="text-lg font-semibold text-yellow-900 mb-3 flex items-center">
                         <i class="fas fa-exclamation-triangle mr-2"></i>
-                        Perubahan Pending
+                        Perubahan Pending (<span x-text="changedItems.length"></span>)
                     </h4>
-                    <div class="space-y-2">
+                    <div class="max-h-32 overflow-y-auto space-y-2">
                         <template x-for="change in changedItems" :key="change.item_detail_id">
-                            <div class="flex items-center justify-between text-sm">
+                            <div class="flex items-center justify-between text-sm bg-white p-2 rounded">
                                 <span class="font-medium" x-text="change.serial_number"></span>
                                 <span class="text-yellow-700">
-                                    <span x-text="change.old_status"></span>
+                                    <span :class="change.old_status === 'stock' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'"
+                                          class="px-2 py-1 rounded-full text-xs font-medium"
+                                          x-text="change.old_status === 'stock' ? 'Stock' : 'Available'"></span>
                                     <i class="fas fa-arrow-right mx-2"></i>
-                                    <span x-text="change.new_status"></span>
+                                    <span :class="change.new_status === 'stock' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'"
+                                          class="px-2 py-1 rounded-full text-xs font-medium"
+                                          x-text="change.new_status === 'stock' ? 'Stock' : 'Available'"></span>
                                 </span>
                             </div>
                         </template>
                     </div>
                 </div>
+
+                <!-- Form Fields -->
+                <div x-show="changedItems.length > 0" class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+                    <h4 class="text-lg font-semibold text-gray-900 mb-4">Form Submission</h4>
+
+                    <!-- Hidden Fields -->
+                    <input type="hidden" name="adjustment_type" value="manual">
+                    <input type="hidden" name="quantity_available" :value="newStockCount">
+                    <input type="hidden" name="quantity_used" :value="newAvailableCount">
+                    <input type="hidden" name="sync_item_details" value="1">
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Reason -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Alasan Perubahan <span class="text-red-500">*</span>
+                            </label>
+                            <select name="reason" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                                <option value="">Pilih alasan...</option>
+                                <option value="Perpindahan status item details">Perpindahan status item details</option>
+                                <option value="Koreksi lokasi item">Koreksi lokasi item</option>
+                                <option value="Update status manual">Update status manual</option>
+                                <option value="Audit dan penyesuaian">Audit dan penyesuaian</option>
+                            </select>
+                        </div>
+
+                        <!-- Preview New Stock -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Preview Stock Baru</label>
+                            <div class="flex space-x-2">
+                                <div class="flex-1 bg-blue-50 px-3 py-2 rounded-lg text-center">
+                                    <div class="text-sm text-blue-700">Stock</div>
+                                    <div class="text-lg font-bold text-blue-900" x-text="newStockCount"></div>
+                                </div>
+                                <div class="flex-1 bg-green-50 px-3 py-2 rounded-lg text-center">
+                                    <div class="text-sm text-green-700">Available</div>
+                                    <div class="text-lg font-bold text-green-900" x-text="newAvailableCount"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Catatan</label>
+                        <textarea name="notes" rows="2" placeholder="Catatan tambahan (opsional)"
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg"></textarea>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex space-x-3 mt-6">
+                        <button type="submit"
+                                class="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center space-x-2">
+                            <i class="fas fa-save"></i>
+                            <span>Simpan Perubahan</span>
+                        </button>
+
+                        <button type="button" @click="resetChanges()"
+                                class="px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-xl hover:from-gray-700 hover:to-gray-800 transition-all duration-200 flex items-center justify-center space-x-2">
+                            <i class="fas fa-undo"></i>
+                            <span>Reset</span>
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            <!-- Right Column - Info & Actions -->
+            <!-- Right Sidebar -->
             <div class="space-y-6">
-                <!-- Item Info Card -->
+                <!-- Current Status -->
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                        <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                            <i class="fas fa-chart-bar mr-2 text-blue-600"></i>
+                            Status Saat Ini
+                        </h3>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">Stock (Gudang)</span>
+                            <span class="text-sm font-medium">{{ $stock->quantity_available }} {{ $stock->item->unit }}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">Available (Siap Pakai)</span>
+                            <span class="text-sm font-medium">{{ $stock->quantity_used }} {{ $stock->item->unit }}</span>
+                        </div>
+                        <div class="flex justify-between items-center border-t pt-3">
+                            <span class="text-sm font-medium text-gray-900">Total</span>
+                            <span class="text-sm font-bold">{{ $stock->total_quantity }} {{ $stock->item->unit }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Item Info -->
                 <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
                     <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
                         <h3 class="text-lg font-semibold text-gray-900 flex items-center">
                             <i class="fas fa-box mr-2 text-blue-600"></i>
-                            Informasi Item
+                            Item Info
                         </h3>
                     </div>
                     <div class="p-6 space-y-4">
@@ -296,135 +367,40 @@
                                 <span class="text-sm text-gray-600">Kategori</span>
                                 <span class="text-sm font-medium">{{ $stock->item->category->category_name ?? 'N/A' }}</span>
                             </div>
-
                             <div class="flex justify-between items-center">
                                 <span class="text-sm text-gray-600">Unit</span>
                                 <span class="text-sm font-medium">{{ $stock->item->unit }}</span>
                             </div>
-
                             <div class="flex justify-between items-center">
-                                <span class="text-sm text-gray-600">Min Stock</span>
-                                <span class="text-sm font-medium">{{ $stock->item->min_stock ?? 0 }} {{ $stock->item->unit }}</span>
-                            </div>
-
-                            <div class="flex justify-between items-center">
-                                <span class="text-sm text-gray-600">Status Stock</span>
-                                @php $statusInfo = $stock->getStockStatus() @endphp
-                                <span class="px-2 py-1 rounded-full text-xs font-medium {{ $statusInfo['class'] }}">
-                                    {{ $statusInfo['text'] }}
-                                </span>
+                                <span class="text-sm text-gray-600">Total Items</span>
+                                <span class="text-sm font-medium">{{ $stock->item->itemDetails->count() }}</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Current Stock Values -->
-                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-                    <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                        <h3 class="text-lg font-semibold text-gray-900 flex items-center">
-                            <i class="fas fa-chart-bar mr-2 text-green-600"></i>
-                            Nilai Saat Ini
-                        </h3>
-                    </div>
-                    <div class="p-6 space-y-4">
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-gray-600">Available (Gudang)</span>
-                            <span class="text-sm font-medium">{{ $stock->quantity_available }} {{ $stock->item->unit }}</span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-gray-600">Used (Siap Pakai)</span>
-                            <span class="text-sm font-medium">{{ $stock->quantity_used }} {{ $stock->item->unit }}</span>
-                        </div>
-                        <div class="flex justify-between items-center border-t pt-3">
-                            <span class="text-sm font-medium text-gray-900">Total</span>
-                            <span class="text-sm font-bold">{{ $stock->total_quantity }} {{ $stock->item->unit }}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Item Details Breakdown -->
-                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-                    <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                        <h3 class="text-lg font-semibold text-gray-900 flex items-center">
-                            <i class="fas fa-list mr-2 text-indigo-600"></i>
-                            Item Details Breakdown
-                        </h3>
-                    </div>
-                    <div class="p-6 space-y-3">
-                        @foreach($itemDetailsBreakdown['by_status'] as $status => $count)
-                            @if($count > 0)
-                                <div class="flex justify-between items-center">
-                                    <span class="text-sm text-gray-600 capitalize">{{ $status }}</span>
-                                    <span class="text-sm font-medium">{{ $count }}</span>
-                                </div>
-                            @endif
-                        @endforeach
-
-                        <div class="border-t pt-3 mt-3">
-                            <div class="flex justify-between items-center">
-                                <span class="text-sm font-medium text-gray-900">Total Trackable</span>
-                                <span class="text-sm font-bold">{{ $itemDetailsBreakdown['comparison']['item_details']['total_trackable'] }}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-
-
-                <!-- Edit Summary -->
-                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-                    <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                        <h3 class="text-lg font-semibold text-gray-900 flex items-center">
-                            <i class="fas fa-calculator mr-2 text-green-600"></i>
-                            Preview Perubahan
-                        </h3>
-                    </div>
-                    <div class="p-6 space-y-4">
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-gray-600">Available</span>
-                            <span class="text-sm font-medium">
-                                <span class="text-gray-400">{{ $stock->quantity_available }}</span>
-                                <i class="fas fa-arrow-right mx-2"></i>
-                                <span x-text="formData.quantity_available"></span>
-                            </span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-gray-600">Used</span>
-                            <span class="text-sm font-medium">
-                                <span class="text-gray-400">{{ $stock->quantity_used }}</span>
-                                <i class="fas fa-arrow-right mx-2"></i>
-                                <span x-text="formData.quantity_used"></span>
-                            </span>
-                        </div>
-                        <div class="flex justify-between items-center border-t pt-3">
-                            <span class="text-sm font-medium text-gray-900">Total Baru</span>
-                            <span class="text-sm font-bold" x-text="(formData.quantity_available + formData.quantity_used) + ' {{ $stock->item->unit }}'"></span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Tips Card -->
+                <!-- Tips -->
                 <div class="bg-blue-50 rounded-2xl border border-blue-200 p-6">
                     <h4 class="text-lg font-semibold text-blue-900 mb-3 flex items-center">
                         <i class="fas fa-lightbulb mr-2"></i>
-                        Tips Stock Edit
+                        Tips
                     </h4>
                     <ul class="text-sm text-blue-800 space-y-2">
                         <li class="flex items-start">
                             <i class="fas fa-check text-blue-600 mr-2 mt-0.5 text-xs"></i>
-                            <span><strong>Available</strong> = barang di gudang</span>
+                            <span>Klik <strong>individual button</strong> untuk toggle 1 item</span>
                         </li>
                         <li class="flex items-start">
                             <i class="fas fa-check text-blue-600 mr-2 mt-0.5 text-xs"></i>
-                            <span><strong>Used</strong> = barang siap pakai di kantor</span>
+                            <span>Pilih beberapa item → <strong>Toggle Status</strong> untuk bulk</span>
                         </li>
                         <li class="flex items-start">
                             <i class="fas fa-check text-blue-600 mr-2 mt-0.5 text-xs"></i>
-                            <span>Auto-sync untuk sinkronkan dengan item details</span>
+                            <span>Gunakan <strong>filter</strong> untuk cari SN tertentu</span>
                         </li>
                         <li class="flex items-start">
                             <i class="fas fa-check text-blue-600 mr-2 mt-0.5 text-xs"></i>
-                            <span>Manual untuk edit nilai langsung</span>
+                            <span><strong>Stock</strong> = di gudang, <strong>Available</strong> = siap pakai</span>
                         </li>
                     </ul>
                 </div>
@@ -475,240 +451,49 @@
         </div>
     @endif
 </div>
-
-<!-- Alpine.js Modals -->
-<div x-data="stockEdit()">
-    <!-- Save Confirmation Modal -->
-    <div x-show="showSaveModal"
-         x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-200"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         class="fixed inset-0 z-50 overflow-y-auto"
-         style="display: none;">
-        <div class="flex items-center justify-center min-h-screen px-4">
-            <div class="fixed inset-0 bg-black bg-opacity-50" @click="showSaveModal = false"></div>
-
-            <div class="relative bg-white rounded-2xl shadow-xl max-w-md w-full p-6"
-                 x-transition:enter="transition ease-out duration-300"
-                 x-transition:enter-start="opacity-0 scale-95"
-                 x-transition:enter-end="opacity-100 scale-100">
-
-                <div class="text-center">
-                    <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="fas fa-save text-blue-600 text-2xl"></i>
-                    </div>
-
-                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Konfirmasi Simpan</h3>
-                    <p class="text-gray-600 mb-6">
-                        Yakin ingin menyimpan <span class="font-semibold" x-text="changedItems.length"></span> perubahan?
-                    </p>
-
-                    <div class="flex space-x-3">
-                        <button @click="showSaveModal = false"
-                                class="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-xl hover:bg-gray-300 transition-colors">
-                            Batal
-                        </button>
-                        <button @click="confirmSaveChanges()"
-                                :disabled="isSaving"
-                                class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50">
-                            <span x-show="!isSaving">Simpan</span>
-                            <span x-show="isSaving">
-                                <i class="fas fa-spinner fa-spin mr-2"></i>Menyimpan...
-                            </span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Reset Confirmation Modal -->
-    <div x-show="showResetModal"
-         x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-200"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         class="fixed inset-0 z-50 overflow-y-auto"
-         style="display: none;">
-        <div class="flex items-center justify-center min-h-screen px-4">
-            <div class="fixed inset-0 bg-black bg-opacity-50" @click="showResetModal = false"></div>
-
-            <div class="relative bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
-                <div class="text-center">
-                    <div class="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="fas fa-undo text-yellow-600 text-2xl"></i>
-                    </div>
-
-                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Konfirmasi Reset</h3>
-                    <p class="text-gray-600 mb-6">
-                        Yakin ingin membatalkan semua perubahan? Semua data akan kembali ke state awal.
-                    </p>
-
-                    <div class="flex space-x-3">
-                        <button @click="showResetModal = false"
-                                class="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-xl hover:bg-gray-300 transition-colors">
-                            Batal
-                        </button>
-                        <button @click="confirmResetChanges()"
-                                class="flex-1 px-4 py-2 bg-yellow-600 text-white rounded-xl hover:bg-yellow-700 transition-colors">
-                            Reset
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Auto-Sync Confirmation Modal -->
-    <div x-show="showSyncModal"
-         x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-200"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         class="fixed inset-0 z-50 overflow-y-auto"
-         style="display: none;">
-        <div class="flex items-center justify-center min-h-screen px-4">
-            <div class="fixed inset-0 bg-black bg-opacity-50" @click="showSyncModal = false"></div>
-
-            <div class="relative bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
-                <div class="text-center">
-                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="fas fa-sync text-green-600 text-2xl"></i>
-                    </div>
-
-                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Konfirmasi Auto-Sync</h3>
-                    <p class="text-gray-600 mb-6">
-                        Yakin ingin melakukan auto-sync? Stock akan disesuaikan dengan item details saat ini.
-                    </p>
-
-                    <div class="flex space-x-3">
-                        <button @click="showSyncModal = false"
-                                class="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-xl hover:bg-gray-300 transition-colors">
-                            Batal
-                        </button>
-                        <button @click="confirmAutoSync()"
-                                class="flex-1 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors">
-                            Auto-Sync
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Preview Modal -->
-    <div x-show="showPreviewModal"
-         x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-200"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         class="fixed inset-0 z-50 overflow-y-auto"
-         style="display: none;">
-        <div class="flex items-center justify-center min-h-screen px-4">
-            <div class="fixed inset-0 bg-black bg-opacity-50" @click="showPreviewModal = false"></div>
-
-            <div class="relative bg-white rounded-2xl shadow-xl max-w-lg w-full p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-semibold text-gray-900">Preview Perubahan</h3>
-                    <button @click="showPreviewModal = false" class="text-gray-400 hover:text-gray-600">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-
-                <div class="space-y-4" x-show="previewData">
-                    <div class="bg-gray-50 rounded-xl p-4">
-                        <h4 class="font-medium text-gray-900 mb-3">Perubahan yang akan disimpan:</h4>
-                        <div class="space-y-2 max-h-64 overflow-y-auto">
-                            <template x-for="change in previewData?.changes || []" :key="change.item_detail_id">
-                                <div class="flex items-center justify-between text-sm bg-white p-2 rounded">
-                                    <span class="font-medium" x-text="change.serial_number"></span>
-                                    <span class="text-gray-600">
-                                        <span x-text="change.old_status"></span>
-                                        <i class="fas fa-arrow-right mx-2"></i>
-                                        <span x-text="change.new_status"></span>
-                                    </span>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4 text-sm">
-                        <div class="bg-blue-50 p-3 rounded-xl text-center">
-                            <div class="font-semibold text-blue-900">Total Stock</div>
-                            <div class="text-2xl font-bold text-blue-600" x-text="previewData?.totalStock || 0"></div>
-                        </div>
-                        <div class="bg-green-50 p-3 rounded-xl text-center">
-                            <div class="font-semibold text-green-900">Total Available</div>
-                            <div class="text-2xl font-bold text-green-600" x-text="previewData?.totalAvailable || 0"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex justify-end mt-6">
-                    <button @click="showPreviewModal = false"
-                            class="px-4 py-2 bg-gray-200 text-gray-800 rounded-xl hover:bg-gray-300 transition-colors">
-                        Tutup
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 @endsection
 
 @push('scripts')
 <script>
     function stockEdit() {
         return {
-            // Item Details Data
-            stockItems: @json($itemDetailsBreakdown['by_status']['stock'] ? $stock->item->itemDetails->where('status', 'stock')->values() : []),
-            availableItems: @json($itemDetailsBreakdown['by_status']['available'] ? $stock->item->itemDetails->where('status', 'available')->values() : []),
-
-            // Original data for reset
-            originalStockItems: [],
-            originalAvailableItems: [],
-
-            // Changed items tracking
+            // Data
+            allItems: @json($stock->item->itemDetails->whereIn('status', ['stock', 'available'])->values() ?? []),
+            selectedItems: [],
             changedItems: [],
+            searchQuery: '',
+            statusFilter: '',
 
-            // Drag & Drop state
-            draggedItem: null,
-
-            // Modal states
-            showSaveModal: false,
-            showResetModal: false,
-            showSyncModal: false,
-            showPreviewModal: false,
-            isSaving: false,
-            previewData: null,
-
-            get hasChanges() {
-                return this.changedItems.length > 0;
+            get filteredItems() {
+                return this.allItems.filter(item => {
+                    const matchesSearch = !this.searchQuery ||
+                        item.serial_number.toLowerCase().includes(this.searchQuery.toLowerCase());
+                    const matchesStatus = !this.statusFilter || item.status === this.statusFilter;
+                    return matchesSearch && matchesStatus;
+                });
             },
 
-            get totalStock() {
-                return this.stockItems.length;
+            get newStockCount() {
+                return this.allItems.filter(item => {
+                    const changed = this.changedItems.find(c => c.item_detail_id === item.item_detail_id);
+                    const status = changed ? changed.new_status : item.status;
+                    return status === 'stock';
+                }).length;
             },
 
-            get totalAvailable() {
-                return this.availableItems.length;
+            get newAvailableCount() {
+                return this.allItems.filter(item => {
+                    const changed = this.changedItems.find(c => c.item_detail_id === item.item_detail_id);
+                    const status = changed ? changed.new_status : item.status;
+                    return status === 'available';
+                }).length;
             },
 
             init() {
-                console.log('Initializing stock edit with drag & drop');
+                console.log('Initializing simple toggle stock edit');
 
-                // Store original data for reset
-                this.originalStockItems = JSON.parse(JSON.stringify(this.stockItems));
-                this.originalAvailableItems = JSON.parse(JSON.stringify(this.availableItems));
+                // Store original data
+                this.originalItems = JSON.parse(JSON.stringify(this.allItems));
 
                 // Add CSRF token
                 const token = document.querySelector('meta[name="csrf-token"]');
@@ -717,57 +502,100 @@
                 }
             },
 
-            handleDragStart(event, item) {
-                this.draggedItem = item;
-                event.dataTransfer.effectAllowed = 'move';
-                event.dataTransfer.setData('text/html', event.target.outerHTML);
-
-                // Add visual feedback
-                event.target.style.opacity = '0.5';
+            // Selection methods
+            toggleSelection(itemId) {
+                const index = this.selectedItems.indexOf(itemId);
+                if (index > -1) {
+                    this.selectedItems.splice(index, 1);
+                } else {
+                    this.selectedItems.push(itemId);
+                }
             },
 
-            handleDrop(event, targetStatus) {
-                event.preventDefault();
+            toggleSelectAll() {
+                if (this.selectedItems.length === this.filteredItems.length) {
+                    this.selectedItems = [];
+                } else {
+                    this.selectedItems = this.filteredItems.map(item => item.item_detail_id);
+                }
+            },
 
-                if (!this.draggedItem) return;
+            clearSelection() {
+                this.selectedItems = [];
+            },
 
-                const item = this.draggedItem;
-                const currentStatus = item.status;
+            // Quick select methods
+            quickSelect(pattern) {
+                if (!pattern) return;
 
-                // Don't do anything if dropped on same status
-                if (currentStatus === targetStatus) {
-                    this.draggedItem = null;
+                if (pattern === 'all_stock') {
+                    this.selectedItems = this.filteredItems
+                        .filter(item => item.status === 'stock')
+                        .map(item => item.item_detail_id);
+                    this.showToast(`Terpilih ${this.selectedItems.length} items Stock`, 'success');
+
+                } else if (pattern === 'all_available') {
+                    this.selectedItems = this.filteredItems
+                        .filter(item => item.status === 'available')
+                        .map(item => item.item_detail_id);
+                    this.showToast(`Terpilih ${this.selectedItems.length} items Available`, 'success');
+
+                } else if (pattern === 'range') {
+                    const start = prompt('Masukkan SN awal (contoh: SN001):');
+                    const end = prompt('Masukkan SN akhir (contoh: SN050):');
+
+                    if (start && end) {
+                        const startNum = parseInt(start.replace(/\D/g, ''));
+                        const endNum = parseInt(end.replace(/\D/g, ''));
+
+                        this.selectedItems = this.filteredItems
+                            .filter(item => {
+                                const sn = parseInt(item.serial_number.replace(/\D/g, ''));
+                                return sn >= startNum && sn <= endNum;
+                            })
+                            .map(item => item.item_detail_id);
+
+                        this.showToast(`Terpilih ${this.selectedItems.length} items dalam range ${start}-${end}`, 'success');
+                    }
+                }
+
+                // Reset select dropdown
+                event.target.value = '';
+            },
+
+            // Toggle methods
+            toggleItemStatus(item) {
+                const newStatus = item.status === 'stock' ? 'available' : 'stock';
+                this.changeItemStatus(item, newStatus);
+                this.showToast(`${item.serial_number} dipindah ke ${newStatus}`, 'success');
+            },
+
+            bulkToggleStatus() {
+                if (this.selectedItems.length === 0) {
+                    this.showToast('Pilih items terlebih dahulu', 'error');
                     return;
                 }
 
-                // Remove from current array
-                if (currentStatus === 'stock') {
-                    this.stockItems = this.stockItems.filter(i => i.item_detail_id !== item.item_detail_id);
-                } else if (currentStatus === 'available') {
-                    this.availableItems = this.availableItems.filter(i => i.item_detail_id !== item.item_detail_id);
-                }
+                const selectedItemsData = this.allItems.filter(item =>
+                    this.selectedItems.includes(item.item_detail_id)
+                );
 
-                // Update item status and location
-                item.status = targetStatus;
-                item.location = targetStatus === 'stock' ? 'Warehouse - Stock' : 'Office - Ready';
+                let changedCount = 0;
+                selectedItemsData.forEach(item => {
+                    const newStatus = item.status === 'stock' ? 'available' : 'stock';
+                    this.changeItemStatus(item, newStatus);
+                    changedCount++;
+                });
 
-                // Add to target array
-                if (targetStatus === 'stock') {
-                    this.stockItems.push(item);
-                } else if (targetStatus === 'available') {
-                    this.availableItems.push(item);
-                }
-
-                // Track the change
-                this.trackChange(item, currentStatus, targetStatus);
-
-                // Reset drag state
-                this.draggedItem = null;
-
-                this.showToast(`${item.serial_number} dipindah ke ${targetStatus}`, 'success');
+                this.showToast(`${changedCount} items berhasil di-toggle`, 'success');
+                this.clearSelection();
             },
 
-            trackChange(item, oldStatus, newStatus) {
+            changeItemStatus(item, newStatus) {
+                const oldStatus = item.status;
+
+                if (oldStatus === newStatus) return;
+
                 // Remove existing change for this item
                 this.changedItems = this.changedItems.filter(c => c.item_detail_id !== item.item_detail_id);
 
@@ -776,82 +604,16 @@
                     item_detail_id: item.item_detail_id,
                     serial_number: item.serial_number,
                     old_status: oldStatus,
-                    new_status: newStatus,
-                    location: item.location
+                    new_status: newStatus
                 });
-            },
 
-            async saveChanges() {
-                if (!this.hasChanges) {
-                    this.showToast('Tidak ada perubahan untuk disimpan', 'info');
-                    return;
-                }
-
-                if (!confirm(`Yakin ingin menyimpan ${this.changedItems.length} perubahan?`)) {
-                    return;
-                }
-
-                try {
-                    // Show loading
-                    const saveButton = document.querySelector('button[\\@click="saveChanges()"]');
-                    const originalText = saveButton.innerHTML;
-                    saveButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Menyimpan...';
-                    saveButton.disabled = true;
-
-                    // Prepare data for bulk update
-                    const updateData = {
-                        changes: this.changedItems.map(change => ({
-                            item_detail_id: change.item_detail_id,
-                            status: change.new_status,
-                            location: change.location,
-                            notes: `Status changed from ${change.old_status} to ${change.new_status} via stock management`
-                        }))
-                    };
-
-                    // Send bulk update request
-                    const response = await fetch('/api/item-details/bulk-update-status-from-stock', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': window.csrfToken
-                        },
-                        body: JSON.stringify(updateData)
-                    });
-
-                    const result = await response.json();
-
-                    if (result.success) {
-                        this.showToast(`Berhasil menyimpan ${result.data.updated_count} perubahan!`, 'success');
-
-                        // Clear changed items
-                        this.changedItems = [];
-
-                        // Update original data
-                        this.originalStockItems = JSON.parse(JSON.stringify(this.stockItems));
-                        this.originalAvailableItems = JSON.parse(JSON.stringify(this.availableItems));
-
-                        // Show auto-sync info if stock was synced
-                        if (result.data.stocks_synced_count > 0) {
-                            this.showToast('Stock telah disinkronkan otomatis!', 'info');
-                        }
-
-                    } else {
-                        this.showToast('Gagal menyimpan: ' + result.message, 'error');
-                    }
-
-                } catch (error) {
-                    console.error('Save changes error:', error);
-                    this.showToast('Terjadi kesalahan saat menyimpan', 'error');
-                } finally {
-                    // Restore button
-                    const saveButton = document.querySelector('button[\\@click="saveChanges()"]');
-                    saveButton.innerHTML = originalText;
-                    saveButton.disabled = false;
-                }
+                // Update item status in display
+                item.status = newStatus;
+                item.location = newStatus === 'stock' ? 'Warehouse - Stock' : 'Office - Ready';
             },
 
             resetChanges() {
-                if (!this.hasChanges) {
+                if (this.changedItems.length === 0) {
                     this.showToast('Tidak ada perubahan untuk direset', 'info');
                     return;
                 }
@@ -861,60 +623,27 @@
                 }
 
                 // Restore original data
-                this.stockItems = JSON.parse(JSON.stringify(this.originalStockItems));
-                this.availableItems = JSON.parse(JSON.stringify(this.originalAvailableItems));
-
-                // Clear changes
+                this.allItems = JSON.parse(JSON.stringify(this.originalItems));
                 this.changedItems = [];
+                this.selectedItems = [];
 
                 this.showToast('Perubahan berhasil direset!', 'info');
             },
 
-            previewChanges() {
-                if (!this.hasChanges) {
-                    this.showToast('Tidak ada perubahan untuk dipreview', 'info');
-                    return;
+            handleSubmit(event) {
+                if (this.changedItems.length === 0) {
+                    event.preventDefault();
+                    this.showToast('Tidak ada perubahan untuk disimpan', 'error');
+                    return false;
                 }
 
-                let preview = 'Perubahan yang akan disimpan:\n\n';
-                this.changedItems.forEach(change => {
-                    preview += `• ${change.serial_number}: ${change.old_status} → ${change.new_status}\n`;
-                });
+                // Show loading
+                const submitBtn = event.target.querySelector('button[type="submit"]');
+                const originalText = submitBtn.innerHTML;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Menyimpan...';
+                submitBtn.disabled = true;
 
-                preview += `\nTotal Stock: ${this.totalStock} items`;
-                preview += `\nTotal Available: ${this.totalAvailable} items`;
-
-                alert(preview);
-            },
-
-            async autoSync() {
-                if (!confirm('Yakin ingin melakukan auto-sync? Stock akan disesuaikan dengan item details.')) {
-                    return;
-                }
-
-                try {
-                    const response = await fetch(`/api/stocks/{{ $stock->stock_id }}/sync-item-details`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': window.csrfToken
-                        }
-                    });
-
-                    const result = await response.json();
-
-                    if (result.success) {
-                        this.showToast('Auto-sync berhasil! Halaman akan direfresh.', 'success');
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 1500);
-                    } else {
-                        this.showToast('Auto-sync gagal: ' + result.message, 'error');
-                    }
-                } catch (error) {
-                    console.error('Auto-sync error:', error);
-                    this.showToast('Terjadi kesalahan saat auto-sync', 'error');
-                }
+                return true;
             },
 
             showToast(message, type = 'info') {
@@ -946,85 +675,55 @@
         }
     }
 
-    // Prevent default drag behaviors
+    // Keyboard shortcuts
     document.addEventListener('DOMContentLoaded', function() {
-        document.addEventListener('dragover', function(e) {
-            e.preventDefault();
-        });
-
-        document.addEventListener('drop', function(e) {
-            e.preventDefault();
-        });
-
-        // Keyboard shortcuts
         document.addEventListener('keydown', function(e) {
-            // Ctrl + S for save
-            if (e.ctrlKey && e.key === 's') {
+            const app = Alpine.$data(document.querySelector('[x-data="stockEdit()"]'));
+            if (!app) return;
+
+            // Ctrl + A untuk select all filtered
+            if (e.ctrlKey && e.key === 'a') {
                 e.preventDefault();
-                // Trigger save changes if there are changes
-                const app = Alpine.$data(document.querySelector('[x-data="stockEdit()"]'));
-                if (app && app.hasChanges) {
-                    app.saveChanges(); // This will show modal instead of confirm
-                }
+                app.toggleSelectAll();
             }
 
-            // Escape to cancel/close modals
+            // Escape untuk clear selection
             if (e.key === 'Escape') {
-                const app = Alpine.$data(document.querySelector('[x-data="stockEdit()"]'));
-                if (app) {
-                    // Close any open modals first
-                    if (app.showSaveModal) {
-                        app.showSaveModal = false;
-                        return;
-                    }
-                    if (app.showResetModal) {
-                        app.showResetModal = false;
-                        return;
-                    }
-                    if (app.showSyncModal) {
-                        app.showSyncModal = false;
-                        return;
-                    }
-                    if (app.showPreviewModal) {
-                        app.showPreviewModal = false;
-                        return;
-                    }
-
-                    // If no modals open and has changes, ask to leave
-                    if (app.hasChanges) {
-                        app.showResetModal = true; // Show reset modal as confirmation
-                    } else {
-                        window.location.href = '{{ route('stocks.show', $stock) }}';
-                    }
+                if (app.selectedItems.length > 0) {
+                    app.clearSelection();
                 }
             }
 
-            // Ctrl + Z for reset
+            // Ctrl + Z untuk reset changes
             if (e.ctrlKey && e.key === 'z') {
                 e.preventDefault();
-                const app = Alpine.$data(document.querySelector('[x-data="stockEdit()"]'));
-                if (app && app.hasChanges) {
-                    app.resetChanges(); // This will show modal instead of confirm
-                }
+                app.resetChanges();
             }
 
-            // Ctrl + P for preview
-            if (e.ctrlKey && e.key === 'p') {
+            // Space untuk toggle selected items (jika ada selection)
+            if (e.key === ' ' && app.selectedItems.length > 0) {
                 e.preventDefault();
-                const app = Alpine.$data(document.querySelector('[x-data="stockEdit()"]'));
-                if (app && app.hasChanges) {
-                    app.previewChanges(); // This will show modal
+                app.bulkToggleStatus();
+            }
+
+            // Ctrl + S untuk submit
+            if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                if (app.changedItems.length > 0) {
+                    document.querySelector('form').submit();
+                } else {
+                    app.showToast('Tidak ada perubahan untuk disimpan', 'error');
                 }
             }
         });
-    });
 
-    // Add drag & drop visual feedback
-    document.addEventListener('DOMContentLoaded', function() {
-        document.addEventListener('dragend', function(e) {
-            // Restore opacity
-            e.target.style.opacity = '1';
-        });
+        // Auto-focus search input
+        setTimeout(() => {
+            const searchInput = document.querySelector('input[x-model="searchQuery"]');
+            if (searchInput) {
+                searchInput.focus();
+            }
+        }, 500);
     });
- </script>
+</script>
 @endpush

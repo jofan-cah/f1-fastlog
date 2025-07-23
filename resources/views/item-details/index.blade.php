@@ -157,17 +157,6 @@
                             @endforeach
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Per Halaman</label>
-                        <select name="per_page"
-                            class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-                            @foreach ($perPageOptions as $option)
-                                <option value="{{ $option }}" {{ $perPage == $option ? 'selected' : '' }}>
-                                    {{ $option }} items
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
 
                     <!-- Status Filter -->
                     <div>

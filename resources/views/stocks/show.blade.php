@@ -46,16 +46,12 @@
             </div>
         </div>
         <div class="flex flex-col sm:flex-row gap-3">
-            <a href="{{ route('stocks.adjust', ['stock_id' => $stock->stock_id]) }}"
+            <a href="{{ route('stocks.edit', $stock->stock_id) }}"
                class="px-4 py-2 bg-gradient-to-r from-yellow-600 to-yellow-700 text-white rounded-xl hover:from-yellow-700 hover:to-yellow-800 transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl">
                 <i class="fas fa-edit"></i>
-                <span>Adjust Stok</span>
+                <span>Edit Stok</span>
             </a>
-            <button @click="showQuickAdjustModal()"
-                    class="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl">
-                <i class="fas fa-plus-minus"></i>
-                <span>Quick Adjust</span>
-            </button>
+
         </div>
     </div>
 
@@ -287,105 +283,7 @@
 
     </div>
 
-    <!-- Quick Adjust Modal -->
-    <div x-show="quickAdjustModal.show"
-         x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-200"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         @click.self="hideQuickAdjustModal()"
-         @keydown.escape.window="hideQuickAdjustModal()"
-         class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-         style="display: none;">
-        <div x-show="quickAdjustModal.show"
-             x-transition:enter="transition ease-out duration-300 transform"
-             x-transition:enter-start="opacity-0 scale-95"
-             x-transition:enter-end="opacity-100 scale-100"
-             x-transition:leave="transition ease-in duration-200 transform"
-             x-transition:leave-start="opacity-100 scale-100"
-             x-transition:leave-end="opacity-0 scale-95"
-             class="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-            <div class="p-6">
-                <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <i class="fas fa-plus-minus text-2xl text-purple-600"></i>
-                </div>
 
-                <h3 class="text-xl font-bold text-gray-900 text-center mb-2">Quick Adjust Stok</h3>
-                <p class="text-gray-600 text-center mb-6">{{ $stock->item->item_name }}</p>
-
-                <form @submit.prevent="submitQuickAdjust()">
-                    <div class="space-y-4">
-                        <!-- Current Stock Info -->
-                        <div class="bg-gray-50 rounded-lg p-4">
-                            <div class="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                    <span class="text-gray-600">Tersedia:</span>
-                                    <span class="ml-2 font-medium">{{ $stock->quantity_available }}</span>
-                                    <span>{{ $stock->item->unit }}</span>
-                                </div>
-                                <div>
-                                    <span class="text-gray-600">Terpakai:</span>
-                                    <span class="ml-2 font-medium">{{ $stock->quantity_used }}</span>
-                                    <span>{{ $stock->item->unit }}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Adjustment Type -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Tipe Adjustment</label>
-                            <select x-model="quickAdjustModal.adjustmentType"
-                                    class="w-full py-2 px-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
-                                <option value="add">Tambah Stok</option>
-                                <option value="reduce">Kurangi Stok</option>
-                                <option value="return">Return Stok</option>
-                            </select>
-                        </div>
-
-                        <!-- Quantity -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Jumlah</label>
-                            <input type="number"
-                                   x-model="quickAdjustModal.quantity"
-                                   min="1"
-                                   class="w-full py-2 px-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                   required>
-                        </div>
-
-                        <!-- Reason -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Alasan</label>
-                            <select x-model="quickAdjustModal.reason"
-                                    class="w-full py-2 px-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
-                                <option value="manual_adjustment">Manual Adjustment</option>
-                                <option value="stock_opname">Stock Opname</option>
-                                <option value="correction">Koreksi Data</option>
-                                <option value="damage">Barang Rusak</option>
-                                <option value="lost">Barang Hilang</option>
-                                <option value="return">Return dari User</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="flex flex-col sm:flex-row gap-3 mt-6">
-                        <button type="button"
-                                @click="hideQuickAdjustModal()"
-                                class="flex-1 px-4 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-all duration-200 flex items-center justify-center space-x-2">
-                            <i class="fas fa-times"></i>
-                            <span>Batal</span>
-                        </button>
-                        <button type="submit"
-                                class="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl">
-                            <i class="fas fa-save"></i>
-                            <span>Simpan</span>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
 
     <!-- Success/Error Messages -->
     @if(session('success'))
