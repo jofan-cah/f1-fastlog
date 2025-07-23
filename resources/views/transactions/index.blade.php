@@ -4,6 +4,17 @@
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 @section('content')
 <div x-data="transactionManager()" class="space-y-6">
+
+    @php
+    $label = [
+        'IN' => 'Transaksi Masuk',
+        'OUT' => 'Transaksi Keluar',
+        'LOST' => 'Transaksi Hilang',
+        'REPAIR' => 'Transaksi Perbaikan',
+    ];
+
+    $judul = $label[$currentType ?? ''] ?? 'Semua Transaksi';
+@endphp
     <!-- Header Section -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -13,7 +24,7 @@
                         <i class="{{ $currentType['icon'] ?? 'fas fa-exchange-alt' }} text-white"></i>
                     </div>
                     <div>
-                        <h1 class="text-2xl font-bold text-gray-900">{{ $currentType['text'] ?? 'Semua Transaksi' }}</h1>
+                        <h1 class="text-2xl font-bold text-gray-900">{{ $judul }}</h1>
                         <p class="text-sm text-gray-600">{{ $currentType['description'] ?? 'Kelola semua transaksi sistem' }}</p>
                     </div>
                 </div>
