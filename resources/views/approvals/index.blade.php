@@ -524,11 +524,11 @@ function approvalCenter() {
             }
         },
 
-        showRejectModal(transaction) {
-            this.rejectTransaction = transaction;
-            this.rejectReason = '';
-            this.showRejectDialog = true;
-        },
+        // showRejectModal(transaction) {
+        //     this.rejectTransaction = transaction;
+        //     this.rejectReason = '';
+        //     this.showRejectDialog = true;
+        // },
 
         closeRejectModal() {
             this.showRejectDialog = false;

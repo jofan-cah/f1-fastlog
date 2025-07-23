@@ -207,6 +207,11 @@
             </button>
             <div id="transactions" class="overflow-hidden transition-all duration-300 {{ $transactionMenuActive ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0' }}">
                 <div class="ml-8 space-y-1">
+                    <a href="{{ route('transactions.index') }}"
+                       class="block p-2 text-sm mt-2 transition-all duration-200 hover:translate-x-1 rounded-lg
+                              {{ request()->routeIs('transactions.*') && request()->get('type') == '' ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
+                        <i class="fas fa-clipboard-list w-4"></i> Semua Data
+                    </a>
                     <a href="{{ route('transactions.index', ['type' => 'IN']) }}"
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
                               {{ request()->routeIs('transactions.*') && request()->get('type') == 'IN' ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">

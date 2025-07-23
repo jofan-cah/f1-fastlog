@@ -67,10 +67,11 @@ class TransactionController extends Controller
         $currentTypeConfig = $currentType ? ($typeConfigs[$currentType] ?? null) : null;
 
         // Build query
-        $query = Transaction::with(['item', 'createdBy', 'approvedBy'])
-            ->when(auth()->user()->userLevel->level_name === 'teknisi', function ($query) {
-                $query->where('created_by', auth()->id());
-            });
+        $query = Transaction::with(['item', 'createdBy', 'approvedBy']);
+        if (auth()->user()->userLevel && strtolower(auth()->user()->userLevel->level_name) === 'teknisi') {
+            // Teknisi tidak bisa lihat transaksi sama sekali
+            $query->where('transaction_id', null); // This will return empty result
+        }
 
         // Apply type filter if specified
         if ($currentType && in_array($currentType, $allowedTypes)) {
