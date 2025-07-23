@@ -19,162 +19,410 @@ class TransactionController extends Controller
     /**
      * Display transaction dashboard - Updated to handle all types
      */
-    public function index(Request $request)
-    {
-        $currentType = $request->get('type');
-        $allowedTypes = Transaction::getUserAllowedTypes();
 
-        // Define transaction type configurations
-        $typeConfigs = [
-            'IN' => [
-                'text' => 'Barang Masuk',
-                'description' => 'Kelola transaksi barang masuk ke sistem',
-                'icon' => 'fas fa-arrow-down',
-                'gradient' => 'from-green-600 to-green-700',
-                'class' => 'bg-green-100 text-green-800'
-            ],
-            'OUT' => [
-                'text' => 'Barang Keluar',
-                'description' => 'Kelola transaksi barang keluar dari sistem',
-                'icon' => 'fas fa-arrow-up',
-                'gradient' => 'from-blue-600 to-blue-700',
-                'class' => 'bg-blue-100 text-blue-800'
-            ],
-            'REPAIR' => [
-                'text' => 'Barang Repair',
-                'description' => 'Kelola transaksi barang yang perlu diperbaiki',
-                'icon' => 'fas fa-wrench',
-                'gradient' => 'from-yellow-600 to-yellow-700',
-                'class' => 'bg-yellow-100 text-yellow-800'
-            ],
-            'LOST' => [
-                'text' => 'Barang Hilang',
-                'description' => 'Kelola transaksi barang yang hilang',
-                'icon' => 'fas fa-exclamation-triangle',
-                'gradient' => 'from-red-600 to-red-700',
-                'class' => 'bg-red-100 text-red-800'
-            ],
-            'RETURN' => [
-                'text' => 'Pengembalian',
-                'description' => 'Kelola transaksi pengembalian barang',
-                'icon' => 'fas fa-undo',
-                'gradient' => 'from-purple-600 to-purple-700',
-                'class' => 'bg-purple-100 text-purple-800'
+public function index(Request $request)
+{
+    $currentType = $request->get('type');
+    $allowedTypes = Transaction::getUserAllowedTypes();
+
+    // ✅ NEW: Get search and filter parameters including date
+    $search = $request->get('search');
+    $statusFilter = $request->get('status');
+    $dateFrom = $request->get('date_from');
+    $dateTo = $request->get('date_to');
+
+    // Define transaction type configurations
+    $typeConfigs = [
+        'IN' => [
+            'text' => 'Barang Masuk',
+            'description' => 'Kelola transaksi barang masuk ke sistem',
+            'icon' => 'fas fa-arrow-down',
+            'gradient' => 'from-green-600 to-green-700',
+            'class' => 'bg-green-100 text-green-800'
+        ],
+        'OUT' => [
+            'text' => 'Barang Keluar',
+            'description' => 'Kelola transaksi barang keluar dari sistem',
+            'icon' => 'fas fa-arrow-up',
+            'gradient' => 'from-blue-600 to-blue-700',
+            'class' => 'bg-blue-100 text-blue-800'
+        ],
+        'REPAIR' => [
+            'text' => 'Barang Repair',
+            'description' => 'Kelola transaksi barang yang perlu diperbaiki',
+            'icon' => 'fas fa-wrench',
+            'gradient' => 'from-yellow-600 to-yellow-700',
+            'class' => 'bg-yellow-100 text-yellow-800'
+        ],
+        'LOST' => [
+            'text' => 'Barang Hilang',
+            'description' => 'Kelola transaksi barang yang hilang',
+            'icon' => 'fas fa-exclamation-triangle',
+            'gradient' => 'from-red-600 to-red-700',
+            'class' => 'bg-red-100 text-red-800'
+        ],
+        'RETURN' => [
+            'text' => 'Pengembalian',
+            'description' => 'Kelola transaksi pengembalian barang',
+            'icon' => 'fas fa-undo',
+            'gradient' => 'from-purple-600 to-purple-700',
+            'class' => 'bg-purple-100 text-purple-800'
+        ]
+    ];
+
+    // Get current type config
+    $currentTypeConfig = $currentType ? ($typeConfigs[$currentType] ?? null) : null;
+
+    // Build query
+    $query = Transaction::with(['item', 'createdBy', 'approvedBy']);
+
+    // ✅ FIXED: Teknisi tidak bisa lihat transaksi
+    if (auth()->user()->userLevel && strtolower(auth()->user()->userLevel->level_name) === 'teknisi') {
+        $query->whereRaw('1 = 0'); // Empty result for teknisi
+    }
+
+    // Apply type filter if specified
+    if ($currentType && in_array($currentType, $allowedTypes)) {
+        $query->where('transaction_type', $currentType);
+    }
+
+    // ✅ NEW: Apply search filter
+    if ($search) {
+        $query->where(function($q) use ($search) {
+            $q->where('transaction_number', 'like', "%{$search}%")
+              ->orWhereHas('item', function($itemQuery) use ($search) {
+                  $itemQuery->where('item_name', 'like', "%{$search}%")
+                           ->orWhere('item_code', 'like', "%{$search}%");
+              })
+              ->orWhereHas('createdBy', function($userQuery) use ($search) {
+                  $userQuery->where('full_name', 'like', "%{$search}%");
+              });
+        });
+    }
+
+    // ✅ NEW: Apply status filter
+    if ($statusFilter) {
+        $query->where('status', $statusFilter);
+    }
+
+    // ✅ NEW: Apply date filters
+    if ($dateFrom) {
+        $query->whereDate('transaction_date', '>=', $dateFrom);
+    }
+
+    if ($dateTo) {
+        $query->whereDate('transaction_date', '<=', $dateTo);
+    }
+
+    // Get transactions
+    $transactions = $query->orderBy('created_at', 'desc')
+        ->get()
+        ->map(function ($transaction) {
+            $typeInfo = $transaction->getTypeInfo();
+            $statusInfo = $transaction->getStatusInfo();
+
+            return [
+                'id' => $transaction->transaction_id,
+                'transaction_number' => $transaction->transaction_number,
+                'transaction_type' => $transaction->transaction_type,
+                'status' => $transaction->status,
+                'item_name' => $transaction->item->item_name ?? 'Unknown',
+                'item_code' => $transaction->item->item_code ?? 'N/A',
+                'created_by_name' => $transaction->createdBy->full_name ?? 'Unknown',
+                'approved_by_name' => $transaction->approvedBy->full_name ?? null,
+                'transaction_date' => $transaction->transaction_date->format('d M Y H:i'),
+                'approved_date' => $transaction->approved_date ? $transaction->approved_date->format('d M Y H:i') : null,
+
+                // Type info
+                'type_text' => $typeInfo['text'],
+                'type_icon' => $typeInfo['icon'],
+                'type_class' => $typeInfo['class'],
+
+                // Status info
+                'status_text' => $statusInfo['text'],
+                'status_icon' => $statusInfo['icon'],
+                'status_class' => $statusInfo['class'],
+
+                // Action permissions
+                'can_edit' => $transaction->created_by === auth()->id() && $transaction->status === Transaction::STATUS_PENDING,
+                'can_approve' => Transaction::canUserApprove() && $transaction->status === Transaction::STATUS_PENDING,
+                'can_cancel' => $transaction->created_by === auth()->id() && $transaction->canBeCancelled(),
+            ];
+        });
+
+    // ✅ NEW: Get statistics with all filters applied
+    $stats = $this->getTransactionStats($currentType, $search, $statusFilter, $dateFrom, $dateTo);
+
+    // Get available transaction types and statuses
+    $transactionTypes = Transaction::getTransactionTypes();
+    $transactionStatuses = Transaction::getStatuses();
+
+    // Handle AJAX requests
+    if ($request->ajax()) {
+        return response()->json([
+            'success' => true,
+            'transactions' => $transactions,
+            'stats' => $stats,
+            'filters' => [
+                'search' => $search,
+                'status' => $statusFilter,
+                'type' => $currentType,
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo
             ]
-        ];
-
-        // Get current type config
-        $currentTypeConfig = $currentType ? ($typeConfigs[$currentType] ?? null) : null;
-
-        // Build query
-        $query = Transaction::with(['item', 'createdBy', 'approvedBy']);
-        if (auth()->user()->userLevel && strtolower(auth()->user()->userLevel->level_name) === 'teknisi') {
-            // Teknisi tidak bisa lihat transaksi sama sekali
-            $query->where('transaction_id', null); // This will return empty result
-        }
-
-        // Apply type filter if specified
-        if ($currentType && in_array($currentType, $allowedTypes)) {
-            $query->where('transaction_type', $currentType);
-        }
-
-        // Get transactions
-        $transactions = $query->orderBy('created_at', 'desc')
-            ->get()
-            ->map(function ($transaction) {
-                $typeInfo = $transaction->getTypeInfo();
-                $statusInfo = $transaction->getStatusInfo();
-
-                return [
-                    'id' => $transaction->transaction_id,
-                    'transaction_number' => $transaction->transaction_number,
-                    'transaction_type' => $transaction->transaction_type,
-                    'status' => $transaction->status,
-                    'item_name' => $transaction->item->item_name ?? 'Unknown',
-                    'item_code' => $transaction->item->item_code ?? 'N/A',
-                    'created_by_name' => $transaction->createdBy->full_name ?? 'Unknown',
-                    'approved_by_name' => $transaction->approvedBy->full_name ?? null,
-                    'transaction_date' => $transaction->transaction_date->format('d M Y H:i'),
-                    'approved_date' => $transaction->approved_date ? $transaction->approved_date->format('d M Y H:i') : null,
-
-                    // Type info
-                    'type_text' => $typeInfo['text'],
-                    'type_icon' => $typeInfo['icon'],
-                    'type_class' => $typeInfo['class'],
-
-                    // Status info
-                    'status_text' => $statusInfo['text'],
-                    'status_icon' => $statusInfo['icon'],
-                    'status_class' => $statusInfo['class'],
-
-                    // Action permissions
-                    'can_edit' => $transaction->created_by === auth()->id() && $transaction->status === Transaction::STATUS_PENDING,
-                    'can_approve' => Transaction::canUserApprove() && $transaction->status === Transaction::STATUS_PENDING,
-                    'can_cancel' => $transaction->created_by === auth()->id() && $transaction->canBeCancelled(),
-                ];
-            });
-
-        // Get statistics
-        $stats = $this->getTransactionStats($currentType);
-
-        // Get available transaction types and statuses
-        $transactionTypes = Transaction::getTransactionTypes();
-        $transactionStatuses = Transaction::getStatuses();
-
-        // Handle AJAX requests
-        if ($request->ajax()) {
-            return response()->json([
-                'success' => true,
-                'transactions' => $transactions,
-                'stats' => $stats
-            ]);
-        }
-
-        return view('transactions.index', compact(
-            'transactions',
-            'stats',
-            'currentType',
-            'currentTypeConfig',
-            'transactionTypes',
-            'transactionStatuses',
-            'allowedTypes'
-        ));
+        ]);
     }
 
-    /**
-     * Get transaction statistics based on type filter
-     */
-    private function getTransactionStats($type = null)
-    {
-        $query = Transaction::query();
+    return view('transactions.index', compact(
+        'transactions',
+        'stats',
+        'currentType',
+        'currentTypeConfig',
+        'transactionTypes',
+        'transactionStatuses',
+        'allowedTypes'
+    ));
+}
 
-        // Apply user filter for teknisi
-        if (auth()->user()->userLevel->level_name === 'teknisi') {
-            $query->where('created_by', auth()->id());
-        }
+// ✅ UPDATED: getTransactionStats with date filters
+private function getTransactionStats($currentType = null, $search = null, $statusFilter = null, $dateFrom = null, $dateTo = null)
+{
+    $query = Transaction::query();
 
-        // Apply type filter
-        if ($type) {
-            $query->where('transaction_type', $type);
-        }
-
-        $totalTransactions = $query->count();
-        $pendingCount = (clone $query)->where('status', Transaction::STATUS_PENDING)->count();
-        $approvedToday = (clone $query)->where('status', Transaction::STATUS_APPROVED)
-            ->whereDate('approved_date', today())->count();
-        $rejectedCount = (clone $query)->where('status', Transaction::STATUS_REJECTED)->count();
-
-        $successRate = $totalTransactions > 0 ?
-            round((($totalTransactions - $rejectedCount) / $totalTransactions) * 100, 1) : 0;
-
-        return [
-            'total_transactions' => $totalTransactions,
-            'pending_count' => $pendingCount,
-            'approved_today' => $approvedToday,
-            'rejected_count' => $rejectedCount,
-            'success_rate' => $successRate,
-        ];
+    // Teknisi tidak bisa lihat stats
+    if (auth()->user()->userLevel && strtolower(auth()->user()->userLevel->level_name) === 'teknisi') {
+        $query->whereRaw('1 = 0');
     }
+
+    // Apply type filter
+    if ($currentType) {
+        $query->where('transaction_type', $currentType);
+    }
+
+    // Apply search filter
+    if ($search) {
+        $query->where(function($q) use ($search) {
+            $q->where('transaction_number', 'like', "%{$search}%")
+              ->orWhereHas('item', function($itemQuery) use ($search) {
+                  $itemQuery->where('item_name', 'like', "%{$search}%")
+                           ->orWhere('item_code', 'like', "%{$search}%");
+              })
+              ->orWhereHas('createdBy', function($userQuery) use ($search) {
+                  $userQuery->where('full_name', 'like', "%{$search}%");
+              });
+        });
+    }
+
+    // Apply date filters
+    if ($dateFrom) {
+        $query->whereDate('transaction_date', '>=', $dateFrom);
+    }
+
+    if ($dateTo) {
+        $query->whereDate('transaction_date', '<=', $dateTo);
+    }
+
+    // Get base stats
+    $totalQuery = clone $query;
+    $pendingQuery = clone $query;
+    $approvedTodayQuery = clone $query;
+    $totalApprovedQuery = clone $query;
+
+    $total = $totalQuery->count();
+    $pending = $pendingQuery->where('status', Transaction::STATUS_PENDING)->count();
+
+    // Approved today - consider date filter
+    if ($dateFrom || $dateTo) {
+        // If date filter applied, show approved in that range
+        $approvedToday = $approvedTodayQuery->where('status', Transaction::STATUS_APPROVED)->count();
+    } else {
+        // Default behavior - approved today only
+        $approvedToday = $approvedTodayQuery
+            ->where('status', Transaction::STATUS_APPROVED)
+            ->whereDate('approved_date', today())
+            ->count();
+    }
+
+    $totalApproved = $totalApprovedQuery->where('status', Transaction::STATUS_APPROVED)->count();
+
+    // Calculate success rate
+    $successRate = $total > 0 ? round(($totalApproved / $total) * 100, 1) : 0;
+
+    return [
+        'total_transactions' => $total,
+        'pending_count' => $pending,
+        'approved_today' => $approvedToday,
+        'success_rate' => $successRate,
+
+        // Additional breakdown stats
+        'approved_count' => $totalApproved,
+        'rejected_count' => (clone $query)->where('status', Transaction::STATUS_REJECTED)->count(),
+
+        // Date range info for frontend
+        'date_range' => [
+            'from' => $dateFrom,
+            'to' => $dateTo,
+            'is_filtered' => $dateFrom || $dateTo
+        ]
+    ];
+}
+
+    // public function index(Request $request)
+    // {
+    //     $currentType = $request->get('type');
+    //     $allowedTypes = Transaction::getUserAllowedTypes();
+
+    //     // Define transaction type configurations
+    //     $typeConfigs = [
+    //         'IN' => [
+    //             'text' => 'Barang Masuk',
+    //             'description' => 'Kelola transaksi barang masuk ke sistem',
+    //             'icon' => 'fas fa-arrow-down',
+    //             'gradient' => 'from-green-600 to-green-700',
+    //             'class' => 'bg-green-100 text-green-800'
+    //         ],
+    //         'OUT' => [
+    //             'text' => 'Barang Keluar',
+    //             'description' => 'Kelola transaksi barang keluar dari sistem',
+    //             'icon' => 'fas fa-arrow-up',
+    //             'gradient' => 'from-blue-600 to-blue-700',
+    //             'class' => 'bg-blue-100 text-blue-800'
+    //         ],
+    //         'REPAIR' => [
+    //             'text' => 'Barang Repair',
+    //             'description' => 'Kelola transaksi barang yang perlu diperbaiki',
+    //             'icon' => 'fas fa-wrench',
+    //             'gradient' => 'from-yellow-600 to-yellow-700',
+    //             'class' => 'bg-yellow-100 text-yellow-800'
+    //         ],
+    //         'LOST' => [
+    //             'text' => 'Barang Hilang',
+    //             'description' => 'Kelola transaksi barang yang hilang',
+    //             'icon' => 'fas fa-exclamation-triangle',
+    //             'gradient' => 'from-red-600 to-red-700',
+    //             'class' => 'bg-red-100 text-red-800'
+    //         ],
+    //         'RETURN' => [
+    //             'text' => 'Pengembalian',
+    //             'description' => 'Kelola transaksi pengembalian barang',
+    //             'icon' => 'fas fa-undo',
+    //             'gradient' => 'from-purple-600 to-purple-700',
+    //             'class' => 'bg-purple-100 text-purple-800'
+    //         ]
+    //     ];
+
+    //     // Get current type config
+    //     $currentTypeConfig = $currentType ? ($typeConfigs[$currentType] ?? null) : null;
+
+    //     // Build query
+    //     $query = Transaction::with(['item', 'createdBy', 'approvedBy']);
+    //     if (auth()->user()->userLevel && strtolower(auth()->user()->userLevel->level_name) === 'teknisi') {
+    //         // Teknisi tidak bisa lihat transaksi sama sekali
+    //         $query->where('transaction_id', null); // This will return empty result
+    //     }
+
+    //     // Apply type filter if specified
+    //     if ($currentType && in_array($currentType, $allowedTypes)) {
+    //         $query->where('transaction_type', $currentType);
+    //     }
+
+    //     // Get transactions
+    //     $transactions = $query->orderBy('created_at', 'desc')
+    //         ->get()
+    //         ->map(function ($transaction) {
+    //             $typeInfo = $transaction->getTypeInfo();
+    //             $statusInfo = $transaction->getStatusInfo();
+
+    //             return [
+    //                 'id' => $transaction->transaction_id,
+    //                 'transaction_number' => $transaction->transaction_number,
+    //                 'transaction_type' => $transaction->transaction_type,
+    //                 'status' => $transaction->status,
+    //                 'item_name' => $transaction->item->item_name ?? 'Unknown',
+    //                 'item_code' => $transaction->item->item_code ?? 'N/A',
+    //                 'created_by_name' => $transaction->createdBy->full_name ?? 'Unknown',
+    //                 'approved_by_name' => $transaction->approvedBy->full_name ?? null,
+    //                 'transaction_date' => $transaction->transaction_date->format('d M Y H:i'),
+    //                 'approved_date' => $transaction->approved_date ? $transaction->approved_date->format('d M Y H:i') : null,
+
+    //                 // Type info
+    //                 'type_text' => $typeInfo['text'],
+    //                 'type_icon' => $typeInfo['icon'],
+    //                 'type_class' => $typeInfo['class'],
+
+    //                 // Status info
+    //                 'status_text' => $statusInfo['text'],
+    //                 'status_icon' => $statusInfo['icon'],
+    //                 'status_class' => $statusInfo['class'],
+
+    //                 // Action permissions
+    //                 'can_edit' => $transaction->created_by === auth()->id() && $transaction->status === Transaction::STATUS_PENDING,
+    //                 'can_approve' => Transaction::canUserApprove() && $transaction->status === Transaction::STATUS_PENDING,
+    //                 'can_cancel' => $transaction->created_by === auth()->id() && $transaction->canBeCancelled(),
+    //             ];
+    //         });
+
+    //     // Get statistics
+    //     $stats = $this->getTransactionStats($currentType);
+
+    //     // Get available transaction types and statuses
+    //     $transactionTypes = Transaction::getTransactionTypes();
+    //     $transactionStatuses = Transaction::getStatuses();
+
+    //     // Handle AJAX requests
+    //     if ($request->ajax()) {
+    //         return response()->json([
+    //             'success' => true,
+    //             'transactions' => $transactions,
+    //             'stats' => $stats
+    //         ]);
+    //     }
+
+    //     return view('transactions.index', compact(
+    //         'transactions',
+    //         'stats',
+    //         'currentType',
+    //         'currentTypeConfig',
+    //         'transactionTypes',
+    //         'transactionStatuses',
+    //         'allowedTypes'
+    //     ));
+    // }
+
+    // /**
+    //  * Get transaction statistics based on type filter
+    //  */
+    // private function getTransactionStats($type = null)
+    // {
+    //     $query = Transaction::query();
+
+    //     // Apply user filter for teknisi
+    //     if (auth()->user()->userLevel->level_name === 'teknisi') {
+    //         $query->where('created_by', auth()->id());
+    //     }
+
+    //     // Apply type filter
+    //     if ($type) {
+    //         $query->where('transaction_type', $type);
+    //     }
+
+    //     $totalTransactions = $query->count();
+    //     $pendingCount = (clone $query)->where('status', Transaction::STATUS_PENDING)->count();
+    //     $approvedToday = (clone $query)->where('status', Transaction::STATUS_APPROVED)
+    //         ->whereDate('approved_date', today())->count();
+    //     $rejectedCount = (clone $query)->where('status', Transaction::STATUS_REJECTED)->count();
+
+    //     $successRate = $totalTransactions > 0 ?
+    //         round((($totalTransactions - $rejectedCount) / $totalTransactions) * 100, 1) : 0;
+
+    //     return [
+    //         'total_transactions' => $totalTransactions,
+    //         'pending_count' => $pendingCount,
+    //         'approved_today' => $approvedToday,
+    //         'rejected_count' => $rejectedCount,
+    //         'success_rate' => $successRate,
+    //     ];
+    // }
     /**
      * Show create transaction form - Updated for dual method
      */
