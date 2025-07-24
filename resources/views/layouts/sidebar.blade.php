@@ -103,6 +103,13 @@
                         Jenis Barang
                     </a>
                     @endcanAccess
+                    @canAccess('items', 'read')
+                    <a href="{{ route('itemsCode.indexCode') }}"
+                       class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
+                              {{ request()->routeIs('items.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
+                        Kode Barang
+                    </a>
+                    @endcanAccess
                     @canAccess('suppliers', 'read')
                     <a href="{{ route('suppliers.index') }}"
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg

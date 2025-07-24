@@ -93,7 +93,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:user_levels,delete')->group(function () {
         Route::delete('/user-levels/{userLevel}', [UserLevelController::class, 'destroy'])->name('user-levels.destroy');
     });
-        Route::middleware('permission:users,create')->group(function () {
+    Route::middleware('permission:users,create')->group(function () {
         Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
         Route::post('/users', [UserController::class, 'store'])->name('users.store');
     });
@@ -120,7 +120,7 @@ Route::middleware('auth')->group(function () {
     // CATEGORY MANAGEMENT
     // ================================================================
 
-        Route::middleware('permission:categories,create')->group(function () {
+    Route::middleware('permission:categories,create')->group(function () {
         Route::get('/categories/create', [CategoryController::class, 'create'])->name('categories.create');
         Route::post('/categories', [CategoryController::class, 'store'])->name('categories.store');
     });
@@ -177,14 +177,18 @@ Route::middleware('auth')->group(function () {
     // ITEM MANAGEMENT
     // ================================================================
     Route::middleware('permission:items,create')->group(function () {
+
         Route::get('/items/create', [ItemController::class, 'create'])->name('items.create');
         Route::post('/items', [ItemController::class, 'store'])->name('items.store');
         Route::post('/items/{item}/generate-qr', [ItemController::class, 'generateQR'])->name('items.generate-qr');
     });
 
     Route::middleware('permission:items,read')->group(function () {
+ Route::get('/items/code', [ItemController::class, 'indexViewCode'])->name('itemsCode.indexCode');
+        Route::get('/items/export/excel', [ItemController::class, 'exportExcel'])->name('items.export.excel');
         Route::get('/items', [ItemController::class, 'index'])->name('items.index');
         Route::get('/items/{item}', [ItemController::class, 'show'])->name('items.show');
+
     });
 
 
@@ -326,7 +330,7 @@ Route::middleware('auth')->group(function () {
     // TRANSACTION MANAGEMENT
     // ================================================================
 
- Route::middleware('permission:transactions,create')->group(function () {
+    Route::middleware('permission:transactions,create')->group(function () {
         Route::get('/transactions/create', [TransactionController::class, 'create'])->name('transactions.create');
         Route::post('/transactions', [TransactionController::class, 'store'])->name('transactions.store');
     });
@@ -719,7 +723,6 @@ Route::middleware('auth')->group(function () {
             }
         })->name('validate-qr');
     });
-
 });
 
 // ================================================================

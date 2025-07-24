@@ -15,6 +15,11 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class ItemController extends Controller
@@ -27,6 +32,167 @@ class ItemController extends Controller
         // $this->middleware('permission:items.create')->only(['create', 'store']);
         // $this->middleware('permission:items.update')->only(['edit', 'update']);
         // $this->middleware('permission:items.delete')->only(['destroy']);
+    }
+
+
+    public function indexViewCode(Request $request)
+    {
+        $query = Item::with(['category', 'stock']);
+
+        // Search functionality
+        if ($request->filled('search')) {
+            $searchTerm = $request->search;
+            $query->where(function($q) use ($searchTerm) {
+                $q->where('item_code', 'like', "%{$searchTerm}%")
+                  ->orWhere('item_name', 'like', "%{$searchTerm}%")
+                  ->orWhereHas('category', function($subQ) use ($searchTerm) {
+                      $subQ->where('code_category', 'like', "%{$searchTerm}%")
+                           ->orWhere('category_name', 'like', "%{$searchTerm}%");
+                  });
+            });
+        }
+
+        // Filter by category
+        if ($request->filled('category_id')) {
+            $query->where('category_id', $request->category_id);
+        }
+
+        // Filter by status
+        if ($request->filled('status')) {
+            $isActive = $request->status === 'active';
+            $query->where('is_active', $isActive);
+        }
+
+        $items = $query->orderBy('item_name')->paginate(20)->withQueryString();
+
+        // Get categories for filter
+        $categories = Category::active()->orderBy('category_name')->get();
+
+        return view('items.indexCode', compact('items', 'categories'));
+    }
+
+    /**
+     * Export items to Excel
+     */
+    public function exportExcel(Request $request)
+    {
+        // Get filtered data (same as index but without pagination)
+        $query = Item::with(['category', 'stock']);
+
+        if ($request->filled('search')) {
+            $searchTerm = $request->search;
+            $query->where(function($q) use ($searchTerm) {
+                $q->where('item_code', 'like', "%{$searchTerm}%")
+                  ->orWhere('item_name', 'like', "%{$searchTerm}%")
+                  ->orWhereHas('category', function($subQ) use ($searchTerm) {
+                      $subQ->where('code_category', 'like', "%{$searchTerm}%")
+                           ->orWhere('category_name', 'like', "%{$searchTerm}%");
+                  });
+            });
+        }
+
+        if ($request->filled('category_id')) {
+            $query->where('category_id', $request->category_id);
+        }
+
+        if ($request->filled('status')) {
+            $isActive = $request->status === 'active';
+            $query->where('is_active', $isActive);
+        }
+
+        $items = $query->orderBy('item_name')->get();
+
+        // Create new Spreadsheet
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        // Set document properties
+        $spreadsheet->getProperties()
+            ->setCreator('Inventory System')
+            ->setTitle('Data Items dan Categories')
+            ->setDescription('Export data items dengan category codes');
+
+        // Header
+        $headers = [
+            'A1' => 'No',
+            'B1' => 'Item ID',
+            'C1' => 'Item Code',
+            'D1' => 'Item Name',
+            'E1' => 'Category Code',
+            'F1' => 'Category Name',
+            'G1' => 'Unit',
+            'H1' => 'Min Stock',
+            'I1' => 'Current Stock',
+            'J1' => 'Stock Status',
+            'K1' => 'Status',
+            'L1' => 'Description'
+        ];
+
+        // Set headers
+        foreach ($headers as $cell => $value) {
+            $sheet->setCellValue($cell, $value);
+        }
+
+        // Style headers
+        $headerRange = 'A1:L1';
+        $sheet->getStyle($headerRange)->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => '4F81BD']
+            ],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+            'borders' => [
+                'allBorders' => ['borderStyle' => Border::BORDER_THIN]
+            ]
+        ]);
+
+        // Data rows
+        $row = 2;
+        foreach ($items as $index => $item) {
+            $stockInfo = $item->getStockInfo();
+
+            $sheet->setCellValue('A' . $row, $index + 1);
+            $sheet->setCellValue('B' . $row, $item->item_id);
+            $sheet->setCellValue('C' . $row, $item->item_code);
+            $sheet->setCellValue('D' . $row, $item->item_name);
+            $sheet->setCellValue('E' . $row, $item->category->code_category ?? '-');
+            $sheet->setCellValue('F' . $row, $item->category->category_name ?? '-');
+            $sheet->setCellValue('G' . $row, $item->unit);
+            $sheet->setCellValue('H' . $row, $item->min_stock);
+            $sheet->setCellValue('I' . $row, $stockInfo['available']);
+            $sheet->setCellValue('J' . $row, $stockInfo['status_text']);
+            $sheet->setCellValue('K' . $row, $item->is_active ? 'Aktif' : 'Nonaktif');
+            $sheet->setCellValue('L' . $row, $item->description ?? '-');
+
+            $row++;
+        }
+
+        // Auto-size columns
+        foreach (range('A', 'L') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        // Add borders to all data
+        $dataRange = 'A1:L' . ($row - 1);
+        $sheet->getStyle($dataRange)->applyFromArray([
+            'borders' => [
+                'allBorders' => ['borderStyle' => Border::BORDER_THIN]
+            ]
+        ]);
+
+        // Generate filename
+        $filename = 'items_export_' . date('Y-m-d_H-i-s') . '.xlsx';
+
+        // Save and download
+        $writer = new Xlsx($spreadsheet);
+
+        return response()->streamDownload(function() use ($writer) {
+            $writer->save('php://output');
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Cache-Control' => 'max-age=0',
+        ]);
     }
 
     // Tampilkan daftar items
