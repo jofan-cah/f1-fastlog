@@ -101,10 +101,10 @@
                     <p class="text-sm font-medium text-gray-900">{{ $transaction->item->item_code ?? 'N/A' }}</p>
                 </div>
 
-                <div>
+                {{-- <div>
                     <span class="text-sm text-gray-600">Category:</span>
                     <p class="text-sm text-gray-600">{{ $transaction->item->category ?? 'N/A' }}</p>
-                </div>
+                </div> --}}
 
                 <div>
                     <span class="text-sm text-gray-600">Current Stock:</span>
