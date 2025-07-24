@@ -14,43 +14,83 @@
         padding: 0;
     }
 
-    /* Base QR label styles - Horizontal Layout */
+    /* Base QR label styles - Enhanced dengan logo */
     .qr-label {
         width: {{ $dimensions['width'] }};
         height: {{ $dimensions['height'] }};
         border: 1px solid #000;
         padding: 1mm;
         display: flex;
-        flex-direction: row; /* Changed to horizontal */
+        flex-direction: row;
         align-items: center;
         font-family: 'Courier New', 'Consolas', monospace;
         page-break-inside: avoid;
         line-height: 1;
-        gap: 2mm; /* Space between QR and content */
+        gap: 1.5mm;
+        position: relative;
+        background: white;
+    }
+
+    /* Logo container - positioned at top right */
+    .logo-container {
+        position: absolute;
+        top: 0.5mm;
+        right: 0.5mm;
+        z-index: 2;
+    }
+
+    .company-logo {
+        display: block;
+        border: none;
+        opacity: 0.8;
     }
 
     /* QR Code Container */
     .qr-code-container {
-        flex-shrink: 0; /* Don't shrink QR code */
+        flex-shrink: 0;
         display: flex;
         align-items: center;
         justify-content: center;
+        z-index: 1;
     }
 
     /* Content Container */
     .content-container {
-        flex: 1; /* Take remaining space */
+        flex: 1;
         display: flex;
         flex-direction: column;
         justify-content: center;
         text-align: left;
-        min-width: 0; /* Allow text to wrap */
+        min-width: 0;
+        padding-right: 8mm; /* Space for logo */
     }
 
-    /* QR code image - Dynamic sizing based on label size */
+    /* QR code image */
     .qr-code {
         display: block;
         border: none;
+    }
+
+    /* Kondisi badge styling */
+    .kondisi-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.5px 2px;
+        border-radius: 2px;
+        font-weight: bold;
+        margin-top: 0.5mm;
+    }
+
+    .kondisi-good {
+        background-color: #d4edda;
+        color: #155724;
+        border: 0.5px solid #c3e6cb;
+    }
+
+    .kondisi-no-good {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 0.5px solid #f5c6cb;
     }
 
     /* Size-specific adjustments */
@@ -62,8 +102,19 @@
     }
 
     .qr-label.sfp .qr-code {
-        width: 12mm;
-        height: 12mm;
+        width: 10mm;
+        height: 10mm;
+    }
+
+    .qr-label.sfp .company-logo {
+        width: 6mm;
+        height: auto;
+        max-height: 4mm;
+    }
+
+    .qr-label.sfp .kondisi-badge {
+        font-size: 4px;
+        padding: 0.2px 1px;
     }
 
     .qr-label.small {
@@ -76,6 +127,16 @@
         height: 15mm;
     }
 
+    .qr-label.small .company-logo {
+        width: 8mm;
+        height: auto;
+        max-height: 6mm;
+    }
+
+    .qr-label.small .kondisi-badge {
+        font-size: 6px;
+    }
+
     .qr-label.medium {
         font-size: 10px;
         line-height: 1.1;
@@ -86,6 +147,16 @@
         height: 18mm;
     }
 
+    .qr-label.medium .company-logo {
+        width: 10mm;
+        height: auto;
+        max-height: 8mm;
+    }
+
+    .qr-label.medium .kondisi-badge {
+        font-size: 8px;
+    }
+
     .qr-label.large {
         font-size: 12px;
         line-height: 1.2;
@@ -94,6 +165,16 @@
     .qr-label.large .qr-code {
         width: 22mm;
         height: 22mm;
+    }
+
+    .qr-label.large .company-logo {
+        width: 12mm;
+        height: auto;
+        max-height: 10mm;
+    }
+
+    .qr-label.large .kondisi-badge {
+        font-size: 10px;
     }
 
     /* Item information */
@@ -202,28 +283,21 @@
         color: #666;
     }
 
-    /* Page break after every certain number of labels */
     @media print {
         .label-container {
-            /* Adjust for optimal page usage */
-            @if($printConfig['labels_per_row'] >= 5)
-                page-break-after: auto;
-            @endif
+            page-break-after: auto;
         }
 
-        /* Ensure labels don't break across pages */
         .qr-label {
             page-break-inside: avoid !important;
             break-inside: avoid !important;
         }
 
-        /* Hide print controls when printing */
         .no-print {
             display: none !important;
         }
     }
 
-    /* Responsive adjustments for very small labels */
     @media screen and (max-width: 600px) {
         .label-container {
             grid-template-columns: repeat(2, 1fr);
@@ -274,6 +348,8 @@
         @if($printConfig['include_po'])
             • PO numbers included
         @endif
+
+        • With company logo • Kondisi included
     </p>
 </div>
 
@@ -281,6 +357,11 @@
 <div class="label-container">
     @foreach($itemDetails as $item)
         <div class="qr-label {{ $printConfig['label_size'] }}">
+            <!-- Company Logo (Top Right) -->
+            <div class="logo-container">
+                <img class="company-logo" src="{{ asset('f1.png') }}" alt="Company Logo">
+            </div>
+
             <!-- QR Code Container (Left Side) -->
             <div class="qr-code-container">
                 <img class="qr-code" src="{{ asset('storage/qr-codes/item-details/' . $item->qr_code) }}" alt="QR Code">
@@ -312,6 +393,13 @@
                         PO: {{ $item->goodsReceivedDetail->goodsReceived->purchaseOrder->po_number ?? 'N/A' }}
                     </div>
                 @endif
+
+                <!-- Kondisi Badge -->
+                @if($item->kondisi)
+                    <div class="kondisi-badge {{ $item->kondisi == 'good' ? 'kondisi-good' : 'kondisi-no-good' }}">
+                        {{ $item->kondisi == 'good' ? 'GOOD' : 'NO GOOD' }}
+                    </div>
+                @endif
             </div>
         </div>
     @endforeach
@@ -326,40 +414,55 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Auto-fit labels based on page size
-    const labelContainer = document.querySelector('.label-container');
-    const labels = document.querySelectorAll('.qr-label');
+    // Auto-adjust logo and QR code sizes
+    function adjustSizes() {
+        const labels = document.querySelectorAll('.qr-label');
+        labels.forEach(label => {
+            const logo = label.querySelector('.company-logo');
+            const qrCode = label.querySelector('.qr-code');
 
-    if (labels.length > 0) {
-        console.log(`Printing ${labels.length} labels in ${{{ $printConfig['labels_per_row'] }}} columns`);
-
-        // Log QR code sizing for debugging
-        const labelSize = '{{ $printConfig["label_size"] }}';
-        console.log(`Label size: ${labelSize}`);
-
-        // Check if QR codes are loading properly
-        labels.forEach((label, index) => {
-            const qrImg = label.querySelector('.qr-code');
-            if (qrImg) {
-                qrImg.onload = function() {
-                    console.log(`QR code ${index + 1} loaded successfully`);
+            // Logo error handling
+            if (logo) {
+                logo.onload = function() {
+                    console.log('Logo loaded successfully');
                 };
-                qrImg.onerror = function() {
-                    console.error(`Failed to load QR code ${index + 1}:`, qrImg.src);
+                logo.onerror = function() {
+                    console.error('Failed to load logo: f1.png');
+                    // Hide logo container if image fails
+                    logo.parentElement.style.display = 'none';
+                    // Adjust content padding when logo is hidden
+                    const contentContainer = label.querySelector('.content-container');
+                    if (contentContainer) {
+                        contentContainer.style.paddingRight = '1mm';
+                    }
+                };
+            }
+
+            // QR Code error handling
+            if (qrCode) {
+                qrCode.onload = function() {
+                    console.log('QR code loaded successfully');
+                };
+                qrCode.onerror = function() {
+                    console.error('Failed to load QR code:', qrCode.src);
                 };
             }
         });
     }
 
+    adjustSizes();
+
+    // Print debugging
+    const labelCount = document.querySelectorAll('.qr-label').length;
+    const labelsPerRow = {{ $printConfig['labels_per_row'] }};
+    console.log(`Printing ${labelCount} labels in ${labelsPerRow} columns with logo`);
+
     // Keyboard shortcuts
     document.addEventListener('keydown', function(e) {
-        // Ctrl+P or Cmd+P for print
         if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
             e.preventDefault();
             window.print();
         }
-
-        // Escape to close
         if (e.key === 'Escape') {
             if (window.opener) {
                 window.close();
@@ -369,44 +472,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Print status logging
+    // Print event handlers
     window.addEventListener('beforeprint', function() {
-        console.log('Starting print process...');
+        console.log('Starting print process with logo and kondisi...');
 
-        // Ensure all QR codes are properly sized before printing
+        // Ensure all elements are properly sized before printing
         const qrCodes = document.querySelectorAll('.qr-code');
-        qrCodes.forEach((qr, index) => {
-            console.log(`QR ${index + 1} dimensions:`, {
-                width: qr.offsetWidth,
-                height: qr.offsetHeight,
-                src: qr.src
-            });
-        });
+        const logos = document.querySelectorAll('.company-logo');
+
+        console.log(`QR Codes: ${qrCodes.length}, Logos: ${logos.length}`);
     });
 
     window.addEventListener('afterprint', function() {
         console.log('Print dialog closed');
     });
-
-    // Dynamic QR code sizing adjustment
-    function adjustQRSizes() {
-        const labels = document.querySelectorAll('.qr-label');
-        labels.forEach(label => {
-            const qrCode = label.querySelector('.qr-code');
-            const labelSize = label.classList.contains('sfp') ? 'sfp' :
-                            label.classList.contains('small') ? 'small' :
-                            label.classList.contains('medium') ? 'medium' : 'large';
-
-            // Ensure QR code maintains proper aspect ratio
-            if (qrCode && qrCode.complete) {
-                qrCode.style.objectFit = 'contain';
-            }
-        });
-    }
-
-    // Call on page load and after images load
-    adjustQRSizes();
-    window.addEventListener('load', adjustQRSizes);
 });
 </script>
 @endpush
