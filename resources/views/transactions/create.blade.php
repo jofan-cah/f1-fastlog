@@ -495,6 +495,14 @@
                     <input type="text" x-model="form.to_location" placeholder="Lokasi tujuan barang"
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500">
                 </div>
+                <!-- Di form create transaction -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Kondisi Barang</label>
+                    <select name="kondisi" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                        <option value="good">Good</option>
+                        <option value="no_good">No Good</option>
+                    </select>
+                </div>
             </div>
 
             <!-- Notes -->
@@ -2053,6 +2061,7 @@
                                 from_location: this.form.from_location || null,
                                 to_location: this.form.to_location || null,
                                 notes: this.form.notes || null,
+                                notes: this.form.kondisi || 'Good',
                                 lost_reason: this.form.lost_reason || null,
                                 items: this.selectedItems.map(item => ({
                                     item_detail_id: item.item_detail_id,
@@ -2068,6 +2077,7 @@
                                 from_location: this.form.from_location || null,
                                 to_location: this.form.to_location || null,
                                 notes: this.form.notes || null,
+                                notes: this.form.kondisi || 'Good',
                                 lost_reason: this.form.lost_reason || null,
                                 item_detail_id: this.selectedItem.item_detail_id
                             };

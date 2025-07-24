@@ -253,40 +253,40 @@ class Transaction extends Model
     }
 
 
-private function getNewStatusForItemDetail(string $currentStatus): string
-{
-    Log::info('Determining new status', [
-        'transaction_type' => $this->transaction_type,
-        'current_status' => $currentStatus
-    ]);
+    private function getNewStatusForItemDetail(string $currentStatus): string
+    {
+        Log::info('Determining new status', [
+            'transaction_type' => $this->transaction_type,
+            'current_status' => $currentStatus
+        ]);
 
-    switch ($this->transaction_type) {
-        case self::TYPE_OUT:
-            // Barang keluar dari sistem - jadi 'used'
-            return 'used';
+        switch ($this->transaction_type) {
+            case self::TYPE_OUT:
+                // Barang keluar dari sistem - jadi 'used'
+                return 'used';
 
-        case self::TYPE_IN:
-        case self::TYPE_RETURN:
-            // Barang masuk ke sistem atau return - jadi 'available'
-            return 'available';
+            case self::TYPE_IN:
+            case self::TYPE_RETURN:
+                // Barang masuk ke sistem atau return - jadi 'available'
+                return 'available';
 
-        case self::TYPE_REPAIR:
-            // Barang ke repair - jadi 'repair'
-            return 'repair';
+            case self::TYPE_REPAIR:
+                // Barang ke repair - jadi 'repair'
+                return 'repair';
 
-        case self::TYPE_LOST:
-            // Barang hilang - jadi 'lost'
-            return 'lost';
+            case self::TYPE_LOST:
+                // Barang hilang - jadi 'lost'
+                return 'lost';
 
-        default:
-            // Tidak ada perubahan status
-            Log::warning('Unknown transaction type, keeping current status', [
-                'transaction_type' => $this->transaction_type,
-                'current_status' => $currentStatus
-            ]);
-            return $currentStatus;
+            default:
+                // Tidak ada perubahan status
+                Log::warning('Unknown transaction type, keeping current status', [
+                    'transaction_type' => $this->transaction_type,
+                    'current_status' => $currentStatus
+                ]);
+                return $currentStatus;
+        }
     }
-}
 
     public static function getTransactionTypes(): array
     {
@@ -666,89 +666,133 @@ private function getNewStatusForItemDetail(string $currentStatus): string
     }
 
 
-private function executeTransactionSync(): void
-{
-    try {
-        DB::beginTransaction();
+    private function executeTransactionSync(): void
+    {
+        try {
+            DB::beginTransaction();
 
-        Log::info('Executing transaction sync', [
-            'transaction_id' => $this->transaction_id,
-            'transaction_type' => $this->transaction_type,
-            'status' => $this->status,
-            'details_count' => $this->transactionDetails->count()
-        ]);
+            Log::info('Executing transaction sync', [
+                'transaction_id' => $this->transaction_id,
+                'transaction_type' => $this->transaction_type,
+                'status' => $this->status,
+                'details_count' => $this->transactionDetails->count()
+            ]);
 
-        foreach ($this->transactionDetails as $detail) {
-            $itemDetail = $detail->itemDetail;
-            $stock = $this->item->stock;
+            foreach ($this->transactionDetails as $detail) {
+                $itemDetail = $detail->itemDetail;
+                $stock = $this->item->stock;
 
-            if (!$itemDetail) {
-                Log::warning('ItemDetail not found for transaction detail', [
-                    'transaction_detail_id' => $detail->transaction_detail_id,
-                    'item_detail_id' => $detail->item_detail_id
+                if (!$itemDetail) {
+                    Log::warning('ItemDetail not found for transaction detail', [
+                        'transaction_detail_id' => $detail->transaction_detail_id,
+                        'item_detail_id' => $detail->item_detail_id
+                    ]);
+                    continue;
+                }
+
+                if (!$stock) {
+                    Log::warning('Stock not found for item', [
+                        'transaction_id' => $this->transaction_id,
+                        'item_id' => $this->item_id
+                    ]);
+                    continue;
+                }
+
+                $oldStatus = $itemDetail->status;
+                $oldKondisi = $itemDetail->kondisi ??  '';
+                $newStatus = $this->getNewStatusForItemDetail($oldStatus);
+                $newKondisi = $this->getNewKondisi(); // Simple method
+
+                Log::info('Processing item detail status change', [
+                    'item_detail_id' => $itemDetail->item_detail_id,
+                    'serial_number' => $itemDetail->serial_number,
+                    'old_status' => $oldStatus,
+                    'new_status' => $newStatus,
+                    'transaction_type' => $this->transaction_type
                 ]);
-                continue;
+
+                // 1. UPDATE ITEM DETAIL STATUS
+                $itemDetail->update([
+                    'status' => $newStatus,
+                    'kondisi' => $newKondisi, // Auto sync kondisi
+                    'location' => $this->to_location ?: $itemDetail->location // Update lokasi jika ada
+                ]);
+
+                // 2. UPDATE TRANSACTION DETAIL dengan status changes
+                // 2. UPDATE TRANSACTION DETAIL (audit trail)
+                $detail->update([
+                    'status_before' => $oldStatus,
+                    'status_after' => $newStatus,
+                    'kondisi_before' => $oldKondisi,
+                    'kondisi_after' => $newKondisi
+                ]);
+
+
+                // 3. UPDATE STOCK QUANTITIES dengan logika yang sudah diperbaiki
+                $this->updateStockQuantities($stock, $oldStatus, $newStatus);
+
+                Log::info('Item detail updated successfully', [
+                    'item_detail_id' => $itemDetail->item_detail_id,
+                    'status_updated' => $oldStatus . ' → ' . $newStatus,
+                    'location_updated' => $itemDetail->location
+                ]);
             }
 
-            if (!$stock) {
-                Log::warning('Stock not found for item', [
-                    'transaction_id' => $this->transaction_id,
-                    'item_id' => $this->item_id
-                ]);
-                continue;
-            }
+            DB::commit();
 
-            $oldStatus = $itemDetail->status;
-            $newStatus = $this->getNewStatusForItemDetail($oldStatus);
-
-            Log::info('Processing item detail status change', [
-                'item_detail_id' => $itemDetail->item_detail_id,
-                'serial_number' => $itemDetail->serial_number,
-                'old_status' => $oldStatus,
-                'new_status' => $newStatus,
-                'transaction_type' => $this->transaction_type
+            Log::info('Transaction sync completed successfully', [
+                'transaction_id' => $this->transaction_id,
+                'transaction_type' => $this->transaction_type,
+                'items_processed' => $this->transactionDetails->count()
             ]);
-
-            // 1. UPDATE ITEM DETAIL STATUS
-            $itemDetail->update([
-                'status' => $newStatus,
-                'location' => $this->to_location ?: $itemDetail->location // Update lokasi jika ada
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to execute transaction sync', [
+                'transaction_id' => $this->transaction_id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
-
-            // 2. UPDATE TRANSACTION DETAIL dengan status changes
-            $detail->update([
-                'status_before' => $oldStatus,
-                'status_after' => $newStatus
-            ]);
-
-            // 3. UPDATE STOCK QUANTITIES dengan logika yang sudah diperbaiki
-            $this->updateStockQuantities($stock, $oldStatus, $newStatus);
-
-            Log::info('Item detail updated successfully', [
-                'item_detail_id' => $itemDetail->item_detail_id,
-                'status_updated' => $oldStatus . ' → ' . $newStatus,
-                'location_updated' => $itemDetail->location
-            ]);
+            throw $e;
         }
-
-        DB::commit();
-
-        Log::info('Transaction sync completed successfully', [
-            'transaction_id' => $this->transaction_id,
-            'transaction_type' => $this->transaction_type,
-            'items_processed' => $this->transactionDetails->count()
-        ]);
-
-    } catch (\Exception $e) {
-        DB::rollBack();
-        Log::error('Failed to execute transaction sync', [
-            'transaction_id' => $this->transaction_id,
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ]);
-        throw $e;
     }
+    // Get kondisi options (simple)
+public static function getKondisiOptions(): array
+{
+    return [
+        'good' => [
+            'text' => 'Good',
+            'class' => 'bg-green-100 text-green-800',
+            'icon' => 'fas fa-check-circle'
+        ],
+        'no_good' => [
+            'text' => 'No Good',
+            'class' => 'bg-red-100 text-red-800',
+            'icon' => 'fas fa-times-circle'
+        ]
+    ];
 }
+
+    // SIMPLE: Auto determine kondisi based on transaction type
+    private function getNewKondisi(): string
+    {
+        switch ($this->transaction_type) {
+            case self::TYPE_IN:
+            case self::TYPE_RETURN:
+                // Barang masuk/return = good (default)
+                return 'good';
+
+            case self::TYPE_REPAIR:
+                // Kalau ke repair = no_good
+                return 'no_good';
+
+            case self::TYPE_OUT:
+            case self::TYPE_LOST:
+            default:
+                // Barang keluar/hilang = kondisi tetap
+                return $this->transactionDetails->first()->itemDetail->kondisi ?? 'good';
+        }
+    }
+
 
     /**
      * Helper method: Get penjelasan perubahan untuk logging

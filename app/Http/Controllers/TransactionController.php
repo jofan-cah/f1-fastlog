@@ -565,6 +565,7 @@ private function getTransactionStats($currentType = null, $search = null, $statu
 
                 'quantity' => count($items),
                 'from_location' => $request->from_location,
+                'kondisi' => $request->kondisi,
                 'to_location' => $request->to_location,
                 'notes' => $request->notes,
                 'status' => Transaction::STATUS_PENDING,

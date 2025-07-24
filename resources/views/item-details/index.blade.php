@@ -265,19 +265,19 @@
 
         <!-- Item Details Table -->
         <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-           <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
-        <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold text-gray-900 flex items-center">
-                <i class="fas fa-boxes mr-2 text-blue-600"></i>
-                Daftar Item Details
-            </h3>
-            <div class="flex items-center space-x-4 text-sm text-gray-600">
-                <span>Total: {{ $itemDetails->total() }} items</span>
-                <span class="text-gray-400">|</span>
-                <span>Menampilkan: {{ $perPage }} per halaman</span>
+            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                        <i class="fas fa-boxes mr-2 text-blue-600"></i>
+                        Daftar Item Details
+                    </h3>
+                    <div class="flex items-center space-x-4 text-sm text-gray-600">
+                        <span>Total: {{ $itemDetails->total() }} items</span>
+                        <span class="text-gray-400">|</span>
+                        <span>Menampilkan: {{ $perPage }} per halaman</span>
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead class="bg-gray-50 border-b border-gray-200">
@@ -298,6 +298,9 @@
                             </th>
                             <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Lokasi
+                            </th>
+                            <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Kondisi
                             </th>
                             <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 PO / Received Date
@@ -360,6 +363,24 @@
                                                         : 'bg-blue-400')) }}"></span>
                                         {{ $statusInfo['text'] }}
                                     </span>
+                                </td>
+                                <!-- Alternative: Simplified Badge Version -->
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    @if ($itemDetail->kondisi == 'good' || $itemDetail->kondisi=== null)
+                                        <span
+                                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            <span class="w-1.5 h-1.5 bg-green-400 rounded-full mr-1.5"></span>
+                                            <i class="fas fa-check-circle mr-1"></i>
+                                            Good
+                                        </span>
+                                    @else
+                                        <span
+                                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                            <span class="w-1.5 h-1.5 bg-red-400 rounded-full mr-1.5"></span>
+                                            <i class="fas fa-times-circle mr-1"></i>
+                                            No Good
+                                        </span>
+                                    @endif
                                 </td>
 
                                 <!-- Location -->
@@ -483,20 +504,20 @@
 
         <!-- Pagination -->
         <!-- Pagination -->
-@if ($itemDetails->hasPages())
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-        <div class="flex items-center justify-between">
-            <div class="text-sm text-gray-700">
-                Menampilkan {{ $itemDetails->firstItem() }} sampai {{ $itemDetails->lastItem() }}
-                dari {{ $itemDetails->total() }} hasil
-                <span class="text-gray-500">({{ $perPage }} per halaman)</span>
+        @if ($itemDetails->hasPages())
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+                <div class="flex items-center justify-between">
+                    <div class="text-sm text-gray-700">
+                        Menampilkan {{ $itemDetails->firstItem() }} sampai {{ $itemDetails->lastItem() }}
+                        dari {{ $itemDetails->total() }} hasil
+                        <span class="text-gray-500">({{ $perPage }} per halaman)</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        {{ $itemDetails->appends(request()->query())->links('pagination::tailwind') }}
+                    </div>
+                </div>
             </div>
-            <div class="flex items-center space-x-2">
-                {{ $itemDetails->appends(request()->query())->links('pagination::tailwind') }}
-            </div>
-        </div>
-    </div>
-@endif
+        @endif
 
         <!-- Keep existing modals from the original view -->
         <!-- ... (Include all the modal code from the original here) ... -->

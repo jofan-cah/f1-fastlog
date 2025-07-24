@@ -24,6 +24,7 @@ class ItemDetail extends Model
         'status',
         'location',
         'notes',
+        'kondisi'
     ];
 
     protected $casts = [
