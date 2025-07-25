@@ -36,7 +36,7 @@ class StockController extends Controller
             $query->byCategory($request->category);
         }
 
-        // Filter by stock status
+        // Filter by stock status - FIXED: tambah 'sufficient'
         if ($request->filled('status')) {
             switch ($request->status) {
                 case 'low':
@@ -48,15 +48,18 @@ class StockController extends Controller
                 case 'available':
                     $query->available();
                     break;
+                case 'sufficient':  // ✅ FIX 1: Tambah case sufficient
+                    $query->sufficientStock();
+                    break;
             }
         }
 
         // Search by item name or code
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->whereHas('item', function($q) use ($search) {
+            $query->whereHas('item', function ($q) use ($search) {
                 $q->where('item_name', 'like', "%{$search}%")
-                  ->orWhere('item_code', 'like', "%{$search}%");
+                    ->orWhere('item_code', 'like', "%{$search}%");
             });
         }
 
@@ -70,34 +73,39 @@ class StockController extends Controller
         } else {
             // Sort by item name
             $query->join('items', 'stocks.item_id', '=', 'items.item_id')
-                  ->orderBy('items.item_name', $sortDirection)
-                  ->select('stocks.*');
+                ->orderBy('items.item_name', $sortDirection)
+                ->select('stocks.*');
         }
 
         $stocks = $query->paginate(15)->withQueryString();
 
-        // Stock summary
-        $summary = Stock::getStockSummary();
+        // ✅ FIX 2: Ganti dengan fixed method
+        $summary = Stock::getStockSummary(); // Ini akan pakai method yang sudah diperbaiki
 
         // Categories untuk filter
         $categories = Category::active()
             ->whereHas('items.stock')
-            ->withCount(['items' => function($q) {
+            ->withCount(['items' => function ($q) {
                 $q->whereHas('stock');
             }])
             ->orderBy('category_name')
             ->get();
 
-        // Low stock alerts
+        // ✅ FIX 3: Enhanced low stock alerts dengan limit safety
         $lowStockAlerts = Stock::lowStock()
             ->with('item')
+            ->where('quantity_available', '>', 0) // Pastikan ada stock
             ->orderBy('quantity_available')
             ->take(5)
             ->get();
 
         return view('stocks.index', compact(
-            'stocks', 'summary', 'categories', 'lowStockAlerts',
-            'sortField', 'sortDirection'
+            'stocks',
+            'summary',
+            'categories',
+            'lowStockAlerts',
+            'sortField',
+            'sortDirection'
         ));
     }
 
@@ -214,7 +222,6 @@ class StockController extends Controller
 
             return redirect()->route('stocks.index')
                 ->with('success', $message);
-
         } catch (\Exception $e) {
             DB::rollback();
             return back()
@@ -277,7 +284,6 @@ class StockController extends Controller
 
             return redirect()->route('stocks.index')
                 ->with('success', "Berhasil melakukan bulk adjustment pada {$successCount} item");
-
         } catch (\Exception $e) {
             DB::rollback();
             return back()
@@ -326,7 +332,7 @@ class StockController extends Controller
             ->orderBy('quantity_available')
             ->take($limit)
             ->get()
-            ->map(function($stock) {
+            ->map(function ($stock) {
                 return [
                     'stock_id' => $stock->stock_id,
                     'item_code' => $stock->item->item_code,
@@ -341,7 +347,7 @@ class StockController extends Controller
 
         return response()->json($lowStockItems);
     }
-      // **NEW: Show edit form**
+    // **NEW: Show edit form**
     public function edit(Stock $stock)
     {
         $stock->load(['item.category', 'item.itemDetails']);
@@ -431,7 +437,6 @@ class StockController extends Controller
 
             return redirect()->route('stocks.show', $stock)
                 ->with('success', $message);
-
         } catch (\Exception $e) {
             DB::rollback();
             return back()
@@ -459,7 +464,6 @@ class StockController extends Controller
                 'message' => 'Stock berhasil disinkronkan dengan item details',
                 'data' => $syncResult
             ]);
-
         } catch (\Exception $e) {
             DB::rollback();
             return response()->json([
@@ -530,7 +534,6 @@ class StockController extends Controller
             ]);
 
             return $updated;
-
         } catch (\Exception $e) {
             Log::error('Failed to sync item details with stock: ' . $e->getMessage());
             throw $e;
@@ -597,7 +600,6 @@ class StockController extends Controller
                 'message' => $syncResult['message'],
                 'data' => $syncResult
             ]);
-
         } catch (\Exception $e) {
             DB::rollback();
             return response()->json([
@@ -617,7 +619,6 @@ class StockController extends Controller
                 'success' => true,
                 'data' => $report
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -641,7 +642,6 @@ class StockController extends Controller
                 'message' => $result['message'],
                 'data' => $result
             ]);
-
         } catch (\Exception $e) {
             DB::rollback();
             return response()->json([

@@ -541,26 +541,11 @@ class Stock extends Model
         }
     }
 
-    // Scope: Low stock items
-    public function scopeLowStock($query)
-    {
-        return $query->whereHas('item', function ($q) {
-            $q->whereRaw('stocks.quantity_available <= items.min_stock');
-        });
-    }
 
-    // Scope: Out of stock items
-    public function scopeOutOfStock($query)
-    {
-        return $query->where('total_quantity', 0)
-            ->orWhere('quantity_available', 0);
-    }
 
-    // Scope: Available stock only
-    public function scopeAvailable($query)
-    {
-        return $query->where('quantity_available', '>', 0);
-    }
+
+
+
 
     // Scope: By category
     public function scopeByCategory($query, $categoryId)
@@ -571,21 +556,226 @@ class Stock extends Model
     }
 
     // Static method: Get stock summary
-    public static function getStockSummary(): array
+    // public static function getStockSummary(): array
+    // {
+    //     $total = self::count();
+    //     $lowStock = self::lowStock()->count();
+    //     $outOfStock = self::outOfStock()->count();
+    //     $available = self::available()->count();
+
+    //     return [
+    //         'total_items' => $total,
+    //         'available_items' => $available,
+    //         'low_stock_items' => $lowStock,
+    //         'out_of_stock_items' => $outOfStock,
+    //         'sufficient_items' => $total - $lowStock - $outOfStock,
+    //     ];
+    // }
+
+/**
+ * Get stock summary - UPDATED: Available = Sufficient only
+ */
+public static function getStockSummary(): array
+{
+    $total = self::count();
+
+    // Get detailed stock status for each item
+    $stockItems = self::with('item')->get();
+
+    $sufficient = 0;
+    $lowStock = 0;
+    $outOfStock = 0;
+
+    foreach ($stockItems as $stock) {
+        $item = $stock->item;
+        $minStock = $item ? $item->min_stock : 0;
+
+        // Determine stock status
+        if ($stock->total_quantity == 0 || $stock->quantity_available == 0) {
+            // Out of stock
+            $outOfStock++;
+        } elseif ($stock->quantity_available <= $minStock) {
+            // Low stock (available ada tapi <= minimum)
+            $lowStock++;
+        } else {
+            // Sufficient stock (available > minimum)
+            $sufficient++;
+        }
+    }
+
+    return [
+        'total_items' => $total,
+        'available_items' => $sufficient,           // ✅ CHANGED: Hanya yang sufficient
+        'sufficient_items' => $sufficient,          // Sama dengan available
+        'low_stock_items' => $lowStock,            // Yang stock rendah (tidak masuk available)
+        'out_of_stock_items' => $outOfStock,       // Yang stock habis
+
+        // Additional breakdown untuk debugging
+        'breakdown' => [
+            'sufficient' => $sufficient,
+            'low_stock' => $lowStock,
+            'out_of_stock' => $outOfStock,
+            'total_check' => $sufficient + $lowStock + $outOfStock, // Harus = total
+        ]
+    ];
+}
+
+/**
+ * Updated available scope - hanya yang sufficient
+ */
+public function scopeAvailable($query)
+{
+    return $query->whereHas('item', function ($q) {
+        $q->whereRaw('stocks.quantity_available > items.min_stock'); // ✅ CHANGED: > min_stock
+    })
+    ->where('quantity_available', '>', 0);
+}
+    /**
+     * Enhanced method untuk debugging stock issues
+     */
+    public static function getDetailedStockAnalysis(): array
     {
-        $total = self::count();
-        $lowStock = self::lowStock()->count();
-        $outOfStock = self::outOfStock()->count();
-        $available = self::available()->count();
+        $stockItems = self::with('item')->get();
+        $analysis = [
+            'sufficient' => [],
+            'low_stock' => [],
+            'out_of_stock' => [],
+            'available' => []
+        ];
+
+        foreach ($stockItems as $stock) {
+            $item = $stock->item;
+            $minStock = $item ? $item->min_stock : 0;
+
+            $stockData = [
+                'stock_id' => $stock->stock_id,
+                'item_name' => $item->item_name ?? 'Unknown',
+                'quantity_available' => $stock->quantity_available,
+                'quantity_used' => $stock->quantity_used,
+                'total_quantity' => $stock->total_quantity,
+                'min_stock' => $minStock,
+                'status' => $stock->getStockStatus()['status']
+            ];
+
+            // Available check
+            if ($stock->quantity_available > 0) {
+                $analysis['available'][] = $stockData;
+            }
+
+            // Status categorization
+            if ($stock->total_quantity == 0 || $stock->quantity_available == 0) {
+                $analysis['out_of_stock'][] = $stockData;
+            } elseif ($stock->quantity_available <= $minStock) {
+                $analysis['low_stock'][] = $stockData;
+            } else {
+                $analysis['sufficient'][] = $stockData;
+            }
+        }
 
         return [
-            'total_items' => $total,
-            'available_items' => $available,
-            'low_stock_items' => $lowStock,
-            'out_of_stock_items' => $outOfStock,
-            'sufficient_items' => $total - $lowStock - $outOfStock,
+            'counts' => [
+                'total' => $stockItems->count(),
+                'available' => count($analysis['available']),
+                'sufficient' => count($analysis['sufficient']),
+                'low_stock' => count($analysis['low_stock']),
+                'out_of_stock' => count($analysis['out_of_stock'])
+            ],
+            'detailed_items' => $analysis,
+            'validation' => [
+                'total_check' => count($analysis['sufficient']) + count($analysis['low_stock']) + count($analysis['out_of_stock']),
+                'should_equal_total' => $stockItems->count()
+            ]
         ];
     }
+
+    /**
+     * Enhanced scope methods untuk memastikan konsistensi
+     */
+
+    // Enhanced lowStock scope
+    public function scopeLowStock($query)
+    {
+        return $query->whereHas('item', function ($q) {
+            $q->whereRaw('stocks.quantity_available <= items.min_stock');
+        })
+            ->where('quantity_available', '>', 0); // Pastikan masih ada stock
+    }
+
+    // Enhanced outOfStock scope
+    public function scopeOutOfStock($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('total_quantity', '<=', 0)
+                ->orWhere('quantity_available', '<=', 0);
+        });
+    }
+
+    // NEW: Sufficient stock scope
+    public function scopeSufficientStock($query)
+    {
+        return $query->whereHas('item', function ($q) {
+            $q->whereRaw('stocks.quantity_available > items.min_stock');
+        })
+            ->where('quantity_available', '>', 0);
+    }
+
+    /**
+     * Debug method untuk cek individual stock
+     */
+    public function debugStockStatus(): array
+    {
+        $item = $this->item;
+        $minStock = $item ? $item->min_stock : 0;
+
+        $status = 'unknown';
+        $reason = '';
+
+        if ($this->total_quantity <= 0) {
+            $status = 'out_of_stock';
+            $reason = 'total_quantity <= 0';
+        } elseif ($this->quantity_available <= 0) {
+            $status = 'out_of_stock';
+            $reason = 'quantity_available <= 0';
+        } elseif ($this->quantity_available <= $minStock) {
+            $status = 'low_stock';
+            $reason = "quantity_available ({$this->quantity_available}) <= min_stock ({$minStock})";
+        } else {
+            $status = 'sufficient';
+            $reason = "quantity_available ({$this->quantity_available}) > min_stock ({$minStock})";
+        }
+
+        return [
+            'stock_id' => $this->stock_id,
+            'item_name' => $item->item_name ?? 'Unknown',
+            'quantities' => [
+                'available' => $this->quantity_available,
+                'used' => $this->quantity_used,
+                'total' => $this->total_quantity
+            ],
+            'min_stock' => $minStock,
+            'calculated_status' => $status,
+            'reason' => $reason,
+            'stock_method_result' => $this->getStockStatus(),
+            'scope_results' => [
+                'is_low_stock' => $this->isLowStock(),
+                'is_out_of_stock' => $this->isOutOfStock()
+            ]
+        ];
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     // Log stock movement (akan diintegrasikan dengan StockMovement model nanti)
     private function logMovement(array $data): void
