@@ -172,20 +172,77 @@ class ItemDetail extends Model
         }
 
         return $this->transactionDetails()
-            ->with('transaction.createdBy')
+            ->with(['transaction.createdBy', 'transaction.approvedBy'])
             ->orderBy('created_at', 'desc')
             ->get()
-            ->map(function($detail) {
+            ->map(function ($detail) {
+                $transaction = $detail->transaction;
+                $typeInfo = $transaction->getTypeInfo();
+
                 return [
+                    // EXISTING FORMAT (tidak berubah - kompatibel dengan view lama)
                     'date' => $detail->created_at->format('Y-m-d H:i'),
                     'action' => $detail->transaction->transaction_type,
-                    'user' => $detail->transaction->createdBy->full_name,
+                    'user' => $detail->transaction->createdBy->full_name ?? 'Unknown',
                     'status_before' => $detail->status_before,
                     'status_after' => $detail->status_after,
                     'notes' => $detail->notes,
+
+                    // NEW ENHANCED FIELDS (tambahan untuk view baru)
+                    'transaction_id' => $transaction->transaction_id,
+                    'transaction_number' => $transaction->transaction_number,
+                    'transaction_status' => $transaction->status,
+                    'approved_date' => $transaction->approved_date?->format('Y-m-d H:i'),
+                    'approved_by' => $transaction->approvedBy->full_name ?? null,
+                    'relative_time' => $detail->created_at->diffForHumans(),
+
+                    // Type & Status Info (dengan icon dan class)
+                    'action_text' => $typeInfo['text'], // "Barang Keluar" instead of "OUT"
+                    'action_icon' => $typeInfo['icon'], // "fas fa-arrow-up"
+                    'action_class' => $typeInfo['class'], // "bg-blue-100 text-blue-800"
+
+                    // Kondisi info (jika ada)
+                    'kondisi_before' => $detail->kondisi_before ?? null,
+                    'kondisi_after' => $detail->kondisi_after ?? null,
+                    'kondisi_changed' => ($detail->kondisi_before ?? '') !== ($detail->kondisi_after ?? ''),
+
+                    // Location info
+                    'from_location' => $transaction->from_location,
+                    'to_location' => $transaction->to_location,
+                    'location_changed' => $transaction->from_location !== $transaction->to_location,
+
+                    // Enhanced notes
+                    'transaction_notes' => $transaction->notes,
+                    'detail_notes' => $detail->notes,
+                    'all_notes' => trim(($transaction->notes ?? '') . ' ' . ($detail->notes ?? '')),
+
+                    // Status summary
+                    'status_summary' => $this->generateStatusSummary($detail),
+                    'is_critical' => in_array($detail->status_after, ['lost', 'damaged']) ||
+                        ($detail->kondisi_after ?? '') === 'no_good',
                 ];
             })
             ->toArray();
+    }
+
+    /**
+     * Helper method: Generate status summary
+     */
+    private function generateStatusSummary($detail): string
+    {
+        $parts = [];
+
+        // Status change
+        if ($detail->status_before && $detail->status_after && $detail->status_before !== $detail->status_after) {
+            $parts[] = "Status: {$detail->status_before} → {$detail->status_after}";
+        }
+
+        // Kondisi change
+        if (($detail->kondisi_before ?? '') !== ($detail->kondisi_after ?? '') && $detail->kondisi_after) {
+            $parts[] = "Kondisi: " . ($detail->kondisi_before ?? 'unknown') . " → {$detail->kondisi_after}";
+        }
+
+        return implode(', ', $parts) ?: 'No changes';
     }
 
     // Helper method: Check if has custom attributes
@@ -235,9 +292,9 @@ class ItemDetail extends Model
     public static function generateSerialNumber(string $itemCode): string
     {
         $year = date('Y');
-        $lastSerial = self::whereHas('item', function($q) use ($itemCode) {
-                $q->where('item_code', $itemCode);
-            })
+        $lastSerial = self::whereHas('item', function ($q) use ($itemCode) {
+            $q->where('item_code', $itemCode);
+        })
             ->where('serial_number', 'like', "{$itemCode}-{$year}-%")
             ->orderBy('serial_number', 'desc')
             ->first();
@@ -329,7 +386,7 @@ class ItemDetail extends Model
     }
 
 
-      public function getStatusPriority(): int
+    public function getStatusPriority(): int
     {
         $priorities = [
             'available' => 1,
@@ -345,7 +402,7 @@ class ItemDetail extends Model
     }
 
 
-      /**
+    /**
      * Check if item can be moved to specific status
      */
     public function canMoveToStatus(string $targetStatus): bool
@@ -363,7 +420,7 @@ class ItemDetail extends Model
         return in_array($targetStatus, $allowedTransitions[$this->status] ?? []);
     }
 
-     public function getAvailableTransactionTypesWithLabels(): array
+    public function getAvailableTransactionTypesWithLabels(): array
     {
         $availableTypes = $this->getAvailableTransactionTypes();
         $allTypes = Transaction::getTransactionTypes();
@@ -403,7 +460,7 @@ class ItemDetail extends Model
             ->with(['transaction.createdBy', 'transaction.approvedBy'])
             ->orderBy('created_at', 'desc')
             ->get()
-            ->map(function($detail) {
+            ->map(function ($detail) {
                 return $detail->toHistoryEntry();
             })->toArray();
     }
@@ -414,12 +471,12 @@ class ItemDetail extends Model
     public function getPendingTransactions(): array
     {
         return $this->transactionDetails()
-            ->whereHas('transaction', function($query) {
+            ->whereHas('transaction', function ($query) {
                 $query->where('status', Transaction::STATUS_PENDING);
             })
             ->with(['transaction.createdBy'])
             ->get()
-            ->map(function($detail) {
+            ->map(function ($detail) {
                 $transaction = $detail->transaction;
                 return [
                     'id' => $transaction->transaction_id,
@@ -439,7 +496,7 @@ class ItemDetail extends Model
     public function hasPendingTransactions(): bool
     {
         return $this->transactionDetails()
-            ->whereHas('transaction', function($query) {
+            ->whereHas('transaction', function ($query) {
                 $query->where('status', Transaction::STATUS_PENDING);
             })
             ->exists();
@@ -511,9 +568,9 @@ class ItemDetail extends Model
         // Get transaction history for the period
         $startDate = now()->subDays($days);
         $transactions = $this->transactionDetails()
-            ->whereHas('transaction', function($query) use ($startDate) {
+            ->whereHas('transaction', function ($query) use ($startDate) {
                 $query->where('status', Transaction::STATUS_APPROVED)
-                      ->where('approved_date', '>=', $startDate);
+                    ->where('approved_date', '>=', $startDate);
             })
             ->with('transaction')
             ->orderBy('created_at')
@@ -579,7 +636,7 @@ class ItemDetail extends Model
                 break;
         }
 
-        return $query->get()->map(function($itemDetail) {
+        return $query->get()->map(function ($itemDetail) {
             return [
                 'item_detail_id' => $itemDetail->item_detail_id,
                 'serial_number' => $itemDetail->serial_number,
@@ -601,7 +658,7 @@ class ItemDetail extends Model
             ->with('item')
             ->get();
 
-        return $items->map(function($itemDetail) {
+        return $items->map(function ($itemDetail) {
             return [
                 'item_detail_id' => $itemDetail->item_detail_id,
                 'serial_number' => $itemDetail->serial_number,
@@ -618,9 +675,9 @@ class ItemDetail extends Model
     public static function getItemsRequiringAttention(): array
     {
         return [
-            'pending_transactions' => self::whereHas('transactionDetails.transaction', function($query) {
+            'pending_transactions' => self::whereHas('transactionDetails.transaction', function ($query) {
                 $query->where('status', Transaction::STATUS_PENDING);
-            })->with(['item', 'transactionDetails.transaction'])->get()->map(function($item) {
+            })->with(['item', 'transactionDetails.transaction'])->get()->map(function ($item) {
                 return [
                     'item_detail_id' => $item->item_detail_id,
                     'serial_number' => $item->serial_number,
@@ -633,7 +690,7 @@ class ItemDetail extends Model
             'repair_items' => self::where('status', 'repair')
                 ->with('item')
                 ->get()
-                ->map(function($item) {
+                ->map(function ($item) {
                     return [
                         'item_detail_id' => $item->item_detail_id,
                         'serial_number' => $item->serial_number,
@@ -646,7 +703,7 @@ class ItemDetail extends Model
             'lost_items' => self::where('status', 'lost')
                 ->with('item')
                 ->get()
-                ->map(function($item) {
+                ->map(function ($item) {
                     return [
                         'item_detail_id' => $item->item_detail_id,
                         'serial_number' => $item->serial_number,
@@ -659,58 +716,58 @@ class ItemDetail extends Model
     }
 
     public static function generateItemDetailId($itemId = null): string
-{
-    if ($itemId) {
-        $item = Item::with('category')->find($itemId);
-        $prefix = ($item->category->code_category ?? 'XXX') . ($item->item_code ?? 'XXX');
-    } else {
-        $prefix = 'UNKNOWN';
+    {
+        if ($itemId) {
+            $item = Item::with('category')->find($itemId);
+            $prefix = ($item->category->code_category ?? 'XXX') . ($item->item_code ?? 'XXX');
+        } else {
+            $prefix = 'UNKNOWN';
+        }
+
+        // Cari nomor terakhir dengan prefix yang sama
+        $lastDetail = self::where('item_detail_id', 'like', $prefix . '%')
+            ->orderBy('item_detail_id', 'desc')
+            ->first();
+
+        $nextNumber = 1;
+        if ($lastDetail) {
+            $lastNumber = (int) substr($lastDetail->item_detail_id, -5);
+            $nextNumber = $lastNumber + 1;
+        }
+
+        return $prefix . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
     }
 
-    // Cari nomor terakhir dengan prefix yang sama
-    $lastDetail = self::where('item_detail_id', 'like', $prefix . '%')
-        ->orderBy('item_detail_id', 'desc')
-        ->first();
+    // ================================================================
+    // Update di Controller jadi lebih simpel
+    // ================================================================
 
-    $nextNumber = 1;
-    if ($lastDetail) {
-        $lastNumber = (int) substr($lastDetail->item_detail_id, -5);
-        $nextNumber = $lastNumber + 1;
+    private function generateItemDetailsForReceived(GoodsReceivedDetail $grDetail, array $itemData, array $serialNumbers = [])
+    {
+        $quantityReceived = (int)$itemData['quantity_received'];
+        $item = Item::find($itemData['item_id']);
+        $itemCode = $item->item_code;
+
+        $itemsGenerated = 0;
+
+        for ($i = 1; $i <= $quantityReceived; $i++) {
+            $serialNumber = $this->getSerialNumber($serialNumbers, $i - 1, $itemCode, $i);
+
+            ItemDetail::create([
+                'item_detail_id' => ItemDetail::generateItemDetailId($itemData['item_id']),
+                'gr_detail_id' => $grDetail->gr_detail_id,
+                'item_id' => $itemData['item_id'],
+                'serial_number' => $serialNumber,
+                'custom_attributes' => null,
+                'qr_code' => null,
+                'status' => 'available',
+                'location' => 'Warehouse - Stock',
+                'notes' => "Received from GR: {$grDetail->gr_detail_id}",
+            ]);
+
+            $itemsGenerated++;
+        }
+
+        return $itemsGenerated;
     }
-
-    return $prefix . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
-}
-
-// ================================================================
-// Update di Controller jadi lebih simpel
-// ================================================================
-
-private function generateItemDetailsForReceived(GoodsReceivedDetail $grDetail, array $itemData, array $serialNumbers = [])
-{
-    $quantityReceived = (int)$itemData['quantity_received'];
-    $item = Item::find($itemData['item_id']);
-    $itemCode = $item->item_code;
-
-    $itemsGenerated = 0;
-
-    for ($i = 1; $i <= $quantityReceived; $i++) {
-        $serialNumber = $this->getSerialNumber($serialNumbers, $i - 1, $itemCode, $i);
-
-        ItemDetail::create([
-            'item_detail_id' => ItemDetail::generateItemDetailId($itemData['item_id']),
-            'gr_detail_id' => $grDetail->gr_detail_id,
-            'item_id' => $itemData['item_id'],
-            'serial_number' => $serialNumber,
-            'custom_attributes' => null,
-            'qr_code' => null,
-            'status' => 'available',
-            'location' => 'Warehouse - Stock',
-            'notes' => "Received from GR: {$grDetail->gr_detail_id}",
-        ]);
-
-        $itemsGenerated++;
-    }
-
-    return $itemsGenerated;
-}
 }

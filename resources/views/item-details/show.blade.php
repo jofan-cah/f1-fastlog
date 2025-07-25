@@ -170,7 +170,7 @@
 
             <!-- Right Sidebar -->
             <div class="space-y-6">
-                       <!-- QR Code Display Section -->
+                <!-- QR Code Display Section -->
                 <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
                     <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
                         <h3 class="text-lg font-semibold text-gray-900 flex items-center">
@@ -185,7 +185,8 @@
                                 @if ($itemDetail->qr_code)
                                     <!-- QR Code Image exists -->
                                     <div class="mb-4">
-                                        <img src="{{ asset('storage/qr-codes/item-details/' . $itemDetail->qr_code) }}" alt="QR Code for {{ $itemDetail->serial_number }}"
+                                        <img src="{{ asset('storage/qr-codes/item-details/' . $itemDetail->qr_code) }}"
+                                            alt="QR Code for {{ $itemDetail->serial_number }}"
                                             class="mx-auto border border-gray-200 rounded-lg" style="max-width: 200px;">
                                     </div>
                                 @else
@@ -325,40 +326,144 @@
         </div>
 
         <!-- Usage History -->
+        <!-- Usage History - Enhanced Version (backward compatible) -->
         @if ($usageHistory && count($usageHistory) > 0)
             <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
                 <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
                     <h3 class="text-lg font-semibold text-gray-900 flex items-center">
                         <i class="fas fa-history mr-2 text-blue-600"></i>
                         Riwayat Penggunaan
+                        <span class="ml-2 text-sm font-normal text-gray-500">({{ count($usageHistory) }} transaksi)</span>
                     </h3>
                 </div>
                 <div class="p-6">
                     <div class="space-y-4">
                         @foreach ($usageHistory as $history)
-                            <div class="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
+                            <div
+                                class="flex items-start space-x-4 p-4 rounded-lg border
+                        {{ $history['is_critical'] ?? false ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200' }}">
+
+                                <!-- Icon -->
                                 <div
-                                    class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                    <i class="fas fa-clock text-blue-600"></i>
+                                    class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0
+                            {{ $history['is_critical'] ?? false ? 'bg-red-100' : 'bg-blue-100' }}">
+                                    <i
+                                        class="{{ $history['action_icon'] ?? 'fas fa-clock' }}
+                                {{ $history['is_critical'] ?? false ? 'text-red-600' : 'text-blue-600' }}"></i>
                                 </div>
+
+                                <!-- Content -->
                                 <div class="flex-1">
+                                    <!-- Header -->
                                     <div class="flex items-center justify-between mb-2">
-                                        <h4 class="font-medium text-gray-900">{{ ucfirst($history['action']) }}</h4>
-                                        <span class="text-sm text-gray-500">{{ $history['date'] }}</span>
+                                        <div class="flex items-center gap-2">
+                                            <h4 class="font-medium text-gray-900">
+                                                {{ $history['action_text'] ?? ucfirst($history['action']) }}
+                                            </h4>
+
+                                            <!-- Transaction Number -->
+                                            @if (isset($history['transaction_number']))
+                                                <span class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">
+                                                    {{ $history['transaction_number'] }}
+                                                </span>
+                                            @endif
+
+                                            <!-- Status Badge -->
+                                            @if (isset($history['transaction_status']))
+                                                <span
+                                                    class="text-xs px-2 py-1 rounded-full
+                                            {{ $history['transaction_status'] === 'approved'
+                                                ? 'bg-green-100 text-green-800'
+                                                : ($history['transaction_status'] === 'pending'
+                                                    ? 'bg-yellow-100 text-yellow-800'
+                                                    : 'bg-red-100 text-red-800') }}">
+                                                    {{ ucfirst($history['transaction_status']) }}
+                                                </span>
+                                            @endif
+                                        </div>
+
+                                        <!-- Date -->
+                                        <div class="text-right">
+                                            <span class="text-sm text-gray-500">{{ $history['date'] }}</span>
+                                            @if (isset($history['relative_time']))
+                                                <div class="text-xs text-gray-400">{{ $history['relative_time'] }}</div>
+                                            @endif
+                                        </div>
                                     </div>
-                                    <div class="flex items-center space-x-4 text-sm text-gray-600">
+
+                                    <!-- Details -->
+                                    <div class="space-y-1 text-sm text-gray-600">
+                                        <!-- Status Changes -->
                                         @if ($history['status_before'] && $history['status_after'])
-                                            <span>
-                                                Status:
-                                                <span class="font-medium">{{ ucfirst($history['status_before']) }}</span>
-                                                →
-                                                <span class="font-medium">{{ ucfirst($history['status_after']) }}</span>
-                                            </span>
+                                            <div class="flex items-center gap-2">
+                                                <i class="fas fa-exchange-alt text-gray-400"></i>
+                                                <span>Status:
+                                                    <span
+                                                        class="font-medium">{{ ucfirst($history['status_before']) }}</span>
+                                                    <i class="fas fa-arrow-right mx-1 text-gray-400"></i>
+                                                    <span
+                                                        class="font-medium">{{ ucfirst($history['status_after']) }}</span>
+                                                </span>
+                                            </div>
                                         @endif
-                                        <span>oleh: <span class="font-medium">{{ $history['user'] }}</span></span>
+
+                                        <!-- Kondisi Changes (NEW) -->
+                                        @if (isset($history['kondisi_changed']) && $history['kondisi_changed'])
+                                            <div class="flex items-center gap-2">
+                                                <i class="fas fa-check-circle text-gray-400"></i>
+                                                <span>Kondisi:
+                                                    <span
+                                                        class="font-medium">{{ ucfirst($history['kondisi_before'] ?? 'unknown') }}</span>
+                                                    <i class="fas fa-arrow-right mx-1 text-gray-400"></i>
+                                                    <span
+                                                        class="font-medium">{{ ucfirst($history['kondisi_after'] ?? 'unknown') }}</span>
+                                                </span>
+                                            </div>
+                                        @endif
+
+                                        <!-- Location Changes (NEW) -->
+                                        @if (isset($history['location_changed']) && $history['location_changed'])
+                                            <div class="flex items-center gap-2">
+                                                <i class="fas fa-map-marker-alt text-gray-400"></i>
+                                                <span>Lokasi:
+                                                    <span
+                                                        class="font-medium">{{ $history['from_location'] ?? 'Unknown' }}</span>
+                                                    <i class="fas fa-arrow-right mx-1 text-gray-400"></i>
+                                                    <span
+                                                        class="font-medium">{{ $history['to_location'] ?? 'Unknown' }}</span>
+                                                </span>
+                                            </div>
+                                        @endif
+
+                                        <!-- User Info -->
+                                        <div class="flex items-center gap-2">
+                                            <i class="fas fa-user text-gray-400"></i>
+                                            <span>Dibuat oleh: <span
+                                                    class="font-medium">{{ $history['user'] }}</span></span>
+
+                                            @if (isset($history['approved_by']) && $history['approved_by'])
+                                                <span class="text-gray-400">•</span>
+                                                <span>Disetujui oleh: <span
+                                                        class="font-medium">{{ $history['approved_by'] }}</span></span>
+                                            @endif
+                                        </div>
                                     </div>
-                                    @if ($history['notes'])
-                                        <p class="text-sm text-gray-600 mt-1 italic">{{ $history['notes'] }}</p>
+
+                                    <!-- Notes -->
+                                    @if (isset($history['all_notes']) && trim($history['all_notes']))
+                                        <div class="mt-2 p-2 bg-white rounded border-l-4 border-blue-300">
+                                            <p class="text-sm text-gray-600 italic">
+                                                <i class="fas fa-sticky-note mr-1 text-blue-500"></i>
+                                                {{ trim($history['all_notes']) }}
+                                            </p>
+                                        </div>
+                                    @elseif($history['notes'])
+                                        <div class="mt-2 p-2 bg-white rounded border-l-4 border-blue-300">
+                                            <p class="text-sm text-gray-600 italic">
+                                                <i class="fas fa-sticky-note mr-1 text-blue-500"></i>
+                                                {{ $history['notes'] }}
+                                            </p>
+                                        </div>
                                     @endif
                                 </div>
                             </div>
@@ -652,56 +757,58 @@
         }
     </script>
     <script>
-// JavaScript functions for QR code actions
-async function generateQRCode(itemDetailId) {
-    try {
-        const response = await fetch(`/item-details/${itemDetailId}/generate-qr`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        // JavaScript functions for QR code actions
+        async function generateQRCode(itemDetailId) {
+            try {
+                const response = await fetch(`/item-details/${itemDetailId}/generate-qr`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute(
+                            'content')
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast('QR Code berhasil digenerate!', 'success');
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showToast(data.message || 'Gagal generate QR Code', 'error');
+                }
+            } catch (error) {
+                showToast('Terjadi kesalahan saat generate QR Code', 'error');
             }
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            showToast('QR Code berhasil digenerate!', 'success');
-            setTimeout(() => window.location.reload(), 1000);
-        } else {
-            showToast(data.message || 'Gagal generate QR Code', 'error');
         }
-    } catch (error) {
-        showToast('Terjadi kesalahan saat generate QR Code', 'error');
-    }
-}
 
-async function regenerateQRImage(itemDetailId) {
-    try {
-        const response = await fetch(`/item-details/${itemDetailId}/regenerate-qr-image`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        async function regenerateQRImage(itemDetailId) {
+            try {
+                const response = await fetch(`/item-details/${itemDetailId}/regenerate-qr-image`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute(
+                            'content')
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast('QR Code image berhasil diregenerate!', 'success');
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showToast(data.message || 'Gagal regenerate QR Code image', 'error');
+                }
+            } catch (error) {
+                showToast('Terjadi kesalahan saat regenerate QR Code image', 'error');
             }
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            showToast('QR Code image berhasil diregenerate!', 'success');
-            setTimeout(() => window.location.reload(), 1000);
-        } else {
-            showToast(data.message || 'Gagal regenerate QR Code image', 'error');
         }
-    } catch (error) {
-        showToast('Terjadi kesalahan saat regenerate QR Code image', 'error');
-    }
-}
 
-function printQR(imageUrl) {
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
+        function printQR(imageUrl) {
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
         <html>
             <head>
                 <title>Print QR Code</title>
@@ -716,18 +823,18 @@ function printQR(imageUrl) {
             </body>
         </html>
     `);
-}
+        }
 
-function showToast(message, type = 'info') {
-    // Toast notification function (sama seperti sebelumnya)
-    const toast = document.createElement('div');
-    toast.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg transition-all duration-300 ${
+        function showToast(message, type = 'info') {
+            // Toast notification function (sama seperti sebelumnya)
+            const toast = document.createElement('div');
+            toast.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg transition-all duration-300 ${
         type === 'success' ? 'bg-green-100 border border-green-400 text-green-700' :
         type === 'error' ? 'bg-red-100 border border-red-400 text-red-700' :
         'bg-blue-100 border border-blue-400 text-blue-700'
     }`;
 
-    toast.innerHTML = `
+            toast.innerHTML = `
         <div class="flex items-center">
             <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'} mr-2"></i>
             <span>${message}</span>
@@ -737,10 +844,10 @@ function showToast(message, type = 'info') {
         </div>
     `;
 
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 5000);
-}
-</script>
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 5000);
+        }
+    </script>
 
     <style>
         /* Custom animations */
