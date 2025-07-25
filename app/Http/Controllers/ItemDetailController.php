@@ -26,51 +26,101 @@ class ItemDetailController extends Controller
     //misal ini index saya nambahin per page
     public function index(Request $request)
     {
-        $query = ItemDetail::with(['item.category', 'goodsReceivedDetail.goodsReceived']);
+        // Enhanced query with purchaseOrder relationship for PO search
+        $query = ItemDetail::with([
+            'item.category',
+            'goodsReceivedDetail.goodsReceived.purchaseOrder'
+        ]);
+
         // Filter by item
         if ($request->filled('item_id')) {
             $query->byItem($request->item_id);
         }
+
         // Filter by status
         if ($request->filled('status')) {
             $query->byStatus($request->status);
         }
+
         // Filter by location
         if ($request->filled('location')) {
             $query->byLocation($request->location);
         }
-        // Search by serial number
+
+        // Filter by kondisi (NEW)
+        if ($request->filled('kondisi')) {
+            $query->where('kondisi', $request->kondisi);
+        }
+
+        // Enhanced search - includes PO number search
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('serial_number', 'like', "%{$search}%")
                     ->orWhere('qr_code', 'like', "%{$search}%")
+                    ->orWhere('item_detail_id', 'like', "%{$search}%")
+                    // Search in item details
                     ->orWhereHas('item', function ($q2) use ($search) {
                         $q2->where('item_name', 'like', "%{$search}%")
                             ->orWhere('item_code', 'like', "%{$search}%");
+                    })
+                    // NEW: Search in PO number
+                    ->orWhereHas('goodsReceivedDetail.goodsReceived.purchaseOrder', function ($q3) use ($search) {
+                        $q3->where('po_number', 'like', "%{$search}%");
                     });
             });
         }
-        // Custom pagination - get per_page value from request or default to 20
-        $perPage = $request->input('per_page', 25);
 
-        // Validate per_page value to prevent abuse
-        $allowedPerPage = [ 25, 50, 100, 1000];
-        if (!in_array($perPage, $allowedPerPage)) {
-            $perPage = 25; // fallback to default
+        // NEW: Dedicated PO search filter
+        if ($request->filled('po_search')) {
+            $poSearch = $request->po_search;
+            $query->whereHas('goodsReceivedDetail.goodsReceived.purchaseOrder', function ($q) use ($poSearch) {
+                $q->where('po_number', 'like', "%{$poSearch}%");
+            });
         }
-        $itemDetails = $query->orderBy('created_at', 'desc')->paginate($perPage);
 
-        // Append query parameters to pagination links
+        // Custom pagination
+        $perPage = $request->input('per_page', 25);
+        $allowedPerPage = [25, 50, 100, 1000];
+        if (!in_array($perPage, $allowedPerPage)) {
+            $perPage = 25;
+        }
+
+        $itemDetails = $query->orderBy('created_at', 'desc')->paginate($perPage);
         $itemDetails->appends($request->query());
+
         // Filter options
         $items = Item::active()->orderBy('item_name')->get();
         $statuses = ['available', 'used', 'damaged', 'maintenance', 'reserved', 'stock'];
         $locations = ItemDetail::distinct('location')->pluck('location')->filter();
 
-        // Per page options
-        $perPageOptions = [ 25, 50,100, 1000];
-        return view('item-details.index', compact('itemDetails', 'items', 'statuses', 'locations', 'perPageOptions', 'perPage'));
+        // NEW: Get kondisi options
+        $kondisiOptions = ['good', 'no_good'];
+
+        // NEW: Get available PO numbers for dropdown
+        $poNumbers = ItemDetail::with('goodsReceivedDetail.goodsReceived.purchaseOrder')
+            ->whereHas('goodsReceivedDetail.goodsReceived.purchaseOrder')
+            ->get()
+            ->map(function ($itemDetail) {
+                return $itemDetail->goodsReceivedDetail->goodsReceived->purchaseOrder->po_number ?? null;
+            })
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
+
+        $perPageOptions = [25, 50, 100, 1000];
+
+        return view('item-details.index', compact(
+            'itemDetails',
+            'items',
+            'statuses',
+            'locations',
+            'kondisiOptions',
+            'poNumbers',
+            'perPageOptions',
+            'perPage'
+        ));
     }
     // Tampilkan detail item
     public function show(ItemDetail $itemDetail)

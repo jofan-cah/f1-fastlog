@@ -217,24 +217,7 @@
 
                 <!-- Filter by PO -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Filter by PO Number</label>
-                        <input type="text" name="po_number" value="{{ request('po_number') }}"
-                            placeholder="Masukkan nomor PO..."
-                            class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Tanggal Mulai</label>
-                        <input type="date" name="start_date" value="{{ request('start_date') }}"
-                            class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Tanggal Akhir</label>
-                        <input type="date" name="end_date" value="{{ request('end_date') }}"
-                            class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-                    </div>
-                </div>
-                <!-- TAMBAHKAN: Per Page Filter -->
+                      <!-- TAMBAHKAN: Per Page Filter -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Per Halaman</label>
                     <select name="per_page"
@@ -246,6 +229,18 @@
                         @endforeach
                     </select>
                 </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Tanggal Mulai</label>
+                        <input type="date" name="start_date" value="{{ request('start_date') }}"
+                            class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Tanggal Akhir</label>
+                        <input type="date" name="end_date" value="{{ request('end_date') }}"
+                            class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                    </div>
+                </div>
+
 
                 <!-- Filter Buttons -->
                 <div class="flex flex-wrap gap-3 pt-2">
@@ -297,10 +292,10 @@
                                 Status
                             </th>
                             <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Lokasi
+                               Kondisi
                             </th>
                             <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Kondisi
+                                 Lokasi
                             </th>
                             <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 PO / Received Date
