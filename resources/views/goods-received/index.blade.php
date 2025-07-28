@@ -285,7 +285,7 @@
                             <!-- Receive Date -->
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm text-gray-900">{{ $gr->receive_date->format('d/m/Y') }}</div>
-                                <div class="text-sm text-gray-500">{{ $gr->receive_date->format('H:i') }}</div>
+                                {{-- <div class="text-sm text-gray-500">{{ $gr->receive_date->format('H:i') }}</div> --}}
                             </td>
 
                             <!-- Items Summary -->
