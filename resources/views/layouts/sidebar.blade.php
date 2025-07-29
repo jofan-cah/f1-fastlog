@@ -75,7 +75,7 @@
         @if(auth()->user()->hasPermission('categories', 'read') || auth()->user()->hasPermission('items', 'read') || auth()->user()->hasPermission('suppliers', 'read'))
         <div class="space-y-1">
             @php
-                $masterMenuActive = request()->routeIs(['categories.*', 'items.*', 'suppliers.*']);
+                $masterMenuActive = request()->routeIs(['categories.*', 'items.*', 'suppliers.*','itemsCode.*']);
                 $masterMenuOpen = $masterMenuActive ? 'true' : 'false';
             @endphp
             <button onclick="toggleDropdown('master'); setActiveMenu(this);"
@@ -106,7 +106,7 @@
                     @canAccess('items', 'read')
                     <a href="{{ route('itemsCode.indexCode') }}"
                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
-                              {{ request()->routeIs('items.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
+                              {{ request()->routeIs('itemsCode.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
                         Kode Barang
                     </a>
                     @endcanAccess

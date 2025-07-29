@@ -73,17 +73,17 @@ Route::middleware('auth')->group(function () {
     // ================================================================
     // USER MANAGEMENT ROUTES (Admin Only)
     // ================================================================
-
+    Route::middleware('permission:user_levels,create')->group(function () {
+        Route::get('/user-levels/create', [UserLevelController::class, 'create'])->name('user-levels.create');
+        Route::post('/user-levels', [UserLevelController::class, 'store'])->name('user-levels.store');
+    });
     // User Level Management
     Route::middleware('permission:user_levels,read')->group(function () {
         Route::get('/user-levels', [UserLevelController::class, 'index'])->name('user-levels.index');
         Route::get('/user-levels/{userLevel}', [UserLevelController::class, 'show'])->name('user-levels.show');
     });
 
-    Route::middleware('permission:user_levels,create')->group(function () {
-        Route::get('/user-levels/create', [UserLevelController::class, 'create'])->name('user-levels.create');
-        Route::post('/user-levels', [UserLevelController::class, 'store'])->name('user-levels.store');
-    });
+
 
     Route::middleware('permission:user_levels,update')->group(function () {
         Route::get('/user-levels/{userLevel}/edit', [UserLevelController::class, 'edit'])->name('user-levels.edit');
@@ -184,11 +184,10 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('permission:items,read')->group(function () {
- Route::get('/items/code', [ItemController::class, 'indexViewCode'])->name('itemsCode.indexCode');
+        Route::get('/itemsCode/code', [ItemController::class, 'indexViewCode'])->name('itemsCode.indexCode');
         Route::get('/items/export/excel', [ItemController::class, 'exportExcel'])->name('items.export.excel');
         Route::get('/items', [ItemController::class, 'index'])->name('items.index');
         Route::get('/items/{item}', [ItemController::class, 'show'])->name('items.show');
-
     });
 
 
