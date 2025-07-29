@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class GoodsReceivedController extends Controller
 {
@@ -574,37 +575,122 @@ class GoodsReceivedController extends Controller
     private function generateItemDetailsForReceived(GoodsReceivedDetail $grDetail, array $itemData, array $serialNumbers = [])
     {
         $quantityReceived = (int)$itemData['quantity_received'];
-        $item = Item::find($itemData['item_id']);
+        $item = Item::with('category')->find($itemData['item_id']);
         $itemCode = $item->item_code;
 
-        $itemsGenerated = 0;
+        // Generate prefix once
+        $codeCategory = $item->category->code_category ?? 'XXX';
+        $itemCodePrefix = $item->item_code ?? 'XXX';
+        $prefix = $codeCategory . $itemCodePrefix;
 
-        for ($i = 1; $i <= $quantityReceived; $i++) {
-            // Use manual serial number atau generate otomatis
-            $serialNumber = $this->getSerialNumber($serialNumbers, $i - 1, $itemCode, $i);
+        // DEBUG: Log the prefix and search pattern
+        Log::info('ItemDetail ID Generation Debug', [
+            'item_id' => $itemData['item_id'],
+            'code_category' => $codeCategory,
+            'item_code' => $itemCodePrefix,
+            'generated_prefix' => $prefix,
+            'search_pattern' => $prefix . '%'
+        ]);
 
-            // Semua barang yang diterima langsung masuk sebagai available di stock
-            $status = 'stock';
-            $location = 'Warehouse - Stock';
-            $notes = "Received from GR: {$grDetail->gr_detail_id}";
+        return DB::transaction(function () use ($grDetail, $itemData, $serialNumbers, $quantityReceived, $item, $itemCode, $prefix) {
+            $itemsGenerated = 0;
 
-            // Create ItemDetail record dengan ID yang di-generate
-            ItemDetail::create([
-                'item_detail_id' => $this->generateItemDetailId($itemData['item_id']),
-                'gr_detail_id' => $grDetail->gr_detail_id,
-                'item_id' => $itemData['item_id'],
-                'serial_number' => $serialNumber,
-                'custom_attributes' => null,
-                'qr_code' => null,
-                'status' => $status,
-                'location' => $location,
-                'notes' => $notes,
+            // Get existing records for debugging
+            $existingRecords = ItemDetail::where('item_detail_id', 'like', $prefix . '%')
+                ->orderBy('item_detail_id', 'desc')
+                ->limit(5)
+                ->pluck('item_detail_id')
+                ->toArray();
+
+            // DEBUG: Log existing records
+            Log::info('Existing ItemDetail records for prefix', [
+                'prefix' => $prefix,
+                'existing_records' => $existingRecords
             ]);
 
-            $itemsGenerated++;
-        }
+            // Get the starting number with row locking
+            $lastDetail = ItemDetail::where('item_detail_id', 'like', $prefix . '%')
+                ->orderBy('item_detail_id', 'desc')
+                ->lockForUpdate()
+                ->first();
 
-        return $itemsGenerated;
+            $startingNumber = 1;
+            if ($lastDetail) {
+                $lastNumber = (int) substr($lastDetail->item_detail_id, -5);
+                $startingNumber = $lastNumber + 1;
+
+                // DEBUG: Log the calculation
+                Log::info('Last ItemDetail found', [
+                    'last_detail_id' => $lastDetail->item_detail_id,
+                    'extracted_number' => $lastNumber,
+                    'next_starting_number' => $startingNumber
+                ]);
+            } else {
+                Log::info('No existing ItemDetail found for prefix', ['prefix' => $prefix]);
+            }
+
+            // Generate all records with sequential IDs
+            for ($i = 0; $i < $quantityReceived; $i++) {
+                $serialNumber = $this->getSerialNumber($serialNumbers, $i, $itemCode, $i + 1);
+                $status = 'stock';
+                $location = 'Warehouse - Stock';
+                $notes = "Received from GR: {$grDetail->gr_detail_id}";
+
+                // Generate sequential ID
+                $currentNumber = $startingNumber + $i;
+                $itemDetailId = $prefix . str_pad($currentNumber, 5, '0', STR_PAD_LEFT);
+
+                // DEBUG: Log each ID being generated
+                Log::info('Generating ItemDetail', [
+                    'iteration' => $i,
+                    'current_number' => $currentNumber,
+                    'generated_id' => $itemDetailId
+                ]);
+
+                // Check if ID already exists before creating
+                $exists = ItemDetail::where('item_detail_id', $itemDetailId)->exists();
+                if ($exists) {
+                    Log::error('ItemDetail ID already exists!', [
+                        'duplicate_id' => $itemDetailId,
+                        'prefix' => $prefix,
+                        'current_number' => $currentNumber
+                    ]);
+                    throw new \Exception("ItemDetail ID {$itemDetailId} already exists in database");
+                }
+
+                try {
+                    ItemDetail::create([
+                        'item_detail_id' => $itemDetailId,
+                        'gr_detail_id' => $grDetail->gr_detail_id,
+                        'item_id' => $itemData['item_id'],
+                        'serial_number' => $serialNumber,
+                        'custom_attributes' => null,
+                        'qr_code' => null,
+                        'status' => $status,
+                        'location' => $location,
+                        'notes' => $notes,
+                    ]);
+
+                    $itemsGenerated++;
+
+                    Log::info('ItemDetail created successfully', [
+                        'item_detail_id' => $itemDetailId,
+                        'iteration' => $i + 1,
+                        'total_generated' => $itemsGenerated
+                    ]);
+                } catch (\Illuminate\Database\QueryException $e) {
+                    Log::error('Database error creating ItemDetail', [
+                        'item_detail_id' => $itemDetailId,
+                        'error_code' => $e->getCode(),
+                        'error_message' => $e->getMessage(),
+                        'sql_state' => $e->errorInfo[0] ?? 'unknown'
+                    ]);
+                    throw $e;
+                }
+            }
+
+            return $itemsGenerated;
+        });
     }
 
     /**
