@@ -421,12 +421,12 @@
                                         </a>
 
                                         <!-- Quick Status Update (Modal) -->
-                                        <button
+                                        {{-- <button
                                             @click="showUpdateStatusModal('{{ $itemDetail->item_detail_id }}', '{{ addslashes($itemDetail->serial_number) }}', '{{ $itemDetail->status }}', '{{ addslashes($itemDetail->location ?? '') }}')"
                                             class="text-green-600 hover:text-green-900 p-2 hover:bg-green-50 rounded-lg transition-all duration-200"
                                             title="Quick Status Update">
                                             <i class="fas fa-sync-alt"></i>
-                                        </button>
+                                        </button> --}}
 
                                         <!-- Show QR Code -->
                                         {{-- <button @click="showQRModal('{{ $itemDetail->qr_code ?: 'Not generated yet' }}', '{{ addslashes($itemDetail->serial_number) }}', '{{ $itemDetail->item_detail_id }}')"
