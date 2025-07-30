@@ -35,26 +35,29 @@ class ItemController extends Controller
     }
 
 
+    // Controller
     public function indexViewCode(Request $request)
     {
         $query = Item::with(['category', 'stock']);
 
-        // Search functionality
-        if ($request->filled('search')) {
+        // Search functionality - hanya jika search term tidak kosong
+        if ($request->has('search')) {
             $searchTerm = $request->search;
-            $query->where(function($q) use ($searchTerm) {
+            $query->where(function ($q) use ($searchTerm) {
                 $q->where('item_code', 'like', "%{$searchTerm}%")
-                  ->orWhere('item_name', 'like', "%{$searchTerm}%")
-                  ->orWhereHas('category', function($subQ) use ($searchTerm) {
-                      $subQ->where('code_category', 'like', "%{$searchTerm}%")
-                           ->orWhere('category_name', 'like', "%{$searchTerm}%");
-                  });
+                    ->orWhere('item_name', 'like', "%{$searchTerm}%")
+                    ->orWhereHas('category', function ($subQ) use ($searchTerm) {
+                        $subQ->where('code_category', 'like', "%{$searchTerm}%")
+                            ->orWhere('category_name', 'like', "%{$searchTerm}%");
+                    });
             });
         }
 
-        // Filter by category
-        if ($request->filled('category_id')) {
-            $query->where('category_id', $request->category_id);
+        // Filter by category - sesuaikan dengan name="category" di form
+        if ($request->filled('category')) {
+            $query->whereHas('category', function ($q) use ($request) {
+                $q->where('category_id', $request->category);
+            });
         }
 
         // Filter by status
@@ -64,8 +67,6 @@ class ItemController extends Controller
         }
 
         $items = $query->orderBy('item_name')->paginate(20)->withQueryString();
-
-        // Get categories for filter
         $categories = Category::active()->orderBy('category_name')->get();
 
         return view('items.indexCode', compact('items', 'categories'));
@@ -81,13 +82,13 @@ class ItemController extends Controller
 
         if ($request->filled('search')) {
             $searchTerm = $request->search;
-            $query->where(function($q) use ($searchTerm) {
+            $query->where(function ($q) use ($searchTerm) {
                 $q->where('item_code', 'like', "%{$searchTerm}%")
-                  ->orWhere('item_name', 'like', "%{$searchTerm}%")
-                  ->orWhereHas('category', function($subQ) use ($searchTerm) {
-                      $subQ->where('code_category', 'like', "%{$searchTerm}%")
-                           ->orWhere('category_name', 'like', "%{$searchTerm}%");
-                  });
+                    ->orWhere('item_name', 'like', "%{$searchTerm}%")
+                    ->orWhereHas('category', function ($subQ) use ($searchTerm) {
+                        $subQ->where('code_category', 'like', "%{$searchTerm}%")
+                            ->orWhere('category_name', 'like', "%{$searchTerm}%");
+                    });
             });
         }
 
@@ -187,7 +188,7 @@ class ItemController extends Controller
         // Save and download
         $writer = new Xlsx($spreadsheet);
 
-        return response()->streamDownload(function() use ($writer) {
+        return response()->streamDownload(function () use ($writer) {
             $writer->save('php://output');
         }, $filename, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
