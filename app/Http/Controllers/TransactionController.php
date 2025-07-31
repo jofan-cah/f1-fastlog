@@ -31,6 +31,15 @@ class TransactionController extends Controller
         $dateFrom = $request->get('date_from');
         $dateTo = $request->get('date_to');
 
+        // ✅ SUPER SIMPLE: LVL003 hanya boleh IN dan OUT
+        $user = auth()->user();
+        $userLevel = $user->userLevel->level_name ?? '';
+        // dd($userLevel);
+
+        if ($userLevel == 'Teknisi' && $currentType && !in_array($currentType, ['IN', 'OUT'])) {
+            return redirect()->route('dashboard');
+        }
+
         // Define transaction type configurations
         $typeConfigs = [
             'IN' => [

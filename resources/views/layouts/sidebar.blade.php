@@ -262,10 +262,15 @@
                     'approvals.*',
                 ]);
                 $transactionMenuOpen = $transactionMenuActive ? 'true' : 'false';
+
+                // ✅ Check user level untuk filtering menu
+                $user = auth()->user();
+                $userLevel = $user->userLevel->level_name ?? '';
+                $isTeknisi = $userLevel === 'Teknisi';
             @endphp
             <button onclick="toggleDropdown('transactions'); setActiveMenu(this);"
                 class="sidebar-item w-full flex items-center justify-between p-3 rounded-xl transition-all duration-200 group
-                           {{ $transactionMenuActive ? 'bg-red-600/20 text-red-400 border border-red-500/30' : 'text-gray-300 hover:text-white hover:bg-white/10' }}">
+                   {{ $transactionMenuActive ? 'bg-red-600/20 text-red-400 border border-red-500/30' : 'text-gray-300 hover:text-white hover:bg-white/10' }}">
                 <div class="flex items-center space-x-3">
                     <i class="fas fa-exchange-alt group-hover:scale-110 transition-transform"></i>
                     <span class="font-medium">Transaksi</span>
@@ -276,35 +281,52 @@
             <div id="transactions"
                 class="overflow-hidden transition-all duration-300 {{ $transactionMenuActive ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0' }}">
                 <div class="ml-8 space-y-1">
-                    <a href="{{ route('transactions.index') }}"
-                        class="block p-2 text-sm mt-2 transition-all duration-200 hover:translate-x-1 rounded-lg
-                              {{ request()->routeIs('transactions.*') && request()->get('type') == '' ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
-                        <i class="fas fa-clipboard-list w-4"></i> Semua Data
-                    </a>
+                    {{-- ✅ Semua Data - Hide untuk Teknisi --}}
+                    @unless ($isTeknisi)
+                        <a href="{{ route('transactions.index') }}"
+                            class="block p-2 text-sm mt-2 transition-all duration-200 hover:translate-x-1 rounded-lg
+                      {{ request()->routeIs('transactions.*') && request()->get('type') == '' ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
+                            <i class="fas fa-clipboard-list w-4"></i> Semua Data
+                        </a>
+                    @endunless
+
+                    {{-- ✅ Barang Masuk - Show untuk semua --}}
                     <a href="{{ route('transactions.index', ['type' => 'IN']) }}"
                         class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
-                              {{ request()->routeIs('transactions.*') && request()->get('type') == 'IN' ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
+                      {{ request()->routeIs('transactions.*') && request()->get('type') == 'IN' ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
                         <i class="fas fa-arrow-down w-4"></i> Barang Masuk
                     </a>
+
+                    {{-- ✅ Barang Keluar - Show untuk semua --}}
                     <a href="{{ route('transactions.index', ['type' => 'OUT']) }}"
                         class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
-                              {{ request()->routeIs('transactions.*') && request()->get('type') == 'OUT' ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
+                      {{ request()->routeIs('transactions.*') && request()->get('type') == 'OUT' ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
                         <i class="fas fa-arrow-up w-4"></i> Barang Keluar
                     </a>
-                    <a href="{{ route('transactions.index', ['type' => 'REPAIR']) }}"
-                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
-                              {{ request()->routeIs('transactions.*') && request()->get('type') == 'REPAIR' ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
-                        <i class="fas fa-wrench w-4"></i> Barang Repair
-                    </a>
-                    <a href="{{ route('transactions.index', ['type' => 'LOST']) }}"
-                        class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
-                              {{ request()->routeIs('transactions.*') && request()->get('type') == 'LOST' ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
-                        <i class="fas fa-exclamation-triangle w-4"></i> Barang Hilang
-                    </a>
+
+                    {{-- ✅ Barang Repair - Hide untuk Teknisi --}}
+                    @unless ($isTeknisi)
+                        <a href="{{ route('transactions.index', ['type' => 'REPAIR']) }}"
+                            class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
+                      {{ request()->routeIs('transactions.*') && request()->get('type') == 'REPAIR' ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
+                            <i class="fas fa-wrench w-4"></i> Barang Repair
+                        </a>
+                    @endunless
+
+                    {{-- ✅ Barang Hilang - Hide untuk Teknisi --}}
+                    @unless ($isTeknisi)
+                        <a href="{{ route('transactions.index', ['type' => 'LOST']) }}"
+                            class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
+                      {{ request()->routeIs('transactions.*') && request()->get('type') == 'LOST' ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
+                            <i class="fas fa-exclamation-triangle w-4"></i> Barang Hilang
+                        </a>
+                    @endunless
+
+                    {{-- ✅ Approval - Hide untuk Teknisi (sudah ada @canAccess) --}}
                     @canAccess('transactions', 'approve')
                     <a href="{{ route('approvals.index') }}"
                         class="block p-2 text-sm transition-all duration-200 hover:translate-x-1 rounded-lg
-                              {{ request()->routeIs('approvals.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
+                      {{ request()->routeIs('approvals.*') ? 'text-red-400 bg-red-600/10' : 'text-gray-400 hover:text-white hover:bg-white/5' }}">
                         <i class="fas fa-check-circle w-4"></i> Approval Transaksi
                     </a>
                     @endcanAccess
