@@ -195,7 +195,7 @@
     /* Item name styling */
     .item-name {
         font-size: 0.9em;
-        color: #333;
+        font-weight: bold;
     }
 
     /* PO number styling */
