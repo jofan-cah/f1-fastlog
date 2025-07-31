@@ -70,6 +70,7 @@ class PurchaseOrderController extends Controller
     }
 
     // Tampilkan daftar PO - Modified untuk workflow
+    // Tampilkan daftar PO - Modified untuk workflow + filter active/completed
     public function index(Request $request)
     {
         if (!$this->canUserAccess('view')) {
@@ -97,10 +98,27 @@ class PurchaseOrderController extends Controller
                 // FinanceRasi bisa lihat semua kecuali draft logistik
                 $query->where('workflow_status', '!=', PurchaseOrderConstants::WORKFLOW_STATUS_DRAFT_LOGISTIC);
                 break;
-            // LVL001 (Admin) sudah bisa lihat semua tanpa filter
+                // LVL001 (Admin) sudah bisa lihat semua tanpa filter
         }
 
-        // Filter by workflow status
+        // NEW: Handle active/completed filter from sidebar
+        $filter = $request->get('filter');
+        if ($filter === 'active') {
+            // PO yang masih dalam proses (belum selesai)
+            $query->whereNotIn('workflow_status', [
+                PurchaseOrderConstants::WORKFLOW_STATUS_RECEIVED,
+                PurchaseOrderConstants::WORKFLOW_STATUS_CANCELLED
+            ]);
+        } elseif ($filter === 'completed') {
+            // PO yang sudah selesai atau dibatalkan
+            $query->whereIn('workflow_status', [
+                PurchaseOrderConstants::WORKFLOW_STATUS_RECEIVED,
+                PurchaseOrderConstants::WORKFLOW_STATUS_CANCELLED
+            ]);
+        }
+        // Jika tidak ada filter atau 'all', tampilkan semua (default behavior)
+
+        // Filter by workflow status (dari dropdown filter)
         if ($request->filled('workflow_status')) {
             $query->byWorkflowStatus($request->workflow_status);
         }
@@ -142,8 +160,8 @@ class PurchaseOrderController extends Controller
 
         $purchaseOrders = $query->paginate(15)->withQueryString();
 
-        // Statistics - Updated untuk workflow
-        $statistics = PurchaseOrder::getWorkflowStatistics();
+        // Statistics - Updated untuk workflow + active/completed breakdown
+        $statistics = $this->getFilteredStatistics($filter, $userLevel);
 
         // Suppliers untuk filter
         $suppliers = Supplier::active()
@@ -151,12 +169,19 @@ class PurchaseOrderController extends Controller
             ->orderBy('supplier_name')
             ->get();
 
-        // Overdue POs
-        $overduePOs = PurchaseOrder::overdue()
-            ->with('supplier')
-            ->orderBy('expected_date')
-            ->take(5)
-            ->get();
+        // Overdue POs (hanya untuk active POs)
+        $overduePOs = collect();
+        if ($filter !== 'completed') {
+            $overduePOs = PurchaseOrder::overdue()
+                ->whereNotIn('workflow_status', [
+                    PurchaseOrderConstants::WORKFLOW_STATUS_RECEIVED,
+                    PurchaseOrderConstants::WORKFLOW_STATUS_CANCELLED
+                ])
+                ->with('supplier')
+                ->orderBy('expected_date')
+                ->take(5)
+                ->get();
+        }
 
         // Workflow statuses untuk filter dropdown
         $workflowStatuses = PurchaseOrderConstants::getWorkflowStatuses();
@@ -168,8 +193,65 @@ class PurchaseOrderController extends Controller
             'overduePOs',
             'workflowStatuses',
             'sortField',
-            'sortDirection'
+            'sortDirection',
+            'filter' // Pass filter to view for UI state
         ));
+    }
+
+    // NEW: Get statistics based on filter
+    private function getFilteredStatistics($filter, $userLevel)
+    {
+        $baseQuery = PurchaseOrder::query();
+
+        // Apply user level filtering
+        switch ($userLevel) {
+            case 'LVL002':
+                $baseQuery->whereIn('workflow_status', [
+                    PurchaseOrderConstants::WORKFLOW_STATUS_DRAFT_LOGISTIC,
+                    PurchaseOrderConstants::WORKFLOW_STATUS_REJECTED_F1,
+                    PurchaseOrderConstants::WORKFLOW_STATUS_REJECTED_F2
+                ]);
+                break;
+            case 'LVL004':
+                $baseQuery->where('workflow_status', PurchaseOrderConstants::WORKFLOW_STATUS_PENDING_FINANCE_F1);
+                break;
+            case 'LVL005':
+                $baseQuery->where('workflow_status', '!=', PurchaseOrderConstants::WORKFLOW_STATUS_DRAFT_LOGISTIC);
+                break;
+        }
+
+        // Base statistics
+        $stats = [
+            'total' => (clone $baseQuery)->count(),
+            'draft_logistic' => (clone $baseQuery)->where('workflow_status', PurchaseOrderConstants::WORKFLOW_STATUS_DRAFT_LOGISTIC)->count(),
+            'pending_finance_f1' => (clone $baseQuery)->where('workflow_status', PurchaseOrderConstants::WORKFLOW_STATUS_PENDING_FINANCE_F1)->count(),
+            'pending_finance_f2' => (clone $baseQuery)->where('workflow_status', PurchaseOrderConstants::WORKFLOW_STATUS_PENDING_FINANCE_F2)->count(),
+            'approved' => (clone $baseQuery)->where('workflow_status', PurchaseOrderConstants::WORKFLOW_STATUS_APPROVED)->count(),
+            'rejected' => (clone $baseQuery)->whereIn('workflow_status', [
+                PurchaseOrderConstants::WORKFLOW_STATUS_REJECTED_F1,
+                PurchaseOrderConstants::WORKFLOW_STATUS_REJECTED_F2
+            ])->count(),
+            'sent' => (clone $baseQuery)->where('workflow_status', PurchaseOrderConstants::WORKFLOW_STATUS_SENT)->count(),
+            'received' => (clone $baseQuery)->where('workflow_status', PurchaseOrderConstants::WORKFLOW_STATUS_RECEIVED)->count(),
+            'overdue' => (clone $baseQuery)->overdue()->count(),
+            'payment_overdue' => (clone $baseQuery)->paymentOverdue()->count(),
+        ];
+
+        // Add filter-specific stats
+        if ($filter === 'active') {
+            $stats['active_total'] = (clone $baseQuery)->whereNotIn('workflow_status', [
+                PurchaseOrderConstants::WORKFLOW_STATUS_RECEIVED,
+                PurchaseOrderConstants::WORKFLOW_STATUS_CANCELLED
+            ])->count();
+        } elseif ($filter === 'completed') {
+            $stats['completed_total'] = (clone $baseQuery)->whereIn('workflow_status', [
+                PurchaseOrderConstants::WORKFLOW_STATUS_RECEIVED,
+                PurchaseOrderConstants::WORKFLOW_STATUS_CANCELLED
+            ])->count();
+            $stats['cancelled'] = (clone $baseQuery)->where('workflow_status', PurchaseOrderConstants::WORKFLOW_STATUS_CANCELLED)->count();
+        }
+
+        return $stats;
     }
 
     // Tampilkan form create PO - Logistik only
@@ -481,7 +563,10 @@ class PurchaseOrderController extends Controller
             $result = $purchaseOrder->submitToFinanceF1(Auth::user()->user_id);
 
             if ($result) {
-                ActivityLog::logActivity('purchase_orders', $purchaseOrder->po_id, 'submit_to_f1',
+                ActivityLog::logActivity(
+                    'purchase_orders',
+                    $purchaseOrder->po_id,
+                    'submit_to_f1',
                     ['old_status' => PurchaseOrderConstants::WORKFLOW_STATUS_DRAFT_LOGISTIC],
                     ['new_status' => PurchaseOrderConstants::WORKFLOW_STATUS_PENDING_FINANCE_F1]
                 );
@@ -548,7 +633,10 @@ class PurchaseOrderController extends Controller
             ]);
 
             if ($result) {
-                ActivityLog::logActivity('purchase_orders', $purchaseOrder->po_id, 'process_f1',
+                ActivityLog::logActivity(
+                    'purchase_orders',
+                    $purchaseOrder->po_id,
+                    'process_f1',
                     ['old_status' => PurchaseOrderConstants::WORKFLOW_STATUS_PENDING_FINANCE_F1],
                     [
                         'new_status' => PurchaseOrderConstants::WORKFLOW_STATUS_PENDING_FINANCE_F2,
@@ -567,7 +655,7 @@ class PurchaseOrderController extends Controller
     }
 
     // NEW: Approve Finance F2 (Finance F2 action)
-  public function approveFinanceF2(Request $request, PurchaseOrder $purchaseOrder)
+    public function approveFinanceF2(Request $request, PurchaseOrder $purchaseOrder)
     {
         if (!$this->canUserAccess('process_f2', $purchaseOrder)) {
             return back()->with('error', 'Anda tidak dapat approve PO ini di level Finance F2.');
@@ -593,7 +681,10 @@ class PurchaseOrderController extends Controller
                 // Update backward compatibility status
                 $purchaseOrder->update(['status' => 'sent']);
 
-                ActivityLog::logActivity('purchase_orders', $purchaseOrder->po_id, 'approve_f2',
+                ActivityLog::logActivity(
+                    'purchase_orders',
+                    $purchaseOrder->po_id,
+                    'approve_f2',
                     ['old_status' => PurchaseOrderConstants::WORKFLOW_STATUS_PENDING_FINANCE_F2],
                     [
                         'new_status' => PurchaseOrderConstants::WORKFLOW_STATUS_APPROVED,
@@ -626,12 +717,15 @@ class PurchaseOrderController extends Controller
         if ($validator->fails()) {
             return back()->withErrors($validator)->withInput();
         }
-//  dd($request->all());
+        //  dd($request->all());
         try {
             $result = $purchaseOrder->rejectByFinanceF1(Auth::user()->user_id, $request->rejection_reason);
 
             if ($result) {
-                ActivityLog::logActivity('purchase_orders', $purchaseOrder->po_id, 'reject_f1',
+                ActivityLog::logActivity(
+                    'purchase_orders',
+                    $purchaseOrder->po_id,
+                    'reject_f1',
                     ['old_status' => PurchaseOrderConstants::WORKFLOW_STATUS_PENDING_FINANCE_F1],
                     ['new_status' => PurchaseOrderConstants::WORKFLOW_STATUS_REJECTED_F1, 'reason' => $request->rejection_reason]
                 );
@@ -664,7 +758,10 @@ class PurchaseOrderController extends Controller
             $result = $purchaseOrder->rejectByFinanceF2(Auth::user()->user_id, $request->rejection_reason);
 
             if ($result) {
-                ActivityLog::logActivity('purchase_orders', $purchaseOrder->po_id, 'reject_f2',
+                ActivityLog::logActivity(
+                    'purchase_orders',
+                    $purchaseOrder->po_id,
+                    'reject_f2',
                     ['old_status' => PurchaseOrderConstants::WORKFLOW_STATUS_PENDING_FINANCE_F2],
                     ['new_status' => PurchaseOrderConstants::WORKFLOW_STATUS_REJECTED_F2, 'reason' => $request->rejection_reason]
                 );
@@ -691,7 +788,10 @@ class PurchaseOrderController extends Controller
             // dd($result);
 
             if ($result) {
-                ActivityLog::logActivity('purchase_orders', $purchaseOrder->po_id, 'return_from_reject',
+                ActivityLog::logActivity(
+                    'purchase_orders',
+                    $purchaseOrder->po_id,
+                    'return_from_reject',
                     ['old_status' => $oldStatus],
                     ['new_status' => PurchaseOrderConstants::WORKFLOW_STATUS_DRAFT_LOGISTIC, 'returned_by' => Auth::user()->user_id]
                 );
