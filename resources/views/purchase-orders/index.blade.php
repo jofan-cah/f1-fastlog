@@ -12,28 +12,30 @@
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900">Purchase Order</h1>
-                <p class="text-gray-600 mt-1">Kelola purchase order dan pemesanan barang</p>
+                <p class="text-gray-600 mt-1">Kelola purchase order dan workflow approval</p>
             </div>
             <div class="flex flex-col sm:flex-row gap-3">
-                <a href="{{ route('purchase-orders.create', ['low_stock' => true]) }}"
-                    class="px-4 py-2 bg-gradient-to-r from-yellow-600 to-yellow-700 text-white rounded-xl hover:from-yellow-700 hover:to-yellow-800 transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <span>PO Stok Rendah</span>
-                </a>
-                <a href="{{ route('purchase-orders.create') }}"
-                    class="px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl hover:from-red-700 hover:to-red-800 transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl">
-                    <i class="fas fa-plus"></i>
-                    <span>Buat PO Baru</span>
-                </a>
+                @if(Auth::user()->user_level_id === 'LVL002' || Auth::user()->user_level_id === 'LVL001')
+                    <a href="{{ route('purchase-orders.create', ['low_stock' => true]) }}"
+                        class="px-4 py-2 bg-gradient-to-r from-yellow-600 to-yellow-700 text-white rounded-xl hover:from-yellow-700 hover:to-yellow-800 transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>PO Stok Rendah</span>
+                    </a>
+                    <a href="{{ route('purchase-orders.create') }}"
+                        class="px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl hover:from-red-700 hover:to-red-800 transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl">
+                        <i class="fas fa-plus"></i>
+                        <span>Buat PO Baru</span>
+                    </a>
+                @endif
             </div>
         </div>
 
-        <!-- Stats Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-6">
+        <!-- Workflow Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-9 gap-4">
+            <!-- Total PO -->
             <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
                 <div class="flex items-center">
-                    <div
-                        class="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center">
+                    <div class="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center">
                         <i class="fas fa-file-invoice text-white text-lg"></i>
                     </div>
                     <div class="ml-4">
@@ -43,97 +45,127 @@
                 </div>
             </div>
 
+            <!-- Draft Logistic -->
             <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
                 <div class="flex items-center">
-                    <div
-                        class="w-12 h-12 bg-gradient-to-br from-gray-600 to-gray-700 rounded-xl flex items-center justify-center">
+                    <div class="w-12 h-12 bg-gradient-to-br from-gray-600 to-gray-700 rounded-xl flex items-center justify-center">
                         <i class="fas fa-edit text-white text-lg"></i>
                     </div>
                     <div class="ml-4">
                         <p class="text-sm font-medium text-gray-600">Draft</p>
-                        <p class="text-2xl font-bold text-gray-900">{{ $statistics['draft'] }}</p>
+                        <p class="text-2xl font-bold text-gray-900">{{ $statistics['draft_logistic'] }}</p>
                     </div>
                 </div>
             </div>
 
+            <!-- Pending Finance F1 -->
             <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
                 <div class="flex items-center">
-                    <div
-                        class="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center">
+                    <div class="w-12 h-12 bg-gradient-to-br from-orange-600 to-orange-700 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-clock text-white text-lg"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Pending F1</p>
+                        <p class="text-2xl font-bold text-gray-900">{{ $statistics['pending_finance_f1'] }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pending Finance F2 -->
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+                <div class="flex items-center">
+                    <div class="w-12 h-12 bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-hourglass-half text-white text-lg"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Pending F2</p>
+                        <p class="text-2xl font-bold text-gray-900">{{ $statistics['pending_finance_f2'] }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Approved -->
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+                <div class="flex items-center">
+                    <div class="w-12 h-12 bg-gradient-to-br from-green-600 to-green-700 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-check-circle text-white text-lg"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Approved</p>
+                        <p class="text-2xl font-bold text-gray-900">{{ $statistics['approved'] }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rejected -->
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+                <div class="flex items-center">
+                    <div class="w-12 h-12 bg-gradient-to-br from-red-600 to-red-700 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-times-circle text-white text-lg"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Rejected</p>
+                        <p class="text-2xl font-bold text-gray-900">{{ $statistics['rejected'] }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sent -->
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+                <div class="flex items-center">
+                    <div class="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center">
                         <i class="fas fa-paper-plane text-white text-lg"></i>
                     </div>
                     <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Terkirim</p>
+                        <p class="text-sm font-medium text-gray-600">Sent</p>
                         <p class="text-2xl font-bold text-gray-900">{{ $statistics['sent'] }}</p>
                     </div>
                 </div>
             </div>
 
+            <!-- Received -->
             <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
                 <div class="flex items-center">
-                    <div
-                        class="w-12 h-12 bg-gradient-to-br from-yellow-600 to-yellow-700 rounded-xl flex items-center justify-center">
-                        <i class="fas fa-clock text-white text-lg"></i>
+                    <div class="w-12 h-12 bg-gradient-to-br from-teal-600 to-teal-700 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-box-open text-white text-lg"></i>
                     </div>
                     <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Sebagian</p>
-                        <p class="text-2xl font-bold text-gray-900">{{ $statistics['partial'] }}</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-                <div class="flex items-center">
-                    <div
-                        class="w-12 h-12 bg-gradient-to-br from-green-600 to-green-700 rounded-xl flex items-center justify-center">
-                        <i class="fas fa-check-circle text-white text-lg"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Selesai</p>
+                        <p class="text-sm font-medium text-gray-600">Received</p>
                         <p class="text-2xl font-bold text-gray-900">{{ $statistics['received'] }}</p>
                     </div>
                 </div>
             </div>
 
+            <!-- Overdue -->
             <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
                 <div class="flex items-center">
-                    <div
-                        class="w-12 h-12 bg-gradient-to-br from-red-600 to-red-700 rounded-xl flex items-center justify-center">
-                        <i class="fas fa-times-circle text-white text-lg"></i>
-                    </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Dibatalkan</p>
-                        <p class="text-2xl font-bold text-gray-900">{{ $statistics['cancelled'] }}</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-                <div class="flex items-center">
-                    <div
-                        class="w-12 h-12 bg-gradient-to-br from-orange-600 to-orange-700 rounded-xl flex items-center justify-center">
+                    <div class="w-12 h-12 bg-gradient-to-br from-red-600 to-red-700 rounded-xl flex items-center justify-center">
                         <i class="fas fa-exclamation-triangle text-white text-lg"></i>
                     </div>
                     <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Terlambat</p>
+                        <p class="text-sm font-medium text-gray-600">Overdue</p>
                         <p class="text-2xl font-bold text-gray-900">{{ $statistics['overdue'] }}</p>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-                <div class="flex items-center">
-                    <div
-                        class="w-12 h-12 bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl flex items-center justify-center">
-                        <i class="fas fa-calendar-month text-white text-lg"></i>
+        <!-- Payment Overdue Alert -->
+        @if ($statistics['payment_overdue'] > 0)
+            <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-6">
+                <div class="flex items-start">
+                    <div class="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <i class="fas fa-credit-card text-yellow-600"></i>
                     </div>
-                    <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Bulan Ini</p>
-                        <p class="text-2xl font-bold text-gray-900">{{ $statistics['this_month'] }}</p>
+                    <div class="ml-4 flex-1">
+                        <h3 class="text-lg font-semibold text-yellow-900 mb-2">
+                            Payment Overdue ({{ $statistics['payment_overdue'] }})
+                        </h3>
+                        <p class="text-yellow-800">Ada {{ $statistics['payment_overdue'] }} PO dengan pembayaran yang terlambat. Segera lakukan pengecekan.</p>
                     </div>
                 </div>
             </div>
-        </div>
+        @endif
 
         <!-- Overdue POs Alert -->
         @if ($overduePOs->count() > 0)
@@ -151,7 +183,8 @@
                                 <div class="flex items-center justify-between bg-white rounded-lg p-3">
                                     <div class="flex items-center space-x-3">
                                         <span class="font-medium text-gray-900">{{ $overduePO->po_number }}</span>
-                                        <span class="text-gray-600">{{ $overduePO->supplier->supplier_name }}</span>
+                                        <span class="text-gray-600">{{ $overduePO->supplier->supplier_name ?? 'No Supplier' }}</span>
+                                        @include('purchase-orders.partials.status-badge', ['purchaseOrder' => $overduePO])
                                     </div>
                                     <div class="flex items-center space-x-3">
                                         <span class="text-sm text-red-600">
@@ -200,20 +233,17 @@
                         </select>
                     </div>
 
-                    <!-- Status Filter -->
+                    <!-- Workflow Status Filter -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                        <select name="status"
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Status Workflow</label>
+                        <select name="workflow_status"
                             class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all">
                             <option value="">Semua Status</option>
-                            <option value="draft" {{ request('status') == 'draft' ? 'selected' : '' }}>Draft</option>
-                            <option value="sent" {{ request('status') == 'sent' ? 'selected' : '' }}>Terkirim</option>
-                            <option value="partial" {{ request('status') == 'partial' ? 'selected' : '' }}>Sebagian
-                                Diterima</option>
-                            <option value="received" {{ request('status') == 'received' ? 'selected' : '' }}>Selesai
-                            </option>
-                            <option value="cancelled" {{ request('status') == 'cancelled' ? 'selected' : '' }}>Dibatalkan
-                            </option>
+                            @foreach ($workflowStatuses as $key => $status)
+                                <option value="{{ $key }}" {{ request('workflow_status') == $key ? 'selected' : '' }}>
+                                    {{ $status }}
+                                </option>
+                            @endforeach
                         </select>
                     </div>
 
@@ -281,22 +311,21 @@
                                     class="flex items-center space-x-1 hover:text-gray-700">
                                     <span>PO Number</span>
                                     @if ($sortField == 'po_number')
-                                        <i
-                                            class="fas fa-sort-{{ $sortDirection == 'asc' ? 'up' : 'down' }} text-red-500"></i>
+                                        <i class="fas fa-sort-{{ $sortDirection == 'asc' ? 'up' : 'down' }} text-red-500"></i>
                                     @else
                                         <i class="fas fa-sort text-gray-400"></i>
                                     @endif
                                 </a>
                             </th>
                             <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Supplier</th>
+                                Supplier
+                            </th>
                             <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 <a href="{{ route('purchase-orders.index', array_merge(request()->query(), ['sort' => 'po_date', 'direction' => $sortField == 'po_date' && $sortDirection == 'asc' ? 'desc' : 'asc'])) }}"
                                     class="flex items-center space-x-1 hover:text-gray-700">
                                     <span>Tanggal</span>
                                     @if ($sortField == 'po_date')
-                                        <i
-                                            class="fas fa-sort-{{ $sortDirection == 'asc' ? 'up' : 'down' }} text-red-500"></i>
+                                        <i class="fas fa-sort-{{ $sortDirection == 'asc' ? 'up' : 'down' }} text-red-500"></i>
                                     @else
                                         <i class="fas fa-sort text-gray-400"></i>
                                     @endif
@@ -307,34 +336,34 @@
                                     class="flex items-center space-x-1 hover:text-gray-700">
                                     <span>Total</span>
                                     @if ($sortField == 'total_amount')
-                                        <i
-                                            class="fas fa-sort-{{ $sortDirection == 'asc' ? 'up' : 'down' }} text-red-500"></i>
+                                        <i class="fas fa-sort-{{ $sortDirection == 'asc' ? 'up' : 'down' }} text-red-500"></i>
                                     @else
                                         <i class="fas fa-sort text-gray-400"></i>
                                     @endif
                                 </a>
                             </th>
                             <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Status</th>
+                                Workflow Status
+                            </th>
                             <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Progress</th>
+                                Progress
+                            </th>
                             <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Aksi</th>
+                                Aksi
+                            </th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         @forelse($purchaseOrders as $po)
                             @php
-                                $statusInfo = $po->getStatusInfo();
                                 $summaryInfo = $po->getSummaryInfo();
+                                $workflowStatusInfo = $po->getWorkflowStatusInfo();
                             @endphp
-                            <tr
-                                class="hover:bg-gray-50 transition-colors duration-200 {{ $po->isOverdue() ? 'bg-red-25 border-l-4 border-red-500' : '' }}">
+                            <tr class="hover:bg-gray-50 transition-colors duration-200 {{ $po->isOverdue() ? 'bg-red-25 border-l-4 border-red-500' : '' }}">
                                 <!-- PO Info -->
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="flex items-center space-x-3">
-                                        <div
-                                            class="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center">
+                                        <div class="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center">
                                             <i class="fas fa-file-invoice text-white text-lg"></i>
                                         </div>
                                         <div>
@@ -352,8 +381,13 @@
 
                                 <!-- Supplier -->
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900">{{ $po->supplier->supplier_name }}</div>
-                                    <div class="text-sm text-gray-500">{{ $po->supplier->supplier_code }}</div>
+                                    @if($po->supplier)
+                                        <div class="text-sm text-gray-900">{{ $po->supplier->supplier_name }}</div>
+                                        <div class="text-sm text-gray-500">{{ $po->supplier->supplier_code }}</div>
+                                    @else
+                                        <div class="text-sm text-gray-400 italic">Belum dipilih</div>
+                                        <div class="text-xs text-gray-400">Akan dipilih di Finance F1</div>
+                                    @endif
                                 </td>
 
                                 <!-- Dates -->
@@ -376,14 +410,9 @@
                                     </div>
                                 </td>
 
-                                <!-- Status -->
+                                <!-- Workflow Status -->
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <span
-                                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $statusInfo['class'] }}">
-                                        <span
-                                            class="w-1.5 h-1.5 rounded-full mr-1.5 {{ $po->status == 'received' ? 'bg-green-400' : ($po->status == 'cancelled' ? 'bg-red-400' : 'bg-blue-400') }}"></span>
-                                        {{ $statusInfo['text'] }}
-                                    </span>
+                                    @include('purchase-orders.partials.status-badge', ['purchaseOrder' => $po])
                                 </td>
 
                                 <!-- Progress -->
@@ -393,8 +422,7 @@
                                             <div class="bg-gradient-to-r from-blue-600 to-green-600 h-2 rounded-full"
                                                 style="width: {{ $summaryInfo['completion_percentage'] }}%"></div>
                                         </div>
-                                        <span
-                                            class="text-xs text-gray-600">{{ $summaryInfo['completion_percentage'] }}%</span>
+                                        <span class="text-xs text-gray-600">{{ $summaryInfo['completion_percentage'] }}%</span>
                                     </div>
                                     <div class="text-xs text-gray-500 mt-1">
                                         {{ $summaryInfo['total_received'] }}/{{ $summaryInfo['total_quantity'] }} diterima
@@ -410,7 +438,7 @@
                                             <i class="fas fa-eye"></i>
                                         </a>
 
-                                        @if ($po->canBeEdited())
+                                        @if ($po->canBeEditedByLogistic() && Auth::user()->user_level_id === 'LVL002')
                                             <a href="{{ route('purchase-orders.edit', $po->po_id) }}"
                                                 class="text-yellow-600 hover:text-yellow-900 p-2 hover:bg-yellow-50 rounded-lg transition-all duration-200"
                                                 title="Edit PO">
@@ -424,12 +452,6 @@
                                             title="Print PO">
                                             <i class="fas fa-print"></i>
                                         </button>
-                                        <button
-                                            @click="showSendModal('{{ $po->po_id }}', '{{ addslashes($po->po_number) }}')"
-                                            class="text-green-600 hover:text-green-900 p-2 hover:bg-green-50 rounded-lg transition-all duration-200"
-                                            title="Kirim PO">
-                                            <i class="fas fa-paper-plane"></i>
-                                        </button>
 
                                         <button
                                             @click="showDuplicateModal('{{ $po->po_id }}', '{{ addslashes($po->po_number) }}')"
@@ -438,7 +460,7 @@
                                             <i class="fas fa-copy"></i>
                                         </button>
 
-                                        @if ($po->canBeCancelled())
+                                        @if ($po->canBeCancelled() && Auth::user()->user_level_id === 'LVL001')
                                             <button
                                                 @click="showCancelModal('{{ $po->po_id }}', '{{ addslashes($po->po_number) }}')"
                                                 class="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded-lg transition-all duration-200"
@@ -455,11 +477,23 @@
                                     <div class="flex flex-col items-center justify-center">
                                         <i class="fas fa-file-invoice text-4xl text-gray-300 mb-4"></i>
                                         <h3 class="text-lg font-medium text-gray-900 mb-2">Tidak ada Purchase Order</h3>
-                                        <p class="text-gray-500 mb-4">Belum ada PO yang dibuat dalam sistem.</p>
-                                        <a href="{{ route('purchase-orders.create') }}"
-                                            class="px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl hover:from-red-700 hover:to-red-800 transition-all duration-200">
-                                            Buat PO Pertama
-                                        </a>
+                                        <p class="text-gray-500 mb-4">
+                                            @if(Auth::user()->user_level_id === 'LVL002')
+                                                Belum ada PO yang dibuat. Mulai dengan membuat PO baru.
+                                            @elseif(Auth::user()->user_level_id === 'LVL004')
+                                                Tidak ada PO yang menunggu persetujuan Finance F1.
+                                            @elseif(Auth::user()->user_level_id === 'LVL005')
+                                                Tidak ada PO yang menunggu persetujuan Finance F2.
+                                            @else
+                                                Tidak ada PO dalam sistem saat ini.
+                                            @endif
+                                        </p>
+                                        {{-- @if(Auth::user()->user_level_id === 'LVL002' ||  Auth::user()->user_level_id === 'LVL001') --}}
+                                            <a href="{{ route('purchase-orders.create') }}"
+                                                class="px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl hover:from-red-700 hover:to-red-800 transition-all duration-200">
+                                                Buat PO Pertama
+                                            </a>
+                                        {{-- @endif --}}
                                     </div>
                                 </td>
                             </tr>
@@ -483,66 +517,6 @@
                 </div>
             </div>
         @endif
-
-        <!-- Send Modal (Konsep Sederhana seperti Cancel Modal) -->
-        <div x-show="sendModal.show" x-transition:enter="transition ease-out duration-300"
-            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-            x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0" @click.self="hideSendModal()" @keydown.escape.window="hideSendModal()"
-            class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" style="display: none;">
-            <div x-show="sendModal.show" x-transition:enter="transition ease-out duration-300 transform"
-                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
-                x-transition:leave="transition ease-in duration-200 transform"
-                x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
-                class="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-                <div class="p-6">
-                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="fas fa-paper-plane text-2xl text-green-600"></i>
-                    </div>
-
-                    <h3 class="text-xl font-bold text-gray-900 text-center mb-2">Kirim Purchase Order</h3>
-
-                    <p class="text-gray-600 text-center mb-4">
-                        Apakah Anda yakin ingin mengirim PO <span x-text="sendModal.poNumber"
-                            class="font-semibold text-gray-900"></span> ke supplier?
-                    </p>
-
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Catatan Pengiriman
-                            <span class="text-gray-400 font-normal">(Opsional)</span>
-                        </label>
-                        <textarea x-model="sendModal.notes" placeholder="Tambahkan catatan pengiriman..."
-                            class="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                            rows="3"></textarea>
-                    </div>
-
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                        <div class="flex items-start space-x-2 text-blue-800">
-                            <i class="fas fa-info-circle mt-0.5"></i>
-                            <div class="text-sm">
-                                <p class="font-medium">Informasi</p>
-                                <p class="text-xs mt-1">PO yang dikirim akan mengubah status menjadi "Terkirim" dan siap
-                                    untuk diproses supplier.</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="flex flex-col sm:flex-row gap-3">
-                        <button type="button" @click="hideSendModal()"
-                            class="flex-1 px-4 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-all duration-200 flex items-center justify-center space-x-2">
-                            <i class="fas fa-times"></i>
-                            <span>Batal</span>
-                        </button>
-                        <button type="button" @click="confirmSend()" :disabled="sendModal.loading"
-                            class="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl disabled:opacity-50">
-                            <i class="fas fa-paper-plane" :class="{ 'animate-spin fa-spinner': sendModal.loading }"></i>
-                            <span x-text="sendModal.loading ? 'Mengirim...' : 'Kirim PO'"></span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
 
         <!-- Print Modal -->
         <div x-show="printModal.show" x-transition:enter="transition ease-out duration-300"
@@ -659,8 +633,7 @@
                             <i class="fas fa-exclamation-triangle mt-0.5"></i>
                             <div class="text-sm">
                                 <p class="font-medium">Perhatian!</p>
-                                <p class="text-xs mt-1">PO yang dibatalkan tidak dapat dikembalikan ke status sebelumnya.
-                                </p>
+                                <p class="text-xs mt-1">PO yang dibatalkan tidak dapat dikembalikan ke status sebelumnya.</p>
                             </div>
                         </div>
                     </div>
@@ -680,125 +653,6 @@
                 </div>
             </div>
         </div>
-
-
-        <!-- Update Status Modal -->
-        <div x-show="updateStatusModal.show" x-transition:enter="transition ease-out duration-300"
-            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-            x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0" @click.self="hideUpdateStatusModal()"
-            @keydown.escape.window="hideUpdateStatusModal()"
-            class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" style="display: none;">
-            <div x-show="updateStatusModal.show" x-transition:enter="transition ease-out duration-300 transform"
-                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
-                x-transition:leave="transition ease-in duration-200 transform"
-                x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
-                class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-                <div class="p-6">
-                    <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="fas fa-sync-alt text-2xl text-blue-600"></i>
-                    </div>
-
-                    <h3 class="text-xl font-bold text-gray-900 text-center mb-2">Update Status Purchase Order</h3>
-
-                    <p class="text-gray-600 text-center mb-6">
-                        Update status PO <span x-text="updateStatusModal.poNumber"
-                            class="font-semibold text-gray-900"></span>
-                    </p>
-
-                    <form @submit.prevent="confirmUpdateStatus()">
-                        <!-- Current Status -->
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Status Saat Ini</label>
-                            <div class="p-3 bg-gray-50 rounded-lg">
-                                <span x-text="getStatusText(updateStatusModal.currentStatus)"
-                                    :class="getStatusClass(updateStatusModal.currentStatus)"
-                                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium">
-                                </span>
-                            </div>
-                        </div>
-
-                        <!-- New Status Selection -->
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Status Baru</label>
-                            <select x-model="updateStatusModal.newStatus"
-                                class="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                required>
-                                <option value="">Pilih Status Baru</option>
-                                <template x-for="status in getAvailableStatuses(updateStatusModal.currentStatus)"
-                                    :key="status.value">
-                                    <option :value="status.value" x-text="status.text"></option>
-                                </template>
-                            </select>
-                        </div>
-
-                        <!-- Status Preview -->
-                        <div x-show="updateStatusModal.newStatus" class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Preview Status Baru</label>
-                            <div class="p-3 bg-blue-50 rounded-lg">
-                                <span x-text="getStatusText(updateStatusModal.newStatus)"
-                                    :class="getStatusClass(updateStatusModal.newStatus)"
-                                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium">
-                                </span>
-                            </div>
-                        </div>
-
-                        <!-- Notes -->
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Catatan
-                                <span class="text-gray-400 font-normal">(Opsional)</span>
-                            </label>
-                            <textarea x-model="updateStatusModal.notes" placeholder="Tambahkan catatan untuk perubahan status..."
-                                class="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                rows="3"></textarea>
-                        </div>
-
-                        <!-- Warning for certain status changes -->
-                        <div x-show="updateStatusModal.newStatus === 'cancelled'" class="mb-4">
-                            <div class="bg-red-50 border border-red-200 rounded-lg p-3">
-                                <div class="flex items-start space-x-2 text-red-800">
-                                    <i class="fas fa-exclamation-triangle mt-0.5"></i>
-                                    <div class="text-sm">
-                                        <p class="font-medium">Perhatian!</p>
-                                        <p class="text-xs mt-1">PO yang dibatalkan tidak dapat dikembalikan ke status
-                                            sebelumnya.</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div x-show="updateStatusModal.newStatus === 'received'" class="mb-4">
-                            <div class="bg-green-50 border border-green-200 rounded-lg p-3">
-                                <div class="flex items-start space-x-2 text-green-800">
-                                    <i class="fas fa-info-circle mt-0.5"></i>
-                                    <div class="text-sm">
-                                        <p class="font-medium">Informasi</p>
-                                        <p class="text-xs mt-1">Mengubah status ke "Selesai" menandakan bahwa semua item
-                                            telah diterima.</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Action Buttons -->
-                        <div class="flex flex-col sm:flex-row gap-3 pt-4">
-                            <button type="button" @click="hideUpdateStatusModal()"
-                                class="flex-1 px-4 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-all duration-200 flex items-center justify-center space-x-2">
-                                <i class="fas fa-times"></i>
-                                <span>Batal</span>
-                            </button>
-                            <button type="submit" :disabled="updateStatusModal.loading || !updateStatusModal.newStatus"
-                                class="flex-1 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl disabled:opacity-50">
-                                <i class="fas fa-sync-alt" :class="{ 'animate-spin': updateStatusModal.loading }"></i>
-                                <span x-text="updateStatusModal.loading ? 'Mengupdate...' : 'Update Status'"></span>
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-
 
         <!-- Success/Error Messages -->
         @if (session('success'))
@@ -863,14 +717,6 @@
                     reason: '',
                     loading: false
                 },
-                sendModal: {
-                    show: false,
-                    poId: '',
-                    poNumber: '',
-                    notes: '',
-                    loading: false
-                },
-
 
                 // Print Modal Functions
                 showPrintModal(poId, poNumber) {
@@ -893,7 +739,6 @@
                 },
 
                 confirmPrint() {
-                    // Open print page in new window
                     const printUrl = `{{ route('purchase-orders.index') }}/${this.printModal.poId}/print`;
                     window.open(printUrl, '_blank');
                     this.hidePrintModal();
@@ -930,8 +775,7 @@
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
-                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute(
-                                        'content')
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                                 }
                             });
 
@@ -940,7 +784,6 @@
                         if (data.success) {
                             this.hideDuplicateModal();
                             this.showToast('PO berhasil diduplikasi!', 'success');
-                            // Redirect to new PO
                             setTimeout(() => {
                                 window.location.href = data.redirect_url;
                             }, 1000);
@@ -987,7 +830,6 @@
                     this.cancelModal.loading = true;
 
                     try {
-                        // Create and submit cancel form
                         const form = document.createElement('form');
                         form.method = 'POST';
                         form.action = `{{ route('purchase-orders.index') }}/${this.cancelModal.poId}/cancel`;
@@ -1015,75 +857,21 @@
                     }
                 },
 
-                // Send Modal Functions
-                showSendModal(poId, poNumber) {
-                    this.sendModal = {
-                        show: true,
-                        poId: poId,
-                        poNumber: poNumber,
-                        notes: '',
-                        loading: false
-                    };
-                },
-
-                hideSendModal() {
-                    this.sendModal.show = false;
-                    setTimeout(() => {
-                        this.sendModal = {
-                            show: false,
-                            poId: '',
-                            poNumber: '',
-                            notes: '',
-                            loading: false
-                        };
-                    }, 300);
-                },
-
-                async confirmSend() {
-                    this.sendModal.loading = true;
-
-                    try {
-                        // Create and submit send form
-                        const form = document.createElement('form');
-                        form.method = 'POST';
-                        form.action = `{{ route('purchase-orders.index') }}/${this.sendModal.poId}/send`;
-                        form.style.display = 'none';
-
-                        const csrfToken = document.createElement('input');
-                        csrfToken.type = 'hidden';
-                        csrfToken.name = '_token';
-                        csrfToken.value = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
-                        const notesField = document.createElement('input');
-                        notesField.type = 'hidden';
-                        notesField.name = 'notes';
-                        notesField.value = this.sendModal.notes;
-
-                        form.appendChild(csrfToken);
-                        form.appendChild(notesField);
-                        document.body.appendChild(form);
-
-                        this.hideSendModal();
-                        form.submit();
-                    } catch (error) {
-                        this.showToast('Terjadi kesalahan saat mengirim PO', 'error');
-                        this.sendModal.loading = false;
-                    }
-                }, // Helper function for toast notifications
+                // Helper function for toast notifications
                 showToast(message, type = 'info') {
                     const toast = document.createElement('div');
                     toast.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg transition-all duration-300 ${
-                    type === 'success' ? 'bg-green-100 border border-green-400 text-green-700' :
-                    type === 'error' ? 'bg-red-100 border border-red-400 text-red-700' :
-                    'bg-blue-100 border border-blue-400 text-blue-700'
-                }`;
+                        type === 'success' ? 'bg-green-100 border border-green-400 text-green-700' :
+                        type === 'error' ? 'bg-red-100 border border-red-400 text-red-700' :
+                        'bg-blue-100 border border-blue-400 text-blue-700'
+                    }`;
 
                     toast.innerHTML = `
-                    <div class="flex items-center">
-                        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'} mr-2"></i>
-                        <span>${message}</span>
-                    </div>
-                `;
+                        <div class="flex items-center">
+                            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'} mr-2"></i>
+                            <span>${message}</span>
+                        </div>
+                    `;
 
                     document.body.appendChild(toast);
 
@@ -1135,13 +923,11 @@
             background-color: rgba(254, 242, 242, 0.3);
         }
 
-        /* Custom animations */
         @keyframes fadeInUp {
             from {
                 opacity: 0;
                 transform: translateY(10px);
             }
-
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -1152,12 +938,10 @@
             animation: fadeInUp 0.3s ease-out;
         }
 
-        /* Progress bar animation */
         .progress-bar {
             transition: width 0.3s ease-in-out;
         }
 
-        /* Hover effects for cards */
         .hover-lift {
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }

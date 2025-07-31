@@ -250,38 +250,60 @@ Route::middleware('auth')->group(function () {
     });
 
     // ================================================================
-    // PURCHASE ORDER MANAGEMENT
+    // PURCHASE ORDER MANAGEMENT - UPDATED WITH WORKFLOW
     // ================================================================
+
+    // CREATE - Logistik only (LVL002)
     Route::middleware('permission:purchase_orders,create')->group(function () {
         Route::get('/purchase-orders/create', [PurchaseOrderController::class, 'create'])->name('purchase-orders.create');
         Route::post('/purchase-orders', [PurchaseOrderController::class, 'store'])->name('purchase-orders.store');
         Route::post('/purchase-orders/{purchaseOrder}/duplicate', [PurchaseOrderController::class, 'duplicate'])->name('purchase-orders.duplicate');
     });
+
+    // READ - All levels can view (filtered by controller based on user level)
     Route::middleware('permission:purchase_orders,read')->group(function () {
         Route::get('/purchase-orders', [PurchaseOrderController::class, 'index'])->name('purchase-orders.index');
         Route::get('/purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'show'])->name('purchase-orders.show');
         Route::get('/purchase-orders/{purchaseOrder}/print', [PurchaseOrderController::class, 'print'])->name('purchase-orders.print');
     });
 
-
-
+    // UPDATE - Basic updates (Logistik untuk draft, Admin untuk override)
     Route::middleware('permission:purchase_orders,update')->group(function () {
         Route::get('/purchase-orders/{purchaseOrder}/edit', [PurchaseOrderController::class, 'edit'])->name('purchase-orders.edit');
         Route::put('/purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'update'])->name('purchase-orders.update');
+
+        // Legacy status updates (Admin only now)
         Route::patch('/purchase-orders/{purchaseOrder}/update-status', [PurchaseOrderController::class, 'updateStatus'])->name('purchase-orders.update-status');
         Route::post('/purchase-orders/{purchaseOrder}/send', [PurchaseOrderController::class, 'send'])->name('purchase-orders.update-send');
         Route::post('/purchase-orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->name('purchase-orders.cancel');
     });
 
+    // NEW: WORKFLOW ROUTES
+    Route::middleware('permission:purchase_orders,update')->group(function () {
+        // Logistik Actions (LVL002)
+        Route::post('/purchase-orders/{purchaseOrder}/submit-to-finance-f1', [PurchaseOrderController::class, 'submitToFinanceF1'])->name('purchase-orders.submit-to-finance-f1');
+
+        // Finance F1 Actions (LVL004, LVL005)
+        Route::post('/purchase-orders/{purchaseOrder}/process-finance-f1', [PurchaseOrderController::class, 'processFinanceF1'])->name('purchase-orders.process-finance-f1');
+        Route::post('/purchase-orders/{purchaseOrder}/reject-finance-f1', [PurchaseOrderController::class, 'rejectFinanceF1'])->name('purchase-orders.reject-finance-f1');
+
+        // Finance F2 Actions (LVL005 only)
+        Route::post('/purchase-orders/{purchaseOrder}/approve-finance-f2', [PurchaseOrderController::class, 'approveFinanceF2'])->name('purchase-orders.approve-finance-f2');
+        Route::post('/purchase-orders/{purchaseOrder}/reject-finance-f2', [PurchaseOrderController::class, 'rejectFinanceF2'])->name('purchase-orders.reject-finance-f2');
+    });
+
+    // APPROVE - Now includes workflow approvals
+    Route::middleware('permission:purchase_orders,approve')->group(function () {
+        // Admin override actions
+        Route::post('/purchase-orders/{purchaseOrder}/return-from-reject', [PurchaseOrderController::class, 'returnFromReject'])->name('purchase-orders.return-from-reject');
+    });
+
     Route::middleware('permission:purchase_orders,delete')->group(function () {
         // Delete PO routes jika diperlukan
+        // Route::delete('/purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'destroy'])->name('purchase-orders.destroy');
     });
 
-    Route::middleware('permission:purchase_orders,approve')->group(function () {
-        // PO approval routes
-    });
-
-    // PO Details API
+    // PO Details API - UNCHANGED
     Route::prefix('api/po-details')->name('api.po-details.')->group(function () {
         Route::post('/{purchaseOrder}/add-item', [PoDetailController::class, 'addItem'])->name('add-item');
         Route::put('/{poDetail}', [PoDetailController::class, 'update'])->name('update');
@@ -289,9 +311,14 @@ Route::middleware('auth')->group(function () {
         Route::get('/{purchaseOrder}/details', [PoDetailController::class, 'getDetails'])->name('get-details');
     });
 
-    // Purchase Order API
+    // Purchase Order API - ENHANCED
     Route::prefix('api/purchase-orders')->name('api.purchase-orders.')->group(function () {
+        // Existing API
         Route::get('/by-supplier/{supplier}', [PurchaseOrderController::class, 'getBySupplier'])->name('by-supplier');
+
+        // NEW: Workflow APIs
+        Route::get('/{purchaseOrder}/payment-methods', [PurchaseOrderController::class, 'getAvailablePaymentMethods'])->name('payment-methods');
+        Route::get('/workflow-statistics', [PurchaseOrderController::class, 'getWorkflowStatistics'])->name('workflow-statistics');
     });
 
     // ================================================================

@@ -40,8 +40,7 @@
         <!-- Page Header -->
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div class="flex items-center space-x-4">
-                <div
-                    class="w-16 h-16 bg-gradient-to-br from-red-600 to-red-700 rounded-2xl flex items-center justify-center">
+                <div class="w-16 h-16 bg-gradient-to-br from-red-600 to-red-700 rounded-2xl flex items-center justify-center">
                     <i class="fas fa-plus text-white text-2xl"></i>
                 </div>
                 <div>
@@ -55,6 +54,10 @@
                             Buat purchase order baru untuk pemesanan barang
                         @endif
                     </p>
+                    <div class="flex items-center mt-2 text-sm text-blue-600">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        <span>Status awal: Draft Logistic</span>
+                    </div>
                 </div>
             </div>
             <div class="flex flex-col sm:flex-row gap-3">
@@ -63,6 +66,28 @@
                     <i class="fas fa-arrow-left"></i>
                     <span>Kembali</span>
                 </a>
+            </div>
+        </div>
+
+        <!-- Workflow Info Alert -->
+        <div class="bg-blue-50 border border-blue-200 rounded-2xl p-6">
+            <div class="flex items-start">
+                <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-route text-blue-600"></i>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-lg font-semibold text-blue-900 mb-2">Workflow Purchase Order</h3>
+                    <div class="text-blue-800 text-sm space-y-1">
+                        <p>• <strong>Draft Logistic:</strong> PO dibuat dan dapat diedit</p>
+                        <p>• <strong>Submit ke Finance F1:</strong> Review supplier dan opsi pembayaran</p>
+                        <p>• <strong>Finance F2:</strong> Approval final dan setup pembayaran</p>
+                        <p>• <strong>Approved:</strong> Siap dikirim ke supplier</p>
+                    </div>
+                    <div class="mt-3 text-xs text-blue-700 bg-blue-100 rounded-lg p-2">
+                        <i class="fas fa-lightbulb mr-1"></i>
+                        <strong>Tips:</strong> Supplier dapat dipilih nanti di tahap Finance F1 jika belum yakin sekarang
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -108,22 +133,23 @@
                                     </label>
                                     <input type="text" id="po_number" name="po_number"
                                         value="{{ old('po_number', $poNumber) }}"
-                                        class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all @error('po_number') border-red-500 @enderror"
+                                        class="w-full py-3 px-4 bg-gray-100 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all @error('po_number') border-red-500 @enderror"
                                         readonly>
+                                    <p class="text-xs text-gray-500 mt-1">Nomor PO akan otomatis di-generate sistem</p>
                                     @error('po_number')
                                         <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                                     @enderror
                                 </div>
 
-                                <!-- Supplier -->
+                                <!-- Supplier - NOW OPTIONAL -->
                                 <div>
                                     <label for="supplier_id" class="block text-sm font-medium text-gray-700 mb-2">
-                                        Supplier <span class="text-red-500">*</span>
+                                        Supplier <span class="text-gray-400">(Opsional)</span>
                                     </label>
                                     <select id="supplier_id" name="supplier_id" x-model="selectedSupplierId"
                                         @change="onSupplierChange()"
                                         class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all @error('supplier_id') border-red-500 @enderror">
-                                        <option value="">Pilih Supplier</option>
+                                        <option value="">Pilih supplier atau kosongkan untuk dipilih di Finance F1</option>
                                         @foreach ($suppliers as $supplier)
                                             <option value="{{ $supplier->supplier_id }}"
                                                 {{ old('supplier_id', $selectedSupplier?->supplier_id) == $supplier->supplier_id ? 'selected' : '' }}>
@@ -131,6 +157,9 @@
                                             </option>
                                         @endforeach
                                     </select>
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        Jika tidak dipilih sekarang, supplier akan dipilih pada tahap Finance F1
+                                    </p>
                                     @error('supplier_id')
                                         <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
                                     @enderror
@@ -156,6 +185,7 @@
                                     </label>
                                     <input type="date" id="expected_date" name="expected_date"
                                         value="{{ old('expected_date') }}"
+                                        min="{{ now()->addDay()->format('Y-m-d') }}"
                                         class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all @error('expected_date') border-red-500 @enderror">
                                     @error('expected_date')
                                         <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
@@ -168,7 +198,8 @@
                                 <label for="notes" class="block text-sm font-medium text-gray-700 mb-2">
                                     Catatan
                                 </label>
-                                <textarea id="notes" name="notes" rows="3" placeholder="Catatan tambahan untuk purchase order..."
+                                <textarea id="notes" name="notes" rows="3"
+                                    placeholder="Catatan tambahan untuk purchase order. Contoh: prioritas, instruksi khusus, dll..."
                                     class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all @error('notes') border-red-500 @enderror">{{ old('notes') }}</textarea>
                                 @error('notes')
                                     <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
@@ -198,16 +229,11 @@
                             <table class="w-full">
                                 <thead class="bg-gray-50 border-b">
                                     <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Harga
-                                        </th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total
-                                        </th>
-                                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Aksi
-                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Harga</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-200">
@@ -215,39 +241,37 @@
                                         <tr class="hover:bg-gray-50">
                                             <td class="px-6 py-4">
                                                 <div class="flex items-center space-x-3">
-                                                    <div
-                                                        class="w-10 h-10 bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg flex items-center justify-center">
+                                                    <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg flex items-center justify-center">
                                                         <i class="fas fa-box text-white text-sm"></i>
                                                     </div>
                                                     <div>
-                                                        <div class="text-sm font-medium text-gray-900"
-                                                            x-text="item.item_name"></div>
+                                                        <div class="text-sm font-medium text-gray-900" x-text="item.item_name"></div>
                                                         <div class="text-sm text-gray-500" x-text="item.item_code"></div>
-                                                        <div class="text-xs text-gray-400" x-text="item.category_name">
-                                                        </div>
+                                                        <div class="text-xs text-gray-400" x-text="item.category_name"></div>
                                                     </div>
                                                 </div>
-                                                <input type="hidden" :name="`items[${index}][item_id]`"
-                                                    :value="item.item_id">
+                                                <input type="hidden" :name="`items[${index}][item_id]`" :value="item.item_id">
                                             </td>
                                             <td class="px-6 py-4">
                                                 <div class="flex items-center space-x-2">
                                                     <input type="number" :name="`items[${index}][quantity]`"
                                                         x-model="item.quantity" @input="updateItemTotal(index)"
-                                                        min="1"
+                                                        min="1" required
                                                         class="w-20 py-2 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                                                     <span class="text-sm text-gray-500" x-text="item.unit"></span>
                                                 </div>
                                             </td>
                                             <td class="px-6 py-4">
-                                                <input type="number" :name="`items[${index}][unit_price]`"
-                                                    x-model="item.unit_price" @input="updateItemTotal(index)"
-                                                    step="1" min="0" placeholder="0"
-                                                    class="w-32 py-2 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                                <div class="relative">
+                                                    <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">Rp</span>
+                                                    <input type="number" :name="`items[${index}][unit_price]`"
+                                                        x-model="item.unit_price" @input="updateItemTotal(index)"
+                                                        step="1" min="0" placeholder="0" required
+                                                        class="w-32 py-2 pl-8 pr-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                                </div>
                                             </td>
                                             <td class="px-6 py-4">
-                                                <div class="text-sm font-medium text-gray-900"
-                                                    x-text="formatCurrency(item.total)"></div>
+                                                <div class="text-sm font-medium text-gray-900" x-text="formatCurrency(item.total)"></div>
                                             </td>
                                             <td class="px-6 py-4 text-center">
                                                 <button type="button" @click="removeItem(index)"
@@ -280,8 +304,7 @@
                                         <td colspan="3" class="px-6 py-4 text-right text-sm font-medium text-gray-900">
                                             Total Amount:
                                         </td>
-                                        <td class="px-6 py-4 text-sm font-bold text-gray-900"
-                                            x-text="formatCurrency(totalAmount)"></td>
+                                        <td class="px-6 py-4 text-sm font-bold text-gray-900" x-text="formatCurrency(totalAmount)"></td>
                                         <td class="px-6 py-4"></td>
                                     </tr>
                                 </tfoot>
@@ -300,8 +323,11 @@
                             <button type="submit" :disabled="selectedItems.length === 0"
                                 class="flex-1 px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl hover:from-red-700 hover:to-red-800 transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed">
                                 <i class="fas fa-save"></i>
-                                <span>Simpan Purchase Order</span>
+                                <span>Simpan sebagai Draft</span>
                             </button>
+                        </div>
+                        <div class="mt-3 text-xs text-center text-gray-500">
+                            PO akan disimpan dengan status "Draft Logistic" dan dapat diedit sebelum disubmit ke Finance F1
                         </div>
                     </div>
                 </div>
@@ -336,8 +362,7 @@
                     </div>
 
                     <!-- Supplier Info -->
-                    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
-                        x-show="selectedSupplier">
+                    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden" x-show="selectedSupplier">
                         <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
                             <h3 class="text-lg font-semibold text-gray-900 flex items-center">
                                 <i class="fas fa-building mr-2 text-blue-600"></i>
@@ -366,6 +391,19 @@
                         </div>
                     </div>
 
+                    <!-- No Supplier Selected Info -->
+                    <div class="bg-yellow-50 rounded-2xl border border-yellow-200 p-6" x-show="!selectedSupplier">
+                        <div class="flex items-start space-x-3">
+                            <i class="fas fa-info-circle text-yellow-600 mt-1"></i>
+                            <div>
+                                <h4 class="text-sm font-semibold text-yellow-900 mb-2">Supplier Belum Dipilih</h4>
+                                <p class="text-sm text-yellow-800">
+                                    Tidak masalah! Supplier dapat dipilih nanti pada tahap Finance F1 berdasarkan analisis kebutuhan dan kebijakan perusahaan.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Quick Add Items -->
                     @if ($lowStockItems && $items->count() > 0)
                         <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
@@ -384,11 +422,9 @@
                                         @click="quickAddItem('{{ $item->item_id }}', '{{ addslashes($item->item_name) }}', '{{ $item->item_code }}', '{{ $item->category->category_name ?? 'No Category' }}', '{{ $item->unit }}')">
                                         <div class="flex items-center justify-between">
                                             <div class="flex-1">
-                                                <div class="text-sm font-medium text-gray-900">{{ $item->item_name }}
-                                                </div>
+                                                <div class="text-sm font-medium text-gray-900">{{ $item->item_name }}</div>
                                                 <div class="text-xs text-gray-500">{{ $item->item_code }}</div>
-                                                <div class="text-xs text-red-600">Stok:
-                                                    {{ $stockInfo['available'] }}/{{ $item->min_stock }}</div>
+                                                <div class="text-xs text-red-600">Stok: {{ $stockInfo['available'] }}/{{ $item->min_stock }}</div>
                                             </div>
                                             <button type="button" class="text-blue-600 hover:text-blue-800">
                                                 <i class="fas fa-plus"></i>
@@ -400,14 +436,38 @@
                         </div>
                     @endif
 
-                    <!-- Tips -->
+                    <!-- Next Steps Info -->
                     <div class="bg-blue-50 rounded-2xl border border-blue-200 p-6">
-                        <h4 class="text-sm font-semibold text-blue-900 mb-3">💡 Tips</h4>
-                        <ul class="text-sm text-blue-800 space-y-2">
-                            <li>• Pastikan supplier sudah dipilih sebelum menambah item</li>
-                            <li>• Periksa kembali harga dan quantity sebelum menyimpan</li>
-                            <li>• Gunakan tanggal diharapkan untuk tracking delivery</li>
+                        <h4 class="text-sm font-semibold text-blue-900 mb-3">📋 Langkah Selanjutnya</h4>
+                        <div class="text-sm text-blue-800 space-y-2">
+                            <div class="flex items-start space-x-2">
+                                <i class="fas fa-arrow-right text-blue-600 mt-1 text-xs"></i>
+                                <span>Setelah disimpan, PO dapat diedit selama masih draft</span>
+                            </div>
+                            <div class="flex items-start space-x-2">
+                                <i class="fas fa-arrow-right text-blue-600 mt-1 text-xs"></i>
+                                <span>Submit ke Finance F1 untuk review supplier & pembayaran</span>
+                            </div>
+                            <div class="flex items-start space-x-2">
+                                <i class="fas fa-arrow-right text-blue-600 mt-1 text-xs"></i>
+                                <span>Finance F2 akan melakukan approval final</span>
+                            </div>
+                            <div class="flex items-start space-x-2">
+                                <i class="fas fa-arrow-right text-blue-600 mt-1 text-xs"></i>
+                                <span>PO siap dikirim ke supplier</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tips -->
+                    <div class="bg-green-50 rounded-2xl border border-green-200 p-6">
+                        <h4 class="text-sm font-semibold text-green-900 mb-3">💡 Tips</h4>
+                        <ul class="text-sm text-green-800 space-y-2">
+                            <li>• Item dan quantity wajib diisi dengan benar</li>
+                            <li>• Harga dapat diisi perkiraan atau kosong dulu</li>
+                            <li>• Gunakan tanggal diharapkan untuk tracking</li>
                             <li>• Tambahkan catatan jika ada instruksi khusus</li>
+                            <li>• Supplier dapat dipilih nanti jika belum yakin</li>
                         </ul>
                     </div>
                 </div>
@@ -451,8 +511,7 @@
                             <div class="border border-gray-200 rounded-xl p-4 hover:border-blue-300 transition-colors cursor-pointer"
                                 @click="selectItemForAdd(item)">
                                 <div class="flex items-center space-x-3">
-                                    <div
-                                        class="w-12 h-12 bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg flex items-center justify-center">
+                                    <div class="w-12 h-12 bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg flex items-center justify-center">
                                         <i class="fas fa-box text-white"></i>
                                     </div>
                                     <div class="flex-1">
@@ -463,8 +522,7 @@
                                 </div>
                                 <div class="mt-3 flex items-center justify-between">
                                     <span class="text-xs text-gray-500" x-text="`Unit: ${item.unit}`"></span>
-                                    <div class="text-xs"
-                                        :class="item.stock_status === 'low' ? 'text-red-600' : 'text-green-600'">
+                                    <div class="text-xs" :class="item.stock_status === 'low' ? 'text-red-600' : 'text-green-600'">
                                         <span x-text="`Stok: ${item.available_stock}`"></span>
                                     </div>
                                 </div>
@@ -534,14 +592,12 @@
 @push('scripts')
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
-       const availableItems = {!! json_encode($availableItems ?? []) !!};
-       const suppliers = {!! json_encode($suppliersJson ?? []) !!};
-
+        const availableItems = {!! json_encode($availableItems ?? []) !!};
+        const suppliers = {!! json_encode($suppliersJson ?? []) !!};
 
         function purchaseOrderCreate() {
             return {
-               selectedSupplierId: '{{ old("supplier_id", $selectedSupplier?->supplier_id) }}',
-
+                selectedSupplierId: '{{ old("supplier_id", $selectedSupplier?->supplier_id) }}',
                 selectedSupplier: null,
                 selectedItems: [],
                 addItemModal: {
@@ -586,8 +642,7 @@
                     // Auto-add first 5 low stock items for quick setup
                     const lowStockItems = this.availableItems.filter(item => item.stock_status === 'low').slice(0, 5);
                     lowStockItems.forEach(item => {
-                        this.quickAddItem(item.item_id, item.item_name, item.item_code, item.category_name, item
-                            .unit);
+                        this.quickAddItem(item.item_id, item.item_name, item.item_code, item.category_name, item.unit);
                     });
                 },
 
@@ -632,8 +687,7 @@
                     const existingIndex = this.selectedItems.findIndex(item => item.item_id === itemId);
                     if (existingIndex !== -1) {
                         // Increase quantity if already exists
-                        this.selectedItems[existingIndex].quantity = parseInt(this.selectedItems[existingIndex].quantity) +
-                            1;
+                        this.selectedItems[existingIndex].quantity = parseInt(this.selectedItems[existingIndex].quantity) + 1;
                         this.updateItemTotal(existingIndex);
                         this.showToast('Quantity item ditambah', 'info');
                     } else {
@@ -677,17 +731,17 @@
                 showToast(message, type = 'info') {
                     const toast = document.createElement('div');
                     toast.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg transition-all duration-300 ${
-                    type === 'success' ? 'bg-green-100 border border-green-400 text-green-700' :
-                    type === 'error' ? 'bg-red-100 border border-red-400 text-red-700' :
-                    'bg-blue-100 border border-blue-400 text-blue-700'
-                }`;
+                        type === 'success' ? 'bg-green-100 border border-green-400 text-green-700' :
+                        type === 'error' ? 'bg-red-100 border border-red-400 text-red-700' :
+                        'bg-blue-100 border border-blue-400 text-blue-700'
+                    }`;
 
                     toast.innerHTML = `
-                    <div class="flex items-center">
-                        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'} mr-2"></i>
-                        <span>${message}</span>
-                    </div>
-                `;
+                        <div class="flex items-center">
+                            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'} mr-2"></i>
+                            <span>${message}</span>
+                        </div>
+                    `;
 
                     document.body.appendChild(toast);
 
@@ -698,11 +752,6 @@
 
                 // Validation before submit
                 validateForm() {
-                    if (!this.selectedSupplierId) {
-                        this.showToast('Supplier harus dipilih', 'error');
-                        return false;
-                    }
-
                     if (this.selectedItems.length === 0) {
                         this.showToast('Minimal harus ada 1 item', 'error');
                         return false;
@@ -715,8 +764,8 @@
                             this.showToast(`Quantity ${item.item_name} harus lebih dari 0`, 'error');
                             return false;
                         }
-                        if (!item.unit_price || item.unit_price < 0) {
-                            this.showToast(`Harga ${item.item_name} harus diisi`, 'error');
+                        if (item.unit_price < 0) {
+                            this.showToast(`Harga ${item.item_name} tidak boleh negatif`, 'error');
                             return false;
                         }
                     }
@@ -737,15 +786,10 @@
                 }
             });
 
-            // Auto-focus on supplier selection if not selected
-            @if (!$selectedSupplier)
-                document.getElementById('supplier_id').focus();
-            @endif
-
             // Initialize Select2 for better UX
             if (typeof $ !== 'undefined' && $.fn.select2) {
                 $('#supplier_id').select2({
-                    placeholder: 'Pilih Supplier',
+                    placeholder: 'Pilih supplier atau kosongkan untuk dipilih di Finance F1',
                     allowClear: true,
                     width: '100%'
                 }).on('change', function() {
@@ -775,30 +819,6 @@
             }
         }
 
-        // Load draft (optional)
-        function loadDraft() {
-            try {
-                const draft = localStorage.getItem('po_draft');
-                if (draft) {
-                    const data = JSON.parse(draft);
-                    const alpineData = Alpine.$data(document.querySelector('[x-data]'));
-
-                    // Confirm with user before loading
-                    if (confirm('Ditemukan draft PO yang belum selesai. Muat draft tersebut?')) {
-                        alpineData.selectedSupplierId = data.supplier_id || '';
-                        alpineData.selectedItems = data.items || [];
-                        document.getElementById('po_date').value = data.po_date || '';
-                        document.getElementById('expected_date').value = data.expected_date || '';
-                        document.getElementById('notes').value = data.notes || '';
-
-                        alpineData.updateSelectedSupplier();
-                    }
-                }
-            } catch (e) {
-                console.log('Could not load draft from localStorage');
-            }
-        }
-
         // Clear draft on successful submission
         window.addEventListener('beforeunload', function() {
             saveDraft();
@@ -812,7 +832,6 @@
                 opacity: 0;
                 transform: translateY(20px);
             }
-
             to {
                 opacity: 1;
                 transform: translateY(0);
