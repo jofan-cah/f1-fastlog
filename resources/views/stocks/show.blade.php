@@ -111,7 +111,7 @@
                                 <i class="fas fa-boxes text-white text-xl"></i>
                             </div>
                             <div class="text-3xl font-bold text-blue-600 mb-2">{{ number_format($stock->quantity_available) }}</div>
-                            <div class="text-sm text-gray-600">Stok Tersedia</div>
+                            <div class="text-sm text-gray-600">Stok Gudang</div>
                             <div class="text-xs text-gray-500 mt-1">{{ $stock->item->unit }}</div>
                         </div>
 
@@ -121,7 +121,7 @@
                                 <i class="fas fa-shipping-fast text-white text-xl"></i>
                             </div>
                             <div class="text-3xl font-bold text-yellow-600 mb-2">{{ number_format($stock->quantity_used) }}</div>
-                            <div class="text-sm text-gray-600">Stok Terpakai</div>
+                            <div class="text-sm text-gray-600">Stok Distribusi</div>
                             <div class="text-xs text-gray-500 mt-1">{{ $stock->item->unit }}</div>
                         </div>
 
