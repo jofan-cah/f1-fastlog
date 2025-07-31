@@ -645,7 +645,7 @@ class PurchaseOrderController extends Controller
                     ]
                 );
 
-                return back()->with('success', 'PO berhasil diproses oleh Finance F1! Payment details sudah di-setup. Menunggu approval Finance F2.');
+                return back()->with('success', 'PO berhasil diproses oleh Finance F1! Payment details sudah di-setup. Menunggu approval FINANCE RBP.');
             }
 
             return back()->with('error', 'Gagal memproses PO di Finance F1.');
@@ -654,11 +654,11 @@ class PurchaseOrderController extends Controller
         }
     }
 
-    // NEW: Approve Finance F2 (Finance F2 action)
+    // NEW: Approve FINANCE RBP (FINANCE RBP action)
     public function approveFinanceF2(Request $request, PurchaseOrder $purchaseOrder)
     {
         if (!$this->canUserAccess('process_f2', $purchaseOrder)) {
-            return back()->with('error', 'Anda tidak dapat approve PO ini di level Finance F2.');
+            return back()->with('error', 'Anda tidak dapat approve PO ini di level FINANCE RBP.');
         }
 
         $validator = Validator::make($request->all(), [
@@ -693,10 +693,10 @@ class PurchaseOrderController extends Controller
                     ]
                 );
 
-                return back()->with('success', 'PO berhasil di-approve Finance F2! PO siap dikirim ke supplier.');
+                return back()->with('success', 'PO berhasil di-approve FINANCE RBP! PO siap dikirim ke supplier.');
             }
 
-            return back()->with('error', 'Gagal approve PO di Finance F2.');
+            return back()->with('error', 'Gagal approve PO di FINANCE RBP.');
         } catch (\Exception $e) {
             return back()->with('error', 'Error: ' . $e->getMessage());
         }
@@ -739,11 +739,11 @@ class PurchaseOrderController extends Controller
         }
     }
 
-    // NEW: Reject by Finance F2
+    // NEW: Reject by FINANCE RBP
     public function rejectFinanceF2(Request $request, PurchaseOrder $purchaseOrder)
     {
         if (!$this->canUserAccess('reject_f2', $purchaseOrder)) {
-            return back()->with('error', 'Anda tidak dapat reject PO ini di level Finance F2.');
+            return back()->with('error', 'Anda tidak dapat reject PO ini di level FINANCE RBP.');
         }
 
         $validator = Validator::make($request->all(), [
@@ -766,7 +766,7 @@ class PurchaseOrderController extends Controller
                     ['new_status' => PurchaseOrderConstants::WORKFLOW_STATUS_REJECTED_F2, 'reason' => $request->rejection_reason]
                 );
 
-                return back()->with('success', 'PO berhasil di-reject oleh Finance F2.');
+                return back()->with('success', 'PO berhasil di-reject oleh FINANCE RBP.');
             }
 
             return back()->with('error', 'Gagal reject PO.');
@@ -890,7 +890,7 @@ class PurchaseOrderController extends Controller
         $userLevel = Auth::user()->user_level_id;
 
         if ($userLevel !== 'LVL001' && $purchaseOrder->workflow_status !== PurchaseOrderConstants::WORKFLOW_STATUS_APPROVED) {
-            return back()->with('error', 'PO harus sudah di-approve Finance F2 terlebih dahulu.');
+            return back()->with('error', 'PO harus sudah di-approve FINANCE RBP terlebih dahulu.');
         }
 
         try {

@@ -51,7 +51,7 @@ return new class extends Migration
             // Finance F1 Notes (untuk payment options, supplier selection)
             $table->text('finance_f1_notes')->nullable()->after('payment_due_date');
 
-            // Finance F2 Notes (untuk approval/rejection)
+            // FINANCE RBP Notes (untuk approval/rejection)
             $table->text('finance_f2_notes')->nullable()->after('finance_f1_notes');
 
             // Add foreign key constraints

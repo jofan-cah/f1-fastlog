@@ -77,7 +77,7 @@
                     <i class="fas fa-times text-2xl text-red-600"></i>
                 </div>
 
-                <h3 class="text-xl font-bold text-gray-900 text-center mb-6">Reject Finance F2</h3>
+                <h3 class="text-xl font-bold text-gray-900 text-center mb-6">Reject FINANCE RBP</h3>
 
                 <div class="mb-6">
                     <label class="block text-sm font-medium text-gray-700 mb-2">

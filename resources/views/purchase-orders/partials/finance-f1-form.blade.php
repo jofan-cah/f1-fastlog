@@ -308,7 +308,7 @@
                         Catatan Finance F1
                     </label>
                     <textarea name="finance_f1_notes" rows="3"
-                        placeholder="Catatan khusus, instruksi untuk Finance F2, atau informasi tambahan..."
+                        placeholder="Catatan khusus, instruksi untuk FINANCE RBP, atau informasi tambahan..."
                         class="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent @error('finance_f1_notes') border-red-500 @enderror">{{ old('finance_f1_notes') }}</textarea>
                     @error('finance_f1_notes')
                         <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
@@ -323,8 +323,8 @@
                             <p class="font-medium mb-1">Setelah di-process:</p>
                             <ul class="text-xs space-y-1">
                                 <li>• Supplier dan payment method sudah final</li>
-                                <li>• PO akan diteruskan ke Finance F2 untuk approval final</li>
-                                <li>• Finance F2 hanya perlu approve tanpa input tambahan</li>
+                                <li>• PO akan diteruskan ke FINANCE RBP untuk approval final</li>
+                                <li>• FINANCE RBP hanya perlu approve tanpa input tambahan</li>
                                 <li>• Payment details sudah lengkap untuk eksekusi</li>
                             </ul>
                         </div>

@@ -71,7 +71,7 @@
                 </div>
             </div>
 
-            <!-- Pending Finance F2 -->
+            <!-- Pending FINANCE RBP -->
             <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
                 <div class="flex items-center">
                     <div class="w-12 h-12 bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl flex items-center justify-center">
@@ -483,7 +483,7 @@
                                             @elseif(Auth::user()->user_level_id === 'LVL004')
                                                 Tidak ada PO yang menunggu persetujuan Finance F1.
                                             @elseif(Auth::user()->user_level_id === 'LVL005')
-                                                Tidak ada PO yang menunggu persetujuan Finance F2.
+                                                Tidak ada PO yang menunggu persetujuan FINANCE RBP.
                                             @else
                                                 Tidak ada PO dalam sistem saat ini.
                                             @endif

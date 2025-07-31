@@ -15,7 +15,7 @@
             <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <i class="fas fa-check-circle text-2xl text-green-600"></i>
             </div>
-            <h3 class="text-xl font-bold text-gray-900 text-center">Final Approval - Finance F2</h3>
+            <h3 class="text-xl font-bold text-gray-900 text-center">Final Approval - FINANCE RBP</h3>
         </div>
 
         <!-- Scrollable Content -->
@@ -113,10 +113,10 @@
                     </div>
                 @endif
 
-                <!-- Finance F2 Notes (Optional) -->
+                <!-- FINANCE RBP Notes (Optional) -->
                 <div class="mb-6">
                     <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Catatan Finance F2 <span class="text-gray-400">(Opsional)</span>
+                        Catatan FINANCE RBP <span class="text-gray-400">(Opsional)</span>
                     </label>
                     <textarea name="finance_f2_notes" rows="3"
                         placeholder="Tambahkan catatan approval atau instruksi khusus..."

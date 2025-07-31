@@ -188,7 +188,7 @@ class PurchaseOrder extends Model
         ]);
     }
 
-   // SIMPLIFIED: Approve Finance F2 - JUST APPROVAL NOW
+   // SIMPLIFIED: Approve FINANCE RBP - JUST APPROVAL NOW
     public function approveFinanceF2(string $financeF2UserId, array $data): bool
     {
         if (!$this->canBeProcessedByFinanceF2()) {

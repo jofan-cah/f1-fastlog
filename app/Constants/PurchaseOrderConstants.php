@@ -40,10 +40,10 @@ class PurchaseOrderConstants
         return [
             self::WORKFLOW_STATUS_DRAFT_LOGISTIC => 'Draft - Logistik',
             self::WORKFLOW_STATUS_PENDING_FINANCE_F1 => 'Menunggu Finance F1',
-            self::WORKFLOW_STATUS_PENDING_FINANCE_F2 => 'Menunggu Finance F2',
+            self::WORKFLOW_STATUS_PENDING_FINANCE_F2 => 'Menunggu FINANCE RBP',
             self::WORKFLOW_STATUS_APPROVED => 'Disetujui',
             self::WORKFLOW_STATUS_REJECTED_F1 => 'Ditolak Finance F1',
-            self::WORKFLOW_STATUS_REJECTED_F2 => 'Ditolak Finance F2',
+            self::WORKFLOW_STATUS_REJECTED_F2 => 'Ditolak FINANCE RBP',
             self::WORKFLOW_STATUS_SENT => 'Terkirim',
             self::WORKFLOW_STATUS_PARTIAL => 'Sebagian Diterima',
             self::WORKFLOW_STATUS_RECEIVED => 'Selesai',
@@ -77,7 +77,7 @@ class PurchaseOrderConstants
     {
         return [
             self::REJECTED_BY_F1 => 'Finance F1',
-            self::REJECTED_BY_F2 => 'Finance F2',
+            self::REJECTED_BY_F2 => 'FINANCE RBP',
         ];
     }
 
@@ -98,10 +98,10 @@ class PurchaseOrderConstants
                 'description' => 'Menunggu Finance F1 pilih supplier & payment options'
             ],
             self::WORKFLOW_STATUS_PENDING_FINANCE_F2 => [
-                'text' => 'Menunggu Finance F2',
+                'text' => 'Menunggu FINANCE RBP',
                 'class' => 'bg-yellow-100 text-yellow-800',
                 'badge_class' => 'badge-warning',
-                'description' => 'Menunggu Finance F2 approve & input payment'
+                'description' => 'Menunggu FINANCE RBP approve & input payment'
             ],
             self::WORKFLOW_STATUS_APPROVED => [
                 'text' => 'Disetujui',
@@ -116,10 +116,10 @@ class PurchaseOrderConstants
                 'description' => 'Ditolak oleh Finance F1'
             ],
             self::WORKFLOW_STATUS_REJECTED_F2 => [
-                'text' => 'Ditolak Finance F2',
+                'text' => 'Ditolak FINANCE RBP',
                 'class' => 'bg-red-100 text-red-800',
                 'badge_class' => 'badge-danger',
-                'description' => 'Ditolak oleh Finance F2'
+                'description' => 'Ditolak oleh FINANCE RBP'
             ],
             self::WORKFLOW_STATUS_SENT => [
                 'text' => 'Terkirim',

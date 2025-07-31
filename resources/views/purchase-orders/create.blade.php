@@ -80,7 +80,7 @@
                     <div class="text-blue-800 text-sm space-y-1">
                         <p>• <strong>Draft Logistic:</strong> PO dibuat dan dapat diedit</p>
                         <p>• <strong>Submit ke Finance F1:</strong> Review supplier dan opsi pembayaran</p>
-                        <p>• <strong>Finance F2:</strong> Approval final dan setup pembayaran</p>
+                        <p>• <strong>FINANCE RBP:</strong> Approval final dan setup pembayaran</p>
                         <p>• <strong>Approved:</strong> Siap dikirim ke supplier</p>
                     </div>
                     <div class="mt-3 text-xs text-blue-700 bg-blue-100 rounded-lg p-2">
@@ -450,7 +450,7 @@
                             </div>
                             <div class="flex items-start space-x-2">
                                 <i class="fas fa-arrow-right text-blue-600 mt-1 text-xs"></i>
-                                <span>Finance F2 akan melakukan approval final</span>
+                                <span>FINANCE RBP akan melakukan approval final</span>
                             </div>
                             <div class="flex items-start space-x-2">
                                 <i class="fas fa-arrow-right text-blue-600 mt-1 text-xs"></i>

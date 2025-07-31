@@ -74,7 +74,7 @@
                 </div>
             @endif
 
-            <!-- Finance F2 Approval -->
+            <!-- FINANCE RBP Approval -->
             @if($purchaseOrder->finance_f2_approved_at)
                 <div class="relative flex items-start">
                     <div class="flex-shrink-0 w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
@@ -82,10 +82,10 @@
                     </div>
                     <div class="ml-4 flex-1">
                         <div class="flex items-center justify-between">
-                            <h4 class="text-sm font-medium text-gray-900">Approved by Finance F2</h4>
+                            <h4 class="text-sm font-medium text-gray-900">Approved by FINANCE RBP</h4>
                             <span class="text-xs text-gray-500">{{ $purchaseOrder->finance_f2_approved_at->format('d/m/Y H:i') }}</span>
                         </div>
-                        <p class="text-sm text-gray-600">Approved by {{ $purchaseOrder->financeF2User->name ?? 'Finance F2' }}</p>
+                        <p class="text-sm text-gray-600">Approved by {{ $purchaseOrder->financeF2User->name ?? 'FINANCE RBP' }}</p>
                         @if($purchaseOrder->finance_f2_notes)
                             <p class="text-xs text-gray-500 mt-1">{{ $purchaseOrder->finance_f2_notes }}</p>
                         @endif
@@ -118,7 +118,7 @@
                     <div class="ml-4 flex-1">
                         <div class="flex items-center justify-between">
                             <h4 class="text-sm font-medium text-gray-900">
-                                Rejected by {{ $purchaseOrder->rejected_by_level === 'F1' ? 'Finance F1' : 'Finance F2' }}
+                                Rejected by {{ $purchaseOrder->rejected_by_level === 'F1' ? 'Finance F1' : 'FINANCE RBP' }}
                             </h4>
                             <span class="text-xs text-gray-500">{{ $purchaseOrder->rejected_at->format('d/m/Y H:i') }}</span>
                         </div>
@@ -126,7 +126,7 @@
                             Rejected by {{
                                 $purchaseOrder->rejected_by_level === 'F1' ?
                                 ($purchaseOrder->financeF1User->name ?? 'Finance F1') :
-                                ($purchaseOrder->financeF2User->name ?? 'Finance F2')
+                                ($purchaseOrder->financeF2User->name ?? 'FINANCE RBP')
                             }}
                         </p>
                         @if($purchaseOrder->rejection_reason)

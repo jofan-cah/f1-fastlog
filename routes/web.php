@@ -287,7 +287,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/purchase-orders/{purchaseOrder}/process-finance-f1', [PurchaseOrderController::class, 'processFinanceF1'])->name('purchase-orders.process-finance-f1');
         Route::post('/purchase-orders/{purchaseOrder}/reject-finance-f1', [PurchaseOrderController::class, 'rejectFinanceF1'])->name('purchase-orders.reject-finance-f1');
 
-        // Finance F2 Actions (LVL005 only)
+        // FINANCE RBP Actions (LVL005 only)
         Route::post('/purchase-orders/{purchaseOrder}/approve-finance-f2', [PurchaseOrderController::class, 'approveFinanceF2'])->name('purchase-orders.approve-finance-f2');
         Route::post('/purchase-orders/{purchaseOrder}/reject-finance-f2', [PurchaseOrderController::class, 'rejectFinanceF2'])->name('purchase-orders.reject-finance-f2');
     });
