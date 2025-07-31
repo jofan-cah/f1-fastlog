@@ -503,10 +503,28 @@ class PurchaseOrderController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
+            // Basic F1 requirements
             'supplier_id' => 'required|string|exists:suppliers,supplier_id',
-            'payment_options' => 'required|array|min:1',
-            'payment_options.*' => 'required|string|in:' . implode(',', array_keys(PurchaseOrderConstants::getPaymentMethods())),
+            'payment_method' => 'required|string|in:' . implode(',', array_keys(PurchaseOrderConstants::getPaymentMethods())),
+            'payment_amount' => 'required|numeric|min:0',
             'finance_f1_notes' => 'nullable|string|max:1000',
+
+            // Payment details validation - conditional based on payment method
+            'virtual_account_number' => 'required_if:payment_method,' . PurchaseOrderConstants::PAYMENT_METHOD_VIRTUAL_ACCOUNT . '|nullable|string',
+            'bank_name' => 'required_if:payment_method,' . PurchaseOrderConstants::PAYMENT_METHOD_VIRTUAL_ACCOUNT . ',' . PurchaseOrderConstants::PAYMENT_METHOD_BANK_TRANSFER . ',' . PurchaseOrderConstants::PAYMENT_METHOD_CHECK . ',' . PurchaseOrderConstants::PAYMENT_METHOD_CREDIT_CARD . '|nullable|string',
+            'account_number' => 'required_if:payment_method,' . PurchaseOrderConstants::PAYMENT_METHOD_BANK_TRANSFER . '|nullable|string',
+            'account_holder' => 'required_if:payment_method,' . PurchaseOrderConstants::PAYMENT_METHOD_BANK_TRANSFER . '|nullable|string',
+            'payment_due_date' => 'nullable|date|after:today',
+        ], [
+            'supplier_id.required' => 'Supplier wajib dipilih.',
+            'payment_method.required' => 'Metode pembayaran wajib dipilih.',
+            'payment_amount.required' => 'Jumlah pembayaran wajib diisi.',
+            'payment_amount.min' => 'Jumlah pembayaran tidak boleh negatif.',
+            'virtual_account_number.required_if' => 'Nomor Virtual Account wajib diisi untuk metode Virtual Account.',
+            'bank_name.required_if' => 'Nama Bank wajib diisi untuk metode pembayaran ini.',
+            'account_number.required_if' => 'Nomor Rekening wajib diisi untuk Bank Transfer.',
+            'account_holder.required_if' => 'Nama Pemegang Rekening wajib diisi untuk Bank Transfer.',
+            'payment_due_date.after' => 'Tanggal jatuh tempo harus setelah hari ini.',
         ]);
 
         if ($validator->fails()) {
@@ -515,18 +533,31 @@ class PurchaseOrderController extends Controller
 
         try {
             $result = $purchaseOrder->processFinanceF1(Auth::user()->user_id, [
+                // Basic info
                 'supplier_id' => $request->supplier_id,
-                'payment_options' => $request->payment_options,
                 'notes' => $request->finance_f1_notes,
+
+                // Payment details - ALL handled by F1 now
+                'payment_method' => $request->payment_method,
+                'payment_amount' => $request->payment_amount,
+                'virtual_account_number' => $request->virtual_account_number,
+                'bank_name' => $request->bank_name,
+                'account_number' => $request->account_number,
+                'account_holder' => $request->account_holder,
+                'payment_due_date' => $request->payment_due_date,
             ]);
 
             if ($result) {
                 ActivityLog::logActivity('purchase_orders', $purchaseOrder->po_id, 'process_f1',
                     ['old_status' => PurchaseOrderConstants::WORKFLOW_STATUS_PENDING_FINANCE_F1],
-                    ['new_status' => PurchaseOrderConstants::WORKFLOW_STATUS_PENDING_FINANCE_F2, 'data' => $request->all()]
+                    [
+                        'new_status' => PurchaseOrderConstants::WORKFLOW_STATUS_PENDING_FINANCE_F2,
+                        'supplier_data' => ['supplier_id' => $request->supplier_id],
+                        'payment_data' => $request->except(['_token', 'supplier_id', 'finance_f1_notes'])
+                    ]
                 );
 
-                return back()->with('success', 'PO berhasil diproses oleh Finance F1! Menunggu Finance F2.');
+                return back()->with('success', 'PO berhasil diproses oleh Finance F1! Payment details sudah di-setup. Menunggu approval Finance F2.');
             }
 
             return back()->with('error', 'Gagal memproses PO di Finance F1.');
@@ -536,32 +567,27 @@ class PurchaseOrderController extends Controller
     }
 
     // NEW: Approve Finance F2 (Finance F2 action)
-    public function approveFinanceF2(Request $request, PurchaseOrder $purchaseOrder)
+  public function approveFinanceF2(Request $request, PurchaseOrder $purchaseOrder)
     {
-        // if (!$this->canUserAccess('process_f2', $purchaseOrder)) {
-        //     return back()->with('error', 'Anda tidak dapat approve PO ini di level Finance F2.');
-        // }
-//  dd($request->all());
+        if (!$this->canUserAccess('process_f2', $purchaseOrder)) {
+            return back()->with('error', 'Anda tidak dapat approve PO ini di level Finance F2.');
+        }
+
         $validator = Validator::make($request->all(), [
-            'payment_method' => 'required|string|in:' . implode(',', array_keys(PurchaseOrderConstants::getPaymentMethods())),
-            'payment_amount' => 'required|numeric|min:0',
-            'virtual_account_number' => 'required_if:payment_method,' . PurchaseOrderConstants::PAYMENT_METHOD_VIRTUAL_ACCOUNT,
-            'bank_name' => 'required_if:payment_method,' . PurchaseOrderConstants::PAYMENT_METHOD_BANK_TRANSFER . ',' . PurchaseOrderConstants::PAYMENT_METHOD_VIRTUAL_ACCOUNT,
-            'account_number' => 'required_if:payment_method,' . PurchaseOrderConstants::PAYMENT_METHOD_BANK_TRANSFER,
-            'account_holder' => 'required_if:payment_method,' . PurchaseOrderConstants::PAYMENT_METHOD_BANK_TRANSFER,
-            'payment_due_date' => 'nullable|date|after:today',
             'finance_f2_notes' => 'nullable|string|max:1000',
+            'final_approval' => 'required|boolean', // Just to make sure it's intentional approval
+        ], [
+            'final_approval.required' => 'Konfirmasi approval diperlukan.',
         ]);
-
-
-//  dd($validator);
 
         if ($validator->fails()) {
             return back()->withErrors($validator)->withInput();
         }
 
         try {
-            $result = $purchaseOrder->approveFinanceF2(Auth::user()->user_id, $request->all());
+            $result = $purchaseOrder->approveFinanceF2(Auth::user()->user_id, [
+                'notes' => $request->finance_f2_notes,
+            ]);
 
             if ($result) {
                 // Update backward compatibility status
@@ -569,7 +595,11 @@ class PurchaseOrderController extends Controller
 
                 ActivityLog::logActivity('purchase_orders', $purchaseOrder->po_id, 'approve_f2',
                     ['old_status' => PurchaseOrderConstants::WORKFLOW_STATUS_PENDING_FINANCE_F2],
-                    ['new_status' => PurchaseOrderConstants::WORKFLOW_STATUS_APPROVED, 'payment_data' => $request->all()]
+                    [
+                        'new_status' => PurchaseOrderConstants::WORKFLOW_STATUS_APPROVED,
+                        'approved_by' => Auth::user()->user_id,
+                        'notes' => $request->finance_f2_notes
+                    ]
                 );
 
                 return back()->with('success', 'PO berhasil di-approve Finance F2! PO siap dikirim ke supplier.');

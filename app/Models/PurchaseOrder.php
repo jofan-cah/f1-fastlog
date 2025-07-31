@@ -167,35 +167,78 @@ class PurchaseOrder extends Model
         }
 
         return $this->update([
+            // Basic F1 data
             'workflow_status' => PurchaseOrderConstants::WORKFLOW_STATUS_PENDING_FINANCE_F2,
             'finance_f1_user_id' => $financeF1UserId,
             'finance_f1_approved_at' => now(),
             'supplier_id' => $data['supplier_id'] ?? $this->supplier_id,
-            'available_payment_options' => $data['payment_options'] ?? [],
             'finance_f1_notes' => $data['notes'] ?? null,
+
+            // Payment details - ALL set by F1 now
+            'payment_method' => $data['payment_method'] ?? null,
+            'payment_amount' => $data['payment_amount'] ?? $this->total_amount,
+            'virtual_account_number' => $data['virtual_account_number'] ?? null,
+            'bank_name' => $data['bank_name'] ?? null,
+            'account_number' => $data['account_number'] ?? null,
+            'account_holder' => $data['account_holder'] ?? null,
+            'payment_due_date' => $data['payment_due_date'] ?? null,
+
+            // Set initial payment status
+            'payment_status' => PurchaseOrderConstants::PAYMENT_STATUS_PENDING,
         ]);
     }
 
-    public function approveFinanceF2(string $financeF2UserId, array $paymentData): bool
+   // SIMPLIFIED: Approve Finance F2 - JUST APPROVAL NOW
+    public function approveFinanceF2(string $financeF2UserId, array $data): bool
     {
         if (!$this->canBeProcessedByFinanceF2()) {
             return false;
+        }
+
+        // Validate that payment details are already set by F1
+        if (!$this->payment_method || !$this->payment_amount) {
+            throw new \Exception('Payment details must be set by Finance F1 before F2 approval.');
         }
 
         return $this->update([
             'workflow_status' => PurchaseOrderConstants::WORKFLOW_STATUS_APPROVED,
             'finance_f2_user_id' => $financeF2UserId,
             'finance_f2_approved_at' => now(),
-            'payment_method' => $paymentData['payment_method'],
-            'virtual_account_number' => $paymentData['virtual_account_number'] ?? null,
-            'payment_amount' => $paymentData['payment_amount'] ?? $this->total_amount,
-            'bank_name' => $paymentData['bank_name'] ?? null,
-            'account_number' => $paymentData['account_number'] ?? null,
-            'account_holder' => $paymentData['account_holder'] ?? null,
-            'payment_due_date' => $paymentData['payment_due_date'] ?? null,
-            'finance_f2_notes' => $paymentData['notes'] ?? null,
+            'finance_f2_notes' => $data['notes'] ?? null,
+
+            // Payment status remains pending until actual payment
+            // 'payment_status' stays as PENDING until payment is made
         ]);
     }
+
+     // NEW: Helper method to check if PO is ready for F2 approval
+    public function hasCompletePaymentDetails(): bool
+    {
+        if (!$this->payment_method || !$this->payment_amount) {
+            return false;
+        }
+
+        // Check required fields based on payment method
+        switch ($this->payment_method) {
+            case PurchaseOrderConstants::PAYMENT_METHOD_BANK_TRANSFER:
+                return !empty($this->bank_name) && !empty($this->account_number) && !empty($this->account_holder);
+
+            case PurchaseOrderConstants::PAYMENT_METHOD_VIRTUAL_ACCOUNT:
+                return !empty($this->bank_name) && !empty($this->virtual_account_number);
+
+            case PurchaseOrderConstants::PAYMENT_METHOD_CHECK:
+            case PurchaseOrderConstants::PAYMENT_METHOD_CREDIT_CARD:
+                return !empty($this->bank_name);
+
+            case PurchaseOrderConstants::PAYMENT_METHOD_CASH:
+                return true; // Cash doesn't need additional details
+
+            default:
+                return true;
+        }
+    }
+
+
 
     public function rejectByFinanceF1(string $financeF1UserId, string $reason): bool
     {
@@ -253,8 +296,8 @@ class PurchaseOrder extends Model
     public function isPaymentOverdue(): bool
     {
         return $this->payment_due_date &&
-               $this->payment_due_date->isPast() &&
-               $this->payment_status === PurchaseOrderConstants::PAYMENT_STATUS_PENDING;
+            $this->payment_due_date->isPast() &&
+            $this->payment_status === PurchaseOrderConstants::PAYMENT_STATUS_PENDING;
     }
 
     // Existing helper methods (unchanged)
@@ -391,7 +434,7 @@ class PurchaseOrder extends Model
     public function scopePaymentOverdue($query)
     {
         return $query->where('payment_due_date', '<', now())
-                     ->where('payment_status', PurchaseOrderConstants::PAYMENT_STATUS_PENDING);
+            ->where('payment_status', PurchaseOrderConstants::PAYMENT_STATUS_PENDING);
     }
 
     // Scope: Overdue POs
@@ -449,7 +492,7 @@ class PurchaseOrder extends Model
             'payment_overdue' => self::paymentOverdue()->count(),
         ];
     }
-        // Helper method: Get status info
+    // Helper method: Get status info
     public function getStatusInfo(): array
     {
         $statuses = [
@@ -487,8 +530,56 @@ class PurchaseOrder extends Model
 
         return $statuses[$this->status] ?? $statuses['draft'];
     }
- public function canBeEdited(): bool
+    public function canBeEdited(): bool
     {
         return in_array($this->status, ['draft']);
+    }
+
+     // UPDATED: Payment information getter - now shows F1 setup
+    public function getPaymentInfo(): array
+    {
+        if (!$this->payment_method) {
+            return [
+                'status' => 'not_setup',
+                'message' => 'Payment details belum di-setup oleh Finance F1'
+            ];
+        }
+
+        $info = [
+            'method' => PurchaseOrderConstants::getPaymentMethods()[$this->payment_method] ?? $this->payment_method,
+            'amount' => $this->payment_amount,
+            'status' => $this->payment_status,
+            'due_date' => $this->payment_due_date,
+            'setup_by' => $this->financeF1User->name ?? 'Finance F1',
+            'setup_at' => $this->finance_f1_approved_at,
+        ];
+
+        // Add method-specific details
+        switch ($this->payment_method) {
+            case PurchaseOrderConstants::PAYMENT_METHOD_BANK_TRANSFER:
+                $info['details'] = [
+                    'bank_name' => $this->bank_name,
+                    'account_number' => $this->account_number,
+                    'account_holder' => $this->account_holder,
+                ];
+                break;
+
+            case PurchaseOrderConstants::PAYMENT_METHOD_VIRTUAL_ACCOUNT:
+                $info['details'] = [
+                    'bank_name' => $this->bank_name,
+                    'virtual_account_number' => $this->virtual_account_number,
+                ];
+                break;
+
+            case PurchaseOrderConstants::PAYMENT_METHOD_CHECK:
+            case PurchaseOrderConstants::PAYMENT_METHOD_CREDIT_CARD:
+                $info['details'] = [
+                    'bank_name' => $this->bank_name,
+                    'account_holder' => $this->account_holder,
+                ];
+                break;
+        }
+
+        return $info;
     }
 }
