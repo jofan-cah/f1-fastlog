@@ -497,6 +497,9 @@ class TransactionController extends Controller
             'kondisi' => 'nullable|in:good,no_good'
         ]);
 
+        // dd($request->all());
+        // dd( $request->kondisi);
+
         try {
             DB::beginTransaction();
 
@@ -520,7 +523,8 @@ class TransactionController extends Controller
 
                 $itemDetails[] = [
                     'detail' => $itemDetail,
-                    'notes' => $itemData['notes'] ?? null
+                    'notes' => $itemData['notes'] ?? null,
+                    'kondisi' => $request->kondisi ?? 'good',
                 ];
             }
 
@@ -533,7 +537,7 @@ class TransactionController extends Controller
                 'item_id' => $itemDetails[0]['detail']->item_id,
                 'quantity' => count($items),
                 'from_location' => $request->from_location,
-                'kondisi' => $request->kondisi ?? 'good',
+                // 'kondisi' => $request->kondisi ?? 'good',
                 'to_location' => $request->to_location,
                 'notes' => $request->notes,
                 'status' => Transaction::STATUS_PENDING,
@@ -547,11 +551,19 @@ class TransactionController extends Controller
                     'transaction_detail_id' => TransactionDetail::generateTransactionDetailId(),
                     'transaction_id' => $transaction->transaction_id,
                     'item_detail_id' => $itemInfo['detail']->item_detail_id,
-                    'status_before' => $itemInfo['detail']->status,
-                    'status_after' => null,
+                    'status_before' => $request->kondisi !== 'good' ? 'no_good' : 'good',
+                    'status_after' => $request->kondisi,
                     'notes' => $itemInfo['notes'],
                 ]);
+
+                // Update kondisi di tabel item_details
+                $itemInfo['detail']->kondisi = $itemInfo['kondisi'];
+                $itemInfo['detail']->save();
             }
+
+
+
+
 
             // Log activity
             ActivityLog::logActivity(

@@ -917,7 +917,7 @@ public function testF1Generation(Request $request)
                 $itemsGenerated = $this->generateItemDetailsForReceived(
                     $grDetail,
                     $itemData,
-                    $itemData['serial_numbers'] ?? []
+                    $itemData['serial_numbers'] = array_map('strtoupper', $itemData['serial_numbers'] ?? [])
                 );
 
                 $totalItemsGenerated += $itemsGenerated;

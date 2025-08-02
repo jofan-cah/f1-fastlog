@@ -119,6 +119,7 @@ class ApprovalController extends Controller
                 throw new \Exception('Transaction cannot be approved');
             }
 
+
             DB::beginTransaction();
 
             // Approve main transaction
@@ -142,6 +143,7 @@ class ApprovalController extends Controller
 
                 // Update item detail status
                 $itemDetail->status = $newStatus;
+                // $itemDetail->kondisi = $newStatus;
                 $itemDetail->save();
 
                 // Update transaction detail
@@ -550,6 +552,7 @@ class ApprovalController extends Controller
                 'message' => 'Transaction is not pending approval'
             ], 400);
         }
+        
 
         try {
             DB::beginTransaction();

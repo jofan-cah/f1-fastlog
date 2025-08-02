@@ -18,7 +18,9 @@ class TransactionDetail extends Model
         'transaction_id',
         'item_detail_id',
         'status_before',
+        'kondisi_before',
         'status_after',
+        'kondisi_after',
         'notes',
     ];
 
