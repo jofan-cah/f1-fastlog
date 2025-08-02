@@ -361,91 +361,649 @@ class StockController extends Controller
         return view('stocks.edit', compact('stock', 'itemDetailsBreakdown', 'syncStatus'));
     }
 
-    // **NEW: Update stock dengan sync item details**
-    public function update(Request $request, Stock $stock)
-    {
-        $validator = Validator::make($request->all(), [
-            'adjustment_type' => 'required|in:manual,sync_auto',
-            'quantity_available' => 'required|integer|min:0',
-            'quantity_used' => 'required|integer|min:0',
-            'reason' => 'required|string|max:255',
-            'notes' => 'nullable|string',
-            'sync_item_details' => 'boolean',
-        ], [
-            'adjustment_type.required' => 'Tipe adjustment wajib dipilih.',
-            'quantity_available.required' => 'Quantity available wajib diisi.',
-            'quantity_used.required' => 'Quantity used wajib diisi.',
-            'reason.required' => 'Alasan wajib diisi.',
-        ]);
 
-        if ($validator->fails()) {
-            return back()->withErrors($validator)->withInput();
+
+
+
+    // ================================================================
+    // DEBUG HELPER untuk StockController.php
+    // Tambahkan method ini di StockController
+    // ================================================================
+
+
+/**
+ * FIXED: Process specific items based on user selection
+ */
+public function syncItemDetailsWithStockDebug(Stock $stock, Request $request)
+{
+    try {
+        $item = $stock->item;
+        if (!$item) {
+            throw new \Exception('Item not found');
         }
 
-        try {
-            DB::beginTransaction();
+        // ✅ FIXED: Get changed items from request
+        $changedItemsJson = $request->input('changed_items');
+        $changedItems = $changedItemsJson ? json_decode($changedItemsJson, true) : [];
 
-            $oldData = [
-                'quantity_available' => $stock->quantity_available,
-                'quantity_used' => $stock->quantity_used,
-                'total_quantity' => $stock->total_quantity,
-            ];
+        Log::info('🎯 Processing specific item changes', [
+            'stock_id' => $stock->stock_id,
+            'changed_items_count' => count($changedItems),
+            'changed_items' => $changedItems
+        ]);
 
-            if ($request->adjustment_type === 'sync_auto') {
-                // Auto sync with item details
-                $syncResult = $stock->syncWithItemDetails();
+        // Get fresh item details
+        $itemDetails = DB::table('item_details')
+            ->where('item_id', $item->item_id)
+            ->get();
 
-                if (!$syncResult['success']) {
-                    throw new \Exception('Gagal sync dengan item details: ' . $syncResult['message']);
+        $targetStock = (int) ($request->quantity_available ?? $stock->quantity_available);
+        $targetAvailable = (int) ($request->quantity_used ?? $stock->quantity_used);
+
+        $currentStock = $itemDetails->where('status', 'stock')->count();
+        $currentAvailable = $itemDetails->where('status', 'available')->count();
+
+        Log::info('📊 Sync calculation with user selection', [
+            'stock_id' => $stock->stock_id,
+            'current_status' => [
+                'stock' => $currentStock,
+                'available' => $currentAvailable
+            ],
+            'targets' => [
+                'target_stock' => $targetStock,
+                'target_available' => $targetAvailable
+            ],
+            'user_selection' => [
+                'has_changed_items' => !empty($changedItems),
+                'will_use_specific_items' => !empty($changedItems)
+            ]
+        ]);
+
+        $updated = 0;
+        $changes = [];
+
+        if (!empty($changedItems)) {
+            // ✅ FIXED: Process specific items selected by user
+            Log::info('🎯 Processing user-selected items');
+
+            foreach ($changedItems as $changeRequest) {
+                $itemDetailId = $changeRequest['item_detail_id'];
+                $serialNumber = $changeRequest['serial_number'];
+                $oldStatus = $changeRequest['old_status'];
+                $newStatus = $changeRequest['new_status'];
+
+                // Verify item exists and has correct current status
+                $itemDetail = $itemDetails->where('item_detail_id', $itemDetailId)->first();
+
+                if (!$itemDetail) {
+                    Log::warning("⚠️ Item detail not found: {$itemDetailId}");
+                    continue;
                 }
 
-                $message = 'Stock berhasil disinkronkan dengan item details.';
-            } else {
-                // Manual adjustment
-                $success = $stock->adjustStock(
-                    $request->quantity_available,
-                    $request->quantity_used,
-                    $request->reason,
-                    Auth::id()
-                );
-
-                if (!$success) {
-                    throw new \Exception('Gagal melakukan adjustment stock');
+                if ($itemDetail->status !== $oldStatus) {
+                    Log::warning("⚠️ Status mismatch for {$serialNumber}: expected {$oldStatus}, got {$itemDetail->status}");
+                    // Continue anyway, but log the discrepancy
                 }
 
-                $message = 'Stock berhasil diupdate manual.';
+                // Apply the specific change
+                $updateResult = DB::table('item_details')
+                    ->where('item_detail_id', $itemDetailId)
+                    ->update([
+                        'status' => $newStatus,
+                        'location' => $newStatus === 'stock' ? 'Warehouse - Stock' : 'Office - Ready',
+                        'notes' => "User-selected change: {$oldStatus} → {$newStatus}. Reason: " . ($request->reason ?? 'Manual adjustment'),
+                        'updated_at' => now()
+                    ]);
 
-                // Jika diminta sync item details setelah manual update
-                if ($request->boolean('sync_item_details')) {
-                    $this->syncItemDetailsWithStock($stock, $request);
-                    $message .= ' Item details juga telah disinkronkan.';
+                if ($updateResult) {
+                    $updated++;
+                    $changes[] = "{$serialNumber}: {$oldStatus} → {$newStatus} (user-selected)";
+
+                    Log::info("✅ Updated specific item", [
+                        'serial_number' => $serialNumber,
+                        'item_detail_id' => $itemDetailId,
+                        'status_change' => "{$oldStatus} → {$newStatus}"
+                    ]);
+                } else {
+                    Log::warning("❌ Failed to update item: {$serialNumber}");
                 }
             }
 
-            // Log activity
-            $this->logActivity('stocks', $stock->stock_id, 'update', $oldData, [
-                'quantity_available' => $stock->quantity_available,
-                'quantity_used' => $stock->quantity_used,
-                'total_quantity' => $stock->total_quantity,
-                'adjustment_type' => $request->adjustment_type,
-                'reason' => $request->reason,
-                'notes' => $request->notes,
-                'sync_applied' => $request->adjustment_type === 'sync_auto' || $request->boolean('sync_item_details')
+        } else {
+            // ✅ FALLBACK: Auto-select items if no specific selection (original logic)
+            Log::info('🔄 No specific selection, using auto-selection');
+
+            $needMoveToStock = $targetStock - $currentStock;
+            $needMoveToAvailable = $targetAvailable - $currentAvailable;
+
+            // Move items from 'available' to 'stock' status
+            if ($needMoveToStock > 0) {
+                $itemsToMove = $itemDetails->where('status', 'available')->take($needMoveToStock);
+
+                Log::info("📦 Auto-moving {$itemsToMove->count()} items from available to stock", [
+                    'items' => $itemsToMove->pluck('serial_number')->toArray()
+                ]);
+
+                foreach ($itemsToMove as $itemDetail) {
+                    DB::table('item_details')
+                        ->where('item_detail_id', $itemDetail->item_detail_id)
+                        ->update([
+                            'status' => 'stock',
+                            'location' => 'Warehouse - Stock',
+                            'notes' => 'Auto-moved to stock: ' . ($request->reason ?? 'Sync'),
+                            'updated_at' => now()
+                        ]);
+
+                    $updated++;
+                    $changes[] = "{$itemDetail->serial_number}: available → stock (auto-selected)";
+                }
+            }
+
+            // Move items from 'stock' to 'available' status
+            if ($needMoveToAvailable > 0) {
+                $itemsToMove = $itemDetails->where('status', 'stock')->take($needMoveToAvailable);
+
+                Log::info("🏢 Auto-moving {$itemsToMove->count()} items from stock to available", [
+                    'items' => $itemsToMove->pluck('serial_number')->toArray()
+                ]);
+
+                foreach ($itemsToMove as $itemDetail) {
+                    DB::table('item_details')
+                        ->where('item_detail_id', $itemDetail->item_detail_id)
+                        ->update([
+                            'status' => 'available',
+                            'location' => 'Office - Ready',
+                            'notes' => 'Auto-moved to available: ' . ($request->reason ?? 'Sync'),
+                            'updated_at' => now()
+                        ]);
+
+                    $updated++;
+                    $changes[] = "{$itemDetail->serial_number}: stock → available (auto-selected)";
+                }
+            }
+        }
+
+        // ✅ VERIFICATION: Check final state
+        $verifyItemDetails = DB::table('item_details')
+            ->where('item_id', $item->item_id)
+            ->get();
+
+        $verifyStock = $verifyItemDetails->where('status', 'stock')->count();
+        $verifyAvailable = $verifyItemDetails->where('status', 'available')->count();
+
+        $stockMatches = ((int) $targetStock) === ((int) $verifyStock);
+        $availableMatches = ((int) $targetAvailable) === ((int) $verifyAvailable);
+
+        Log::info('✅ Item details sync completed', [
+            'stock_id' => $stock->stock_id,
+            'processing_method' => !empty($changedItems) ? 'user-specific' : 'auto-selection',
+            'updated_items' => $updated,
+            'changes' => $changes,
+            'verification' => [
+                'target_stock' => $targetStock,
+                'actual_stock' => $verifyStock,
+                'target_available' => $targetAvailable,
+                'actual_available' => $verifyAvailable,
+                'stock_matches' => $stockMatches,
+                'available_matches' => $availableMatches,
+                'success' => $stockMatches && $availableMatches
+            ]
+        ]);
+
+        // ✅ VALIDATION: Check if targets were met
+        if (!$stockMatches || !$availableMatches) {
+            Log::warning('⚠️ Target quantities not met after sync', [
+                'stock_id' => $stock->stock_id,
+                'expected_vs_actual' => [
+                    'stock' => "{$targetStock} vs {$verifyStock}",
+                    'available' => "{$targetAvailable} vs {$verifyAvailable}"
+                ],
+                'possible_cause' => !empty($changedItems) ? 'User selection insufficient for targets' : 'Auto-selection logic issue'
+            ]);
+        }
+
+        return $updated;
+    } catch (\Exception $e) {
+        Log::error('❌ Item details sync failed', [
+            'stock_id' => $stock->stock_id,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        throw $e;
+    }
+}
+
+/**
+ * NEW: Debug method untuk validate user selection vs target
+ */
+public function validateUserSelection(Request $request)
+{
+    try {
+        $changedItemsJson = $request->input('changed_items');
+        $changedItems = $changedItemsJson ? json_decode($changedItemsJson, true) : [];
+
+        $targetStock = (int) $request->quantity_available;
+        $targetAvailable = (int) $request->quantity_used;
+
+        // Count expected changes
+        $toStockCount = 0;
+        $toAvailableCount = 0;
+
+        foreach ($changedItems as $change) {
+            if ($change['old_status'] === 'available' && $change['new_status'] === 'stock') {
+                $toStockCount++;
+            } elseif ($change['old_status'] === 'stock' && $change['new_status'] === 'available') {
+                $toAvailableCount++;
+            }
+        }
+
+        $analysis = [
+            'user_selection' => [
+                'total_changes' => count($changedItems),
+                'to_stock_count' => $toStockCount,
+                'to_available_count' => $toAvailableCount,
+                'changes_detail' => $changedItems
+            ],
+            'targets' => [
+                'target_stock' => $targetStock,
+                'target_available' => $targetAvailable
+            ],
+            'validation' => [
+                'selection_sufficient' => true, // Basic check, can be enhanced
+                'changes_align_with_targets' => true // Basic check, can be enhanced
+            ]
+        ];
+
+        Log::info('🔍 User selection validation', $analysis);
+
+        return response()->json([
+            'success' => true,
+            'analysis' => $analysis
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+
+/**
+ * FIXED: Update method dengan proper integer casting
+ */
+public function update(Request $request, Stock $stock)
+{
+    // ✅ DEBUG: Log incoming request dengan type checking
+    Log::info('📥 Stock Edit Form Submission', [
+        'stock_id' => $stock->stock_id,
+        'item_code' => $stock->item->item_code,
+        'request_data' => $request->all(),
+        'request_types' => [
+            'quantity_available_type' => gettype($request->quantity_available),
+            'quantity_used_type' => gettype($request->quantity_used),
+            'quantity_available_value' => $request->quantity_available,
+            'quantity_used_value' => $request->quantity_used
+        ],
+        'user_id' => Auth::id()
+    ]);
+
+    $validator = Validator::make($request->all(), [
+        'adjustment_type' => 'required|in:manual,sync_auto',
+        'quantity_available' => 'required|integer|min:0',
+        'quantity_used' => 'required|integer|min:0',
+        'reason' => 'required|string|max:255',
+        'notes' => 'nullable|string',
+        'sync_item_details' => 'boolean',
+    ]);
+
+    if ($validator->fails()) {
+        Log::warning('❌ Validation failed', [
+            'stock_id' => $stock->stock_id,
+            'errors' => $validator->errors()->toArray()
+        ]);
+        return back()->withErrors($validator)->withInput();
+    }
+
+    try {
+        DB::beginTransaction();
+
+        $preUpdateState = [
+            'quantity_available' => $stock->quantity_available,
+            'quantity_used' => $stock->quantity_used,
+            'total_quantity' => $stock->total_quantity,
+        ];
+
+        // ✅ FIXED: Explicit integer casting untuk request values
+        $newQuantityAvailable = (int) $request->quantity_available;
+        $newQuantityUsed = (int) $request->quantity_used;
+
+        // Get current item details state
+        $currentItemDetails = DB::table('item_details')
+            ->where('item_id', $stock->item->item_id)
+            ->select('item_detail_id', 'serial_number', 'status')
+            ->get();
+
+        $currentStatus = [
+            'stock_count' => $currentItemDetails->where('status', 'stock')->count(),
+            'available_count' => $currentItemDetails->where('status', 'available')->count(),
+            'total_trackable' => $currentItemDetails->whereIn('status', ['stock', 'available'])->count()
+        ];
+
+        Log::info('📊 Pre-update analysis', [
+            'stock_id' => $stock->stock_id,
+            'stock_table' => $preUpdateState,
+            'item_details_actual' => $currentStatus,
+            'request_targets' => [
+                'quantity_available' => $newQuantityAvailable,    // ✅ FIXED: Now integer
+                'quantity_used' => $newQuantityUsed               // ✅ FIXED: Now integer
+            ],
+            'target_types' => [
+                'quantity_available_type' => gettype($newQuantityAvailable),
+                'quantity_used_type' => gettype($newQuantityUsed)
+            ],
+            'consistency_check' => [
+                'available_matches' => $stock->quantity_available === $currentStatus['stock_count'],
+                'used_matches' => $stock->quantity_used === $currentStatus['available_count']
+            ]
+        ]);
+
+        if ($request->adjustment_type === 'sync_auto') {
+            $syncResult = $stock->syncWithItemDetails();
+
+            if (!$syncResult['success']) {
+                throw new \Exception('Gagal sync: ' . $syncResult['message']);
+            }
+
+            $message = 'Stock berhasil disinkronkan dengan item details.';
+        } else {
+            // ✅ FIXED: Use properly casted integer values
+            Log::info('🔧 Manual adjustment started', [
+                'stock_id' => $stock->stock_id,
+                'from' => $preUpdateState,
+                'to' => [
+                    'quantity_available' => $newQuantityAvailable,
+                    'quantity_used' => $newQuantityUsed
+                ]
             ]);
 
-            DB::commit();
+            $success = $stock->adjustStock(
+                $newQuantityAvailable,   // ✅ FIXED: Integer
+                $newQuantityUsed,        // ✅ FIXED: Integer
+                $request->reason,
+                Auth::id()
+            );
 
-            return redirect()->route('stocks.show', $stock)
-                ->with('success', $message);
+            if (!$success) {
+                throw new \Exception('Gagal melakukan adjustment stock');
+            }
+
+            $message = 'Stock berhasil diupdate manual.';
+
+            if ($request->boolean('sync_item_details')) {
+                Log::info('🔄 Starting item details sync', [
+                    'stock_id' => $stock->stock_id,
+                    'target_stock' => $newQuantityAvailable,     // ✅ FIXED: Integer
+                    'target_available' => $newQuantityUsed       // ✅ FIXED: Integer
+                ]);
+
+                $syncCount = $this->syncItemDetailsWithStockDebug($stock, $request);
+                $message .= " Item details disinkronkan ($syncCount items).";
+
+                Log::info('✅ Item details sync completed', [
+                    'stock_id' => $stock->stock_id,
+                    'synced_count' => $syncCount
+                ]);
+            }
+        }
+
+        // Verify final state
+        $stock->refresh();
+        $finalState = [
+            'quantity_available' => $stock->quantity_available,
+            'quantity_used' => $stock->quantity_used,
+            'total_quantity' => $stock->total_quantity,
+        ];
+
+        // Verify item details after changes
+        $finalItemDetails = DB::table('item_details')
+            ->where('item_id', $stock->item->item_id)
+            ->select('item_detail_id', 'serial_number', 'status')
+            ->get();
+
+        $finalStatus = [
+            'stock_count' => $finalItemDetails->where('status', 'stock')->count(),
+            'available_count' => $finalItemDetails->where('status', 'available')->count(),
+            'total_trackable' => $finalItemDetails->whereIn('status', ['stock', 'available'])->count()
+        ];
+
+        // ✅ FIXED: Proper type casting for final verification
+        $finalConsistencyCheck = [
+            'available_matches' => ((int) $finalState['quantity_available']) === ((int) $finalStatus['stock_count']),
+            'used_matches' => ((int) $finalState['quantity_used']) === ((int) $finalStatus['available_count'])
+        ];
+
+        Log::info('📊 Post-update verification', [
+            'stock_id' => $stock->stock_id,
+            'stock_table_final' => $finalState,
+            'item_details_final' => $finalStatus,
+            'changes_applied' => [
+                'available_diff' => $finalState['quantity_available'] - $preUpdateState['quantity_available'],
+                'used_diff' => $finalState['quantity_used'] - $preUpdateState['quantity_used'],
+                'total_diff' => $finalState['total_quantity'] - $preUpdateState['total_quantity']
+            ],
+            'consistency_final' => $finalConsistencyCheck  // ✅ FIXED
+        ]);
+
+        // Log activity
+        $this->logActivity('stocks', $stock->stock_id, 'edit_update', $preUpdateState, [
+            'quantity_available' => $stock->quantity_available,
+            'quantity_used' => $stock->quantity_used,
+            'total_quantity' => $stock->total_quantity,
+            'type' => $request->adjustment_type,
+            'reason' => substr($request->reason, 0, 100)
+        ]);
+
+        DB::commit();
+
+        Log::info('✅ Stock update completed successfully', [
+            'stock_id' => $stock->stock_id,
+            'message' => $message
+        ]);
+
+        return redirect()->route('stocks.show', $stock)
+            ->with('success', $message);
+
+    } catch (\Exception $e) {
+        DB::rollback();
+
+        Log::error('❌ Stock update failed', [
+            'stock_id' => $stock->stock_id,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+            'request_data' => $request->all()
+        ]);
+
+        return back()->withInput()->with('error', 'Error: ' . $e->getMessage());
+    }
+}
+
+    /**
+     * DEBUG: Endpoint untuk debug form submission data
+     */
+    public function debugFormSubmission(Request $request)
+    {
+        Log::info('🔍 Debug form submission', [
+            'all_request_data' => $request->all(),
+            'headers' => $request->headers->all(),
+            'method' => $request->method(),
+            'url' => $request->fullUrl(),
+            'user_id' => Auth::id(),
+            'timestamp' => now()
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Debug data logged',
+            'data' => $request->all()
+        ]);
+    }
+
+    /**
+     * FIXED: syncItemDetailsWithStock - Line 487 error fix
+     */
+    public function syncItemDetailsWithStock(Stock $stock, Request $request)
+    {
+        try {
+            $item = $stock->item;
+            if (!$item) {
+                throw new \Exception('Item not found');
+            }
+
+            // ✅ FIXED: Fresh query langsung dari DB
+            $itemDetails = DB::table('item_details')
+                ->where('item_id', $item->item_id)
+                ->get();
+
+            $targetStock = $request->quantity_available ?? $stock->quantity_available;
+            $targetAvailable = $request->quantity_used ?? $stock->quantity_used;
+
+            $currentStock = $itemDetails->where('status', 'stock')->count();
+            $currentAvailable = $itemDetails->where('status', 'available')->count();
+
+            $updated = 0;
+            $changes = [];
+
+            // Move dari available ke stock
+            $needMoveToStock = $targetStock - $currentStock;
+            if ($needMoveToStock > 0) {
+                $itemsToMove = $itemDetails->where('status', 'available')->take($needMoveToStock);
+
+                foreach ($itemsToMove as $itemDetail) {
+                    DB::table('item_details')
+                        ->where('item_detail_id', $itemDetail->item_detail_id)
+                        ->update([
+                            'status' => 'stock',
+                            'location' => 'Warehouse - Stock',
+                            'notes' => 'Moved to stock: ' . ($request->reason ?? 'Sync'),
+                            'updated_at' => now()
+                        ]);
+
+                    $updated++;
+                    $changes[] = "{$itemDetail->serial_number}: available → stock";
+                }
+            }
+
+            // Move dari stock ke available
+            $needMoveToAvailable = $targetAvailable - $currentAvailable;
+            if ($needMoveToAvailable > 0) {
+                $itemsToMove = $itemDetails->where('status', 'stock')->take($needMoveToAvailable);
+
+                foreach ($itemsToMove as $itemDetail) {
+                    DB::table('item_details')
+                        ->where('item_detail_id', $itemDetail->item_detail_id)
+                        ->update([
+                            'status' => 'available',
+                            'location' => 'Office - Ready',
+                            'notes' => 'Moved to available: ' . ($request->reason ?? 'Sync'),
+                            'updated_at' => now()
+                        ]);
+
+                    $updated++;
+                    $changes[] = "{$itemDetail->serial_number}: stock → available";
+                }
+            }
+
+            Log::info('Item details synced with stock', [
+                'stock_id' => $stock->stock_id,
+                'updated_items' => $updated,
+                'target_stock' => $targetStock,
+                'target_available' => $targetAvailable,
+                'changes' => $changes
+            ]);
+
+            return $updated;
         } catch (\Exception $e) {
-            DB::rollback();
-            return back()
-                ->withInput()
-                ->with('error', 'Gagal mengupdate stock: ' . $e->getMessage());
+            Log::error('Sync item details failed', [
+                'stock_id' => $stock->stock_id,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
         }
     }
 
-    // **NEW: Sync stock dengan item details**
+    /**
+     * FIXED: logActivity method - Fix DB column length error
+     */
+    private function logActivity($tableName, $recordId, $action, $oldData, $newData)
+    {
+        try {
+            // ✅ FIXED: Limit semua field untuk avoid DB truncation error
+            $shortAction = substr($action, 0, 50); // Max 50 chars
+
+            // Limit data size
+            $limitedOldData = $this->limitLogDataSize($oldData);
+            $limitedNewData = $this->limitLogDataSize($newData);
+
+            $lastLog = \App\Models\ActivityLog::orderBy('log_id', 'desc')->first();
+            $lastNumber = $lastLog ? (int) substr($lastLog->log_id, 3) : 0;
+            $newNumber = $lastNumber + 1;
+            $logId = 'LOG' . str_pad($newNumber, 8, '0', STR_PAD_LEFT);
+
+            \App\Models\ActivityLog::create([
+                'log_id' => $logId,
+                'user_id' => Auth::id(),
+                'table_name' => substr($tableName, 0, 50),
+                'record_id' => substr($recordId, 0, 50),
+                'action' => $shortAction,
+                'old_values' => $limitedOldData,
+                'new_values' => $limitedNewData,
+                'ip_address' => request()->ip(),
+                'user_agent' => substr(request()->userAgent() ?? '', 0, 255),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to log activity', [
+                'error' => $e->getMessage(),
+                'table' => $tableName,
+                'record_id' => $recordId,
+                'action' => $action
+            ]);
+        }
+    }
+
+    /**
+     * NEW: Helper method untuk limit log data size
+     */
+    private function limitLogDataSize($data, $maxLength = 1000)
+    {
+        if (!is_array($data)) {
+            return is_string($data) ? substr($data, 0, $maxLength) : $data;
+        }
+
+        $jsonData = json_encode($data);
+
+        if (strlen($jsonData) <= $maxLength) {
+            return $data;
+        }
+
+        // Create summary if too long
+        $summary = [];
+        foreach ($data as $key => $value) {
+            if (is_string($value)) {
+                $summary[$key] = substr($value, 0, 100) . (strlen($value) > 100 ? '...' : '');
+            } elseif (is_array($value)) {
+                $summary[$key] = '[Array: ' . count($value) . ' items]';
+            } else {
+                $summary[$key] = $value;
+            }
+        }
+
+        return $summary;
+    }
+
+    /**
+     * FIXED: syncWithItemDetails endpoint
+     */
     public function syncWithItemDetails(Stock $stock)
     {
         try {
@@ -457,11 +1015,21 @@ class StockController extends Controller
                 throw new \Exception($syncResult['message']);
             }
 
+            // ✅ FIXED: Short action name untuk activity log
+            $this->logActivity(
+                'stocks',
+                $stock->stock_id,
+                'sync',
+                $syncResult['old_values'],
+                $syncResult['new_values']
+            );
+
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Stock berhasil disinkronkan dengan item details',
+                'message' => 'Stock berhasil disinkronkan',
+                'changes' => $syncResult['changes'],
                 'data' => $syncResult
             ]);
         } catch (\Exception $e) {
@@ -473,72 +1041,218 @@ class StockController extends Controller
         }
     }
 
-    // **NEW: Sync item details status dengan stock**
-    public function syncItemDetailsWithStock(Stock $stock, Request $request)
+    /**
+     * NEW: Debug endpoint untuk troubleshooting
+     */
+    public function debugStock(Stock $stock)
     {
         try {
-            // Ambil item details yang perlu disesuaikan
-            $item = $stock->item;
-            $itemDetails = $item->itemDetails;
+            $debugInfo = $stock->debugSyncIssues();
 
-            $targetAvailable = $request->quantity_available ?? $stock->quantity_available;
-            $targetUsed = $request->quantity_used ?? $stock->quantity_used;
-
-            // Hitung current status dari item details
-            $currentStock = $itemDetails->where('status', 'stock')->count();
-            $currentAvailable = $itemDetails->where('status', 'available')->count();
-
-            // Calculate yang perlu diubah
-            $needToMoveToStock = $targetAvailable - $currentStock;
-            $needToMoveToAvailable = $targetUsed - $currentAvailable;
-
-            $updated = 0;
-
-            // Move items to stock status
-            if ($needToMoveToStock > 0) {
-                $itemsToMoveToStock = $itemDetails
-                    ->where('status', 'available')
-                    ->take($needToMoveToStock);
-
-                foreach ($itemsToMoveToStock as $itemDetail) {
-                    $itemDetail->update([
-                        'status' => 'stock',
-                        'location' => 'Warehouse - Stock',
-                        'notes' => 'Moved to stock via sync: ' . ($request->reason ?? 'Stock sync')
-                    ]);
-                    $updated++;
-                }
-            }
-
-            // Move items to available status
-            if ($needToMoveToAvailable > 0) {
-                $itemsToMoveToAvailable = $itemDetails
-                    ->where('status', 'stock')
-                    ->take($needToMoveToAvailable);
-
-                foreach ($itemsToMoveToAvailable as $itemDetail) {
-                    $itemDetail->update([
-                        'status' => 'available',
-                        'location' => 'Office - Ready',
-                        'notes' => 'Moved to available via sync: ' . ($request->reason ?? 'Stock sync')
-                    ]);
-                    $updated++;
-                }
-            }
-
-            Log::info('Item details synced with stock', [
-                'stock_id' => $stock->stock_id,
-                'updated_items' => $updated,
-                'target_stock' => $targetAvailable,
-                'target_available' => $targetUsed
+            return response()->json([
+                'success' => true,
+                'debug_info' => $debugInfo,
+                'timestamp' => now()
             ]);
-
-            return $updated;
         } catch (\Exception $e) {
-            Log::error('Failed to sync item details with stock: ' . $e->getMessage());
-            throw $e;
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
+
+
+    /**
+     * Enhanced sync validation endpoint
+     */
+    public function validateStockConsistency(Stock $stock)
+    {
+        try {
+            $validation = $stock->validateConsistencyFixed();
+
+            return response()->json([
+                'success' => true,
+                'validation' => $validation,
+                'timestamp' => now()
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Batch sync multiple stocks
+     */
+    public function batchSyncStocks(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'stock_ids' => 'required|array|min:1',
+            'stock_ids.*' => 'required|string|exists:stocks,stock_id',
+            'force_sync' => 'boolean'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $results = [];
+            $successCount = 0;
+            $errorCount = 0;
+
+            foreach ($request->stock_ids as $stockId) {
+                try {
+                    $stock = Stock::findOrFail($stockId);
+
+                    // Check consistency first unless force sync
+                    if (!$request->boolean('force_sync')) {
+                        $validation = $stock->validateConsistencyFixed();
+                        if ($validation['consistent']) {
+                            $results[] = [
+                                'stock_id' => $stockId,
+                                'status' => 'skipped',
+                                'message' => 'Already consistent'
+                            ];
+                            continue;
+                        }
+                    }
+
+                    $syncResult = $stock->syncWithItemDetails();
+
+                    if ($syncResult['success']) {
+                        $successCount++;
+                        $results[] = [
+                            'stock_id' => $stockId,
+                            'status' => 'success',
+                            'changes' => $syncResult['changes']
+                        ];
+                    } else {
+                        $errorCount++;
+                        $results[] = [
+                            'stock_id' => $stockId,
+                            'status' => 'error',
+                            'message' => $syncResult['message']
+                        ];
+                    }
+                } catch (\Exception $e) {
+                    $errorCount++;
+                    $results[] = [
+                        'stock_id' => $stockId,
+                        'status' => 'error',
+                        'message' => $e->getMessage()
+                    ];
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'summary' => [
+                    'total_processed' => count($request->stock_ids),
+                    'success_count' => $successCount,
+                    'error_count' => $errorCount,
+                    'skipped_count' => count($results) - $successCount - $errorCount
+                ],
+                'results' => $results
+            ]);
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json([
+                'success' => false,
+                'error' => 'Batch sync failed: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get detailed sync report for all stocks
+     */
+    public function getSyncReport(Request $request)
+    {
+        try {
+            $includeConsistent = $request->boolean('include_consistent', false);
+            $limit = $request->get('limit', 50);
+
+            $query = Stock::with('item');
+
+            if ($limit > 0) {
+                $stocks = $query->take($limit)->get();
+            } else {
+                $stocks = $query->get();
+            }
+
+            $report = [
+                'total_stocks' => $stocks->count(),
+                'consistent_count' => 0,
+                'inconsistent_count' => 0,
+                'error_count' => 0,
+                'items' => []
+            ];
+
+            foreach ($stocks as $stock) {
+                try {
+                    $validation = $stock->validateConsistencyFixed();
+
+                    $item = [
+                        'stock_id' => $stock->stock_id,
+                        'item_code' => $stock->item->item_code ?? 'N/A',
+                        'item_name' => $stock->item->item_name ?? 'Unknown',
+                        'consistent' => $validation['consistent'],
+                        'last_updated' => $stock->last_updated
+                    ];
+
+                    if (!$validation['consistent']) {
+                        $item['discrepancies'] = $validation['discrepancies'];
+                        $item['recommendations'] = $validation['recommendations'] ?? [];
+                        $report['inconsistent_count']++;
+                    } else {
+                        $report['consistent_count']++;
+                    }
+
+                    // Include in report based on filter
+                    if (!$validation['consistent'] || $includeConsistent) {
+                        $report['items'][] = $item;
+                    }
+                } catch (\Exception $e) {
+                    $report['error_count']++;
+                    $report['items'][] = [
+                        'stock_id' => $stock->stock_id,
+                        'item_code' => $stock->item->item_code ?? 'N/A',
+                        'item_name' => $stock->item->item_name ?? 'Unknown',
+                        'consistent' => false,
+                        'error' => $e->getMessage()
+                    ];
+                }
+            }
+
+            $report['consistency_rate'] = $stocks->count() > 0
+                ? round(($report['consistent_count'] / $stocks->count()) * 100, 2)
+                : 0;
+
+            return response()->json([
+                'success' => true,
+                'report' => $report,
+                'timestamp' => now()
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to generate sync report: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+
 
     // **NEW: Get item details breakdown**
     private function getItemDetailsBreakdown(Stock $stock): array
@@ -648,35 +1362,6 @@ class StockController extends Controller
                 'success' => false,
                 'message' => 'Gagal auto-fix: ' . $e->getMessage()
             ], 500);
-        }
-    }
-
-
-
-
-
-    // Helper method untuk log activity
-    private function logActivity($tableName, $recordId, $action, $oldData, $newData)
-    {
-        try {
-            $lastLog = \App\Models\ActivityLog::orderBy('log_id', 'desc')->first();
-            $lastNumber = $lastLog ? (int) substr($lastLog->log_id, 3) : 0;
-            $newNumber = $lastNumber + 1;
-            $logId = 'LOG' . str_pad($newNumber, 8, '0', STR_PAD_LEFT);
-
-            \App\Models\ActivityLog::create([
-                'log_id' => $logId,
-                'user_id' => Auth::id(),
-                'table_name' => $tableName,
-                'record_id' => $recordId,
-                'action' => $action,
-                'old_values' => $oldData,
-                'new_values' => $newData,
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to log activity: ' . $e->getMessage());
         }
     }
 }

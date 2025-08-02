@@ -9,6 +9,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class Stock extends Model
@@ -40,63 +41,70 @@ class Stock extends Model
         return $this->belongsTo(Item::class, 'item_id', 'item_id');
     }
 
+    /**
+     * Synchronize stock with actual item_details status - FIXED VERSION
+     */
     public function syncWithItemDetails(): array
     {
         try {
-            $item = $this->item;
-            if (!$item) {
-                throw new \Exception('Item not found');
-            }
+            return DB::transaction(function () {
+                $item = $this->item;
+                if (!$item) {
+                    throw new \Exception('Item not found');
+                }
 
-            // Calculate actual quantities from item_details
-            $actualQuantities = $this->calculateActualQuantitiesFromItemDetails($item);
+                // ✅ FIXED: Fresh query dengan DB table langsung
+                $actualQuantities = $this->calculateActualQuantitiesFromItemDetailsFixed($item);
 
-            // Store old values for logging
-            $oldValues = [
-                'quantity_available' => $this->quantity_available,
-                'quantity_used' => $this->quantity_used,
-                'total_quantity' => $this->total_quantity,
-            ];
-
-            // Update stock berdasarkan status item_details
-            $this->quantity_available = $actualQuantities['stock_status']; // Barang di gudang
-            $this->quantity_used = $actualQuantities['available_status']; // Barang siap pakai
-            $this->total_quantity = $actualQuantities['total_trackable'];
-            $this->last_updated = now();
-            $this->save();
-
-            // Log the sync
-            ActivityLog::logActivity(
-                'stocks',
-                $this->stock_id,
-                'sync_with_item_details',
-                $oldValues,
-                [
+                // Store old values for logging
+                $oldValues = [
                     'quantity_available' => $this->quantity_available,
                     'quantity_used' => $this->quantity_used,
                     'total_quantity' => $this->total_quantity,
-                    'sync_method' => 'auto',
-                    'item_details_breakdown' => $actualQuantities['detailed']
-                ]
-            );
+                ];
 
-            return [
-                'success' => true,
-                'old_values' => $oldValues,
-                'new_values' => [
-                    'quantity_available' => $this->quantity_available,
-                    'quantity_used' => $this->quantity_used,
-                    'total_quantity' => $this->total_quantity
-                ],
-                'changes' => [
-                    'available_diff' => $this->quantity_available - $oldValues['quantity_available'],
-                    'used_diff' => $this->quantity_used - $oldValues['quantity_used'],
-                    'total_diff' => $this->total_quantity - $oldValues['total_quantity'],
-                ],
-                'breakdown' => $actualQuantities['detailed']
-            ];
+                // ✅ FIXED: Update stock berdasarkan status item_details
+                $this->quantity_available = $actualQuantities['stock_status']; // status 'stock'
+                $this->quantity_used = $actualQuantities['available_status']; // status 'available'
+                $this->total_quantity = $actualQuantities['total_trackable'];
+                $this->last_updated = now();
+                $this->save();
+
+                // Verify update berhasil
+                $this->refresh();
+
+                Log::info('Stock synced successfully', [
+                    'stock_id' => $this->stock_id,
+                    'item_code' => $item->item_code,
+                    'changes' => [
+                        'available_diff' => $this->quantity_available - $oldValues['quantity_available'],
+                        'used_diff' => $this->quantity_used - $oldValues['quantity_used'],
+                        'total_diff' => $this->total_quantity - $oldValues['total_quantity'],
+                    ],
+                    'breakdown' => $actualQuantities['detailed']
+                ]);
+
+                return [
+                    'success' => true,
+                    'old_values' => $oldValues,
+                    'new_values' => [
+                        'quantity_available' => $this->quantity_available,
+                        'quantity_used' => $this->quantity_used,
+                        'total_quantity' => $this->total_quantity
+                    ],
+                    'changes' => [
+                        'available_diff' => $this->quantity_available - $oldValues['quantity_available'],
+                        'used_diff' => $this->quantity_used - $oldValues['quantity_used'],
+                        'total_diff' => $this->total_quantity - $oldValues['total_quantity'],
+                    ],
+                    'breakdown' => $actualQuantities['detailed']
+                ];
+            });
         } catch (\Exception $e) {
-            Log::error('Failed to sync stock with item details: ' . $e->getMessage());
+            Log::error('Sync failed', [
+                'stock_id' => $this->stock_id,
+                'error' => $e->getMessage()
+            ]);
             return [
                 'success' => false,
                 'message' => $e->getMessage()
@@ -104,6 +112,215 @@ class Stock extends Model
         }
     }
 
+    /**
+     * FIXED: Calculate quantities dengan fresh DB query
+     */
+    private function calculateActualQuantitiesFromItemDetailsFixed(Item $item): array
+    {
+        // ✅ FIXED: Direct DB query untuk hindari cache
+        $itemDetails = DB::table('item_details')
+            ->where('item_id', $item->item_id)
+            ->select('detail_id', 'serial_number', 'status')
+            ->get();
+
+        $quantities = [
+            'stock' => 0,      // status 'stock' = di gudang
+            'available' => 0,  // status 'available' = siap pakai
+            'used' => 0,       // status 'used' = sedang digunakan
+            'damaged' => 0,    // status 'damaged'
+            'maintenance' => 0, // status 'maintenance'
+            'reserved' => 0,   // status 'reserved'
+            'repair' => 0,     // status 'repair'
+            'lost' => 0,       // status 'lost'
+            'total' => 0
+        ];
+
+        $serialNumbers = [
+            'stock' => [],
+            'available' => [],
+            'others' => []
+        ];
+
+        foreach ($itemDetails as $detail) {
+            $status = $detail->status;
+
+            // Count by exact status
+            if (isset($quantities[$status])) {
+                $quantities[$status]++;
+            }
+
+            // Track serial numbers
+            if ($status === 'stock') {
+                $serialNumbers['stock'][] = $detail->serial_number;
+            } elseif ($status === 'available') {
+                $serialNumbers['available'][] = $detail->serial_number;
+            } else {
+                $serialNumbers['others'][] = $detail->serial_number . '(' . $status . ')';
+            }
+
+            // Total count (exclude lost/damaged)
+            if (!in_array($status, ['lost', 'damaged'])) {
+                $quantities['total']++;
+            }
+        }
+
+        // ✅ FIXED: Proper mapping sesuai konsep Anda
+        $result = [
+            'stock_status' => $quantities['stock'],        // quantity_available = barang di gudang
+            'available_status' => $quantities['available'], // quantity_used = barang siap pakai
+            'total_trackable' => $quantities['stock'] + $quantities['available'],
+            'detailed' => $quantities,
+            'serial_numbers' => $serialNumbers
+        ];
+
+        Log::debug('Stock calculation from item details', [
+            'item_id' => $item->item_id,
+            'total_item_details' => $itemDetails->count(),
+            'breakdown_by_status' => $quantities,
+            'mapping' => [
+                'quantity_available' => $result['stock_status'] . ' (status=stock)',
+                'quantity_used' => $result['available_status'] . ' (status=available)'
+            ]
+        ]);
+
+        return $result;
+    }
+
+    /**
+     * FIXED: Enhanced validation
+     */
+    public function validateConsistencyFixed(): array
+    {
+        try {
+            $item = $this->item;
+            if (!$item) {
+                throw new \Exception('Item not found');
+            }
+
+            $actualQuantities = $this->calculateActualQuantitiesFromItemDetailsFixed($item);
+            $discrepancies = [];
+
+            // Check stock (quantity_available vs status 'stock')
+            if ($this->quantity_available !== $actualQuantities['stock_status']) {
+                $discrepancies[] = [
+                    'field' => 'quantity_available',
+                    'description' => 'Gudang: Stock Table vs Item Details status "stock"',
+                    'stock_table' => $this->quantity_available,
+                    'item_details' => $actualQuantities['stock_status'],
+                    'difference' => $this->quantity_available - $actualQuantities['stock_status']
+                ];
+            }
+
+            // Check available (quantity_used vs status 'available')
+            if ($this->quantity_used !== $actualQuantities['available_status']) {
+                $discrepancies[] = [
+                    'field' => 'quantity_used',
+                    'description' => 'Siap Pakai: Stock Table vs Item Details status "available"',
+                    'stock_table' => $this->quantity_used,
+                    'item_details' => $actualQuantities['available_status'],
+                    'difference' => $this->quantity_used - $actualQuantities['available_status']
+                ];
+            }
+
+            // Check total
+            $expectedTotal = $actualQuantities['stock_status'] + $actualQuantities['available_status'];
+            if ($this->total_quantity !== $expectedTotal) {
+                $discrepancies[] = [
+                    'field' => 'total_quantity',
+                    'description' => 'Total: Stock Table vs Expected',
+                    'stock_table' => $this->total_quantity,
+                    'item_details' => $expectedTotal,
+                    'difference' => $this->total_quantity - $expectedTotal
+                ];
+            }
+
+            return [
+                'consistent' => empty($discrepancies),
+                'message' => empty($discrepancies) ? 'Stock konsisten' : 'Stock tidak konsisten',
+                'actual_from_item_details' => $actualQuantities,
+                'current_stock_values' => [
+                    'quantity_available' => $this->quantity_available,
+                    'quantity_used' => $this->quantity_used,
+                    'total_quantity' => $this->total_quantity,
+                ],
+                'discrepancies' => $discrepancies,
+                'recommendations' => empty($discrepancies) ? [] : [
+                    'Use syncWithItemDetails() to fix inconsistencies',
+                    'Check item_details status values',
+                    'Verify transaction logs'
+                ]
+            ];
+        } catch (\Exception $e) {
+            return [
+                'consistent' => false,
+                'message' => 'Validation error: ' . $e->getMessage(),
+                'discrepancies' => [['error' => $e->getMessage()]]
+            ];
+        }
+    }
+
+    /**
+     * FIXED: Debug method untuk troubleshooting
+     */
+    public function debugSyncIssues(): array
+    {
+        try {
+            $item = $this->item;
+            if (!$item) {
+                return ['error' => 'Item not found'];
+            }
+
+            // Current stock values
+            $currentStock = [
+                'quantity_available' => $this->quantity_available,
+                'quantity_used' => $this->quantity_used,
+                'total_quantity' => $this->total_quantity
+            ];
+
+            // Fresh calculation
+            $actualQuantities = $this->calculateActualQuantitiesFromItemDetailsFixed($item);
+
+            // Validation
+            $validation = $this->validateConsistencyFixed();
+
+            // Recent changes in item_details
+            $recentChanges = DB::table('item_details')
+                ->where('item_id', $item->item_id)
+                ->where('updated_at', '>=', now()->subHours(24))
+                ->orderBy('updated_at', 'desc')
+                ->limit(10)
+                ->get(['detail_id', 'serial_number', 'status', 'updated_at']);
+
+            return [
+                'stock_id' => $this->stock_id,
+                'item_info' => [
+                    'item_id' => $item->item_id,
+                    'item_code' => $item->item_code,
+                    'item_name' => $item->item_name
+                ],
+                'current_stock_table' => $currentStock,
+                'calculated_from_item_details' => [
+                    'stock_status_count' => $actualQuantities['stock_status'],
+                    'available_status_count' => $actualQuantities['available_status'],
+                    'total_trackable' => $actualQuantities['total_trackable'],
+                    'detailed_breakdown' => $actualQuantities['detailed']
+                ],
+                'consistency_check' => $validation,
+                'recent_item_details_changes' => $recentChanges->toArray(),
+                'recommendations' => [
+                    'consistent' => $validation['consistent'],
+                    'action_needed' => !$validation['consistent'] ? 'Run syncWithItemDetails()' : 'No action needed',
+                    'sync_command' => '$stock->syncWithItemDetails()'
+                ],
+                'debug_timestamp' => now()
+            ];
+        } catch (\Exception $e) {
+            return [
+                'error' => $e->getMessage(),
+                'debug_failed' => true
+            ];
+        }
+    }
     /**
      * Calculate quantities berdasarkan status item_details
      * Konsep: stock=gudang (quantity_available), available=siap pakai (quantity_used)
@@ -572,64 +789,64 @@ class Stock extends Model
     //     ];
     // }
 
-/**
- * Get stock summary - UPDATED: Available = Sufficient only
- */
-public static function getStockSummary(): array
-{
-    $total = self::count();
+    /**
+     * Get stock summary - UPDATED: Available = Sufficient only
+     */
+    public static function getStockSummary(): array
+    {
+        $total = self::count();
 
-    // Get detailed stock status for each item
-    $stockItems = self::with('item')->get();
+        // Get detailed stock status for each item
+        $stockItems = self::with('item')->get();
 
-    $sufficient = 0;
-    $lowStock = 0;
-    $outOfStock = 0;
+        $sufficient = 0;
+        $lowStock = 0;
+        $outOfStock = 0;
 
-    foreach ($stockItems as $stock) {
-        $item = $stock->item;
-        $minStock = $item ? $item->min_stock : 0;
+        foreach ($stockItems as $stock) {
+            $item = $stock->item;
+            $minStock = $item ? $item->min_stock : 0;
 
-        // Determine stock status
-        if ($stock->total_quantity == 0 || $stock->quantity_available == 0) {
-            // Out of stock
-            $outOfStock++;
-        } elseif ($stock->quantity_available <= $minStock) {
-            // Low stock (available ada tapi <= minimum)
-            $lowStock++;
-        } else {
-            // Sufficient stock (available > minimum)
-            $sufficient++;
+            // Determine stock status
+            if ($stock->total_quantity == 0 || $stock->quantity_available == 0) {
+                // Out of stock
+                $outOfStock++;
+            } elseif ($stock->quantity_available <= $minStock) {
+                // Low stock (available ada tapi <= minimum)
+                $lowStock++;
+            } else {
+                // Sufficient stock (available > minimum)
+                $sufficient++;
+            }
         }
+
+        return [
+            'total_items' => $total,
+            'available_items' => $sufficient,           // ✅ CHANGED: Hanya yang sufficient
+            'sufficient_items' => $sufficient,          // Sama dengan available
+            'low_stock_items' => $lowStock,            // Yang stock rendah (tidak masuk available)
+            'out_of_stock_items' => $outOfStock,       // Yang stock habis
+
+            // Additional breakdown untuk debugging
+            'breakdown' => [
+                'sufficient' => $sufficient,
+                'low_stock' => $lowStock,
+                'out_of_stock' => $outOfStock,
+                'total_check' => $sufficient + $lowStock + $outOfStock, // Harus = total
+            ]
+        ];
     }
 
-    return [
-        'total_items' => $total,
-        'available_items' => $sufficient,           // ✅ CHANGED: Hanya yang sufficient
-        'sufficient_items' => $sufficient,          // Sama dengan available
-        'low_stock_items' => $lowStock,            // Yang stock rendah (tidak masuk available)
-        'out_of_stock_items' => $outOfStock,       // Yang stock habis
-
-        // Additional breakdown untuk debugging
-        'breakdown' => [
-            'sufficient' => $sufficient,
-            'low_stock' => $lowStock,
-            'out_of_stock' => $outOfStock,
-            'total_check' => $sufficient + $lowStock + $outOfStock, // Harus = total
-        ]
-    ];
-}
-
-/**
- * Updated available scope - hanya yang sufficient
- */
-public function scopeAvailable($query)
-{
-    return $query->whereHas('item', function ($q) {
-        $q->whereRaw('stocks.quantity_available > items.min_stock'); // ✅ CHANGED: > min_stock
-    })
-    ->where('quantity_available', '>', 0);
-}
+    /**
+     * Updated available scope - hanya yang sufficient
+     */
+    public function scopeAvailable($query)
+    {
+        return $query->whereHas('item', function ($q) {
+            $q->whereRaw('stocks.quantity_available > items.min_stock'); // ✅ CHANGED: > min_stock
+        })
+            ->where('quantity_available', '>', 0);
+    }
     /**
      * Enhanced method untuk debugging stock issues
      */
