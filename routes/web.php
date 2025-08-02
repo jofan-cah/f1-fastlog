@@ -333,6 +333,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/api/goods-received/validate-serial-number', [GoodsReceivedController::class, 'validateSerialNumber'])->name('validate-serial-number');
     });
 
+
+
     Route::middleware('permission:goods_receiveds,read')->group(function () {
         Route::get('/goods-received', [GoodsReceivedController::class, 'index'])->name('goods-received.index');
         Route::get('/goods-received/{goodsReceived}', [GoodsReceivedController::class, 'show'])->name('goods-received.show');
@@ -350,6 +352,22 @@ Route::middleware('auth')->group(function () {
     // Goods Received API
     Route::prefix('api/goods-received')->name('api.goods-received.')->group(function () {
         Route::get('/po-details/{po}', [GoodsReceivedController::class, 'getPODetails'])->name('po-details');
+    });
+    Route::prefix('api/goods-received')->group(function () {
+    // Serial Number Management
+    Route::get('serial-number-template', [GoodsReceivedController::class, 'getSerialNumberTemplate'])
+        ->name('api.goods-received.serial-template');
+
+    Route::post('validate-serial-number', [GoodsReceivedController::class, 'validateSerialNumber'])
+        ->name('api.goods-received.validate-serial');
+
+    Route::post('bulk-validate-serial-numbers', [GoodsReceivedController::class, 'bulkValidateSerialNumbers'])
+        ->name('api.goods-received.bulk-validate-serials');
+
+    Route::get('serial-number-stats', [GoodsReceivedController::class, 'getSerialNumberStats'])
+        ->name('api.goods-received.serial-stats');
+
+
     });
 
     // ================================================================
