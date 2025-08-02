@@ -355,7 +355,7 @@ Route::middleware('auth')->group(function () {
     });
     Route::prefix('api/goods-received')->group(function () {
     // Serial Number Management
-    Route::get('serial-number-template', [GoodsReceivedController::class, 'getSerialNumberTemplate'])
+    Route::post('serial-number-template', [GoodsReceivedController::class, 'getSerialNumberTemplate'])
         ->name('api.goods-received.serial-template');
 
     Route::post('validate-serial-number', [GoodsReceivedController::class, 'validateSerialNumber'])
