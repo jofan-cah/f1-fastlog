@@ -465,7 +465,7 @@ public function bulkValidateSerialNumbers(Request $request)
             ], 400);
         }
 
-        if (count($serialNumbers) > 100) {
+        if (count($serialNumbers) > 1000) {
             return response()->json([
                 'success' => false,
                 'message' => 'Maksimal 100 serial numbers per batch'
@@ -1735,7 +1735,7 @@ public function getSerialNumberTemplate(Request $request)
             ], 400);
         }
 
-        if ($quantity > 100) {
+        if ($quantity > 1000) {
             return response()->json([
                 'success' => false,
                 'message' => 'Maksimal 100 serial numbers per request'
