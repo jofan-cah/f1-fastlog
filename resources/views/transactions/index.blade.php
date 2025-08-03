@@ -281,14 +281,14 @@
                                             class="text-blue-600 hover:text-blue-900">
                                             <i class="fas fa-eye"></i>
                                         </a>
-                                        <button x-show="transaction.can_edit" @click="editTransaction(transaction.id)"
+                                        {{-- <button x-show="transaction.can_edit" @click="editTransaction(transaction.id)"
                                             class="text-yellow-600 hover:text-yellow-900">
                                             <i class="fas fa-edit"></i>
                                         </button>
                                         <button x-show="transaction.can_approve" @click="quickApprove(transaction.id)"
                                             class="text-green-600 hover:text-green-900">
                                             <i class="fas fa-check"></i>
-                                        </button>
+                                        </button> --}}
                                     </div>
                                 </td>
                             </tr>

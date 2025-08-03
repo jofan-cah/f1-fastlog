@@ -101,7 +101,7 @@
                                 <label for="transaction_type" class="block text-sm font-medium text-gray-700 mb-2">
                                     Tipe Transaksi <span class="text-red-500">*</span>
                                 </label>
-                                <select id="transaction_type" name="transaction_type"
+                                <select  disabled id="transaction_type" name="transaction_type"
                                     x-model="formData.transaction_type"
                                     @change="updateLocationSuggestion()"
                                     class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all @error('transaction_type') border-red-500 @enderror"
@@ -109,7 +109,7 @@
                                     @foreach($allowedTypes as $value => $label)
                                         <option value="{{ $value }}"
                                                 {{ old('transaction_type', $transaction->transaction_type) == $value ? 'selected' : '' }}>
-                                            {{ $label }}
+                                            {{ $transaction->transaction_type }}
                                         </option>
                                     @endforeach
                                 </select>
