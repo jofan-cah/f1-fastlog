@@ -354,17 +354,28 @@
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span
                                         class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $statusInfo['class'] }}">
+                                        @php
+                                            $labels = [
+                                                'stock' => 'Stock',
+                                                'available' => 'Ready To Use',
+                                                'used' => 'Used',
+                                                'damaged' => 'Faulty',
+                                                'maintenance' => 'Service',
+                                                'reserved' => 'Booking',
+                                            ];
+                                        @endphp
+
                                         <span
                                             class="w-1.5 h-1.5 rounded-full mr-1.5
-                                            {{ $itemDetail->status == 'available'
-                                                ? 'bg-green-400'
-                                                : ($itemDetail->status == 'damaged'
-                                                    ? 'bg-red-400'
-                                                    : ($itemDetail->status == 'maintenance'
-                                                        ? 'bg-yellow-400'
-                                                        : 'bg-blue-400')) }}"></span>
-                                        {{ $statusInfo['text'] }}
-                                    </span>
+    {{ $itemDetail->status == 'available'
+        ? 'bg-green-400'
+        : ($itemDetail->status == 'damaged'
+            ? 'bg-red-400'
+            : ($itemDetail->status == 'maintenance'
+                ? 'bg-yellow-400'
+                : 'bg-blue-400')) }}"></span>
+                                        {{ $labels[$itemDetail->status] ?? ucfirst($itemDetail->status) }}
+
                                 </td>
                                 <!-- Alternative: Simplified Badge Version -->
                                 <td class="px-6 py-4 whitespace-nowrap">
