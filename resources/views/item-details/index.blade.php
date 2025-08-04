@@ -50,7 +50,7 @@
                         <i class="fas fa-check-circle text-white text-lg"></i>
                     </div>
                     <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Tersedia</p>
+                        <p class="text-sm font-medium text-gray-600">Ready to Use</p>
                         <p class="text-2xl font-bold text-gray-900">
                             {{ $totalByStatus['available'] ?? 0 }}
                         </p>
@@ -65,7 +65,7 @@
                         <i class="fas fa-tools text-white text-lg"></i>
                     </div>
                     <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Terpakai</p>
+                        <p class="text-sm font-medium text-gray-600">Used</p>
                         <p class="text-2xl font-bold text-gray-900">
 
                             {{ $totalByStatus['used'] ?? 0 }}
@@ -81,7 +81,7 @@
                         <i class="fas fa-exclamation-triangle text-white text-lg"></i>
                     </div>
                     <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Rusak</p>
+                        <p class="text-sm font-medium text-gray-600">Faulty</p>
                         <p class="text-2xl font-bold text-gray-900">
                             {{ $totalByStatus['damaged'] ?? 0 }}
 
@@ -97,7 +97,7 @@
                         <i class="fas fa-wrench text-white text-lg"></i>
                     </div>
                     <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Maintenance</p>
+                        <p class="text-sm font-medium text-gray-600">Service</p>
                         <p class="text-2xl font-bold text-gray-900">
                             {{ $totalByStatus['maintenance'] ?? 0 }}
                         </p>
