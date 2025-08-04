@@ -394,8 +394,8 @@
                 <div x-show="['IN', 'OUT', 'RETURN'].includes(form.transaction_type)">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Kondisi Barang</label>
                     <select x-model="form.kondisi" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500">
-                        <option value="good">Good - Kondisi baik</option>
-                        <option value="no_good">No Good - Kondisi rusak/tidak baik</option>
+                        <option value="good">Normal</option>
+                        <option value="no_good">Observasi </option>
                     </select>
                 </div>
 
