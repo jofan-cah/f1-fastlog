@@ -777,6 +777,10 @@
                 <label class="block text-sm font-medium text-gray-700 mb-1">Reference ID</label>
                 <div class="p-3 bg-gray-50 rounded-xl border space-y-2">
                     <div class="text-sm">
+                        <span class="font-medium">ID Ticket:</span>
+                        <span class="font-mono text-gray-900">${ticket.ticket_id}</span>
+                    </div>
+                    <div class="text-sm">
                         <span class="font-medium">Jenis Tiket:</span>
                         <span class="font-mono text-gray-900">${ticket.jenis_tiket}</span>
                     </div>
