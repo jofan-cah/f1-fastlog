@@ -80,6 +80,8 @@
     </div>
 </div>
 
+@if(auth::user()->user_level_id !== 'LVL003');
+
 <!-- Alert Section -->
 @if($lowStockAlerts['total_low_stock'] > 0)
 <div class="bg-red-50 border-l-4 border-red-500 p-6 rounded-2xl mb-8">
@@ -111,75 +113,14 @@
 </div>
 @endif
 
-<!-- Quick Actions -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mb-8">
-    <!-- Scan QR Code -->
-    {{-- <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300">
-        <div class="flex items-center space-x-4 mb-4">
-            <div class="w-12 h-12 gradient-dark rounded-xl flex items-center justify-center">
-                <i class="fas fa-qrcode text-white text-lg"></i>
-            </div>
-            <h3 class="text-lg font-semibold text-gray-900">Scan QR Code</h3>
-        </div>
-        <p class="text-gray-600 mb-4">Scan kode QR untuk tracking barang dengan cepat</p>
-        <a href="" class="block w-full py-2 bg-gray-800 text-white text-center rounded-lg hover:bg-gray-900 transition-colors">
-            Buka Scanner
-        </a>
-    </div> --}}
 
-    <!-- Buat PO Baru -->
-    <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300">
-        <div class="flex items-center space-x-4 mb-4">
-            <div class="w-12 h-12 gradient-red rounded-xl flex items-center justify-center">
-                <i class="fas fa-plus-circle text-white text-lg"></i>
-            </div>
-            <h3 class="text-lg font-semibold text-gray-900">Buat PO Baru</h3>
-        </div>
-        <p class="text-gray-600 mb-4">Buat purchase order untuk pengadaan barang</p>
-        <a href="{{ route('purchase-orders.create') }}" class="block w-full py-2 bg-red-600 text-white text-center rounded-lg hover:bg-red-700 transition-colors">
-            Buat PO
-        </a>
-    </div>
 
-    <!-- Transaksi Baru -->
-    <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300">
-        <div class="flex items-center space-x-4 mb-4">
-            <div class="w-12 h-12 gradient-gray rounded-xl flex items-center justify-center">
-                <i class="fas fa-exchange-alt text-white text-lg"></i>
-            </div>
-            <h3 class="text-lg font-semibold text-gray-900">Transaksi Baru</h3>
-        </div>
-        <p class="text-gray-600 mb-4">Buat transaksi barang masuk atau keluar</p>
-        <a href="{{ route('transactions.create') }}" class="block w-full py-2 bg-gray-600 text-white text-center rounded-lg hover:bg-gray-700 transition-colors">
-            Buat Transaksi
-        </a>
-    </div>
-
-    <!-- Laporan -->
-    {{-- <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300">
-        <div class="flex items-center space-x-4 mb-4">
-            <div class="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
-                <i class="fas fa-chart-bar text-white text-lg"></i>
-            </div>
-            <h3 class="text-lg font-semibold text-gray-900">Laporan</h3>
-        </div>
-        <p class="text-gray-600 mb-4">Lihat laporan detail stok dan transaksi</p>
-        <a href="" class="block w-full py-2 bg-blue-600 text-white text-center rounded-lg hover:bg-blue-700 transition-colors">
-            Lihat Laporan
-        </a>
-    </div> --}}
-</div>
 
 <!-- Content Grid -->
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
     <!-- Recent Transactions -->
     <div class="lg:col-span-2 bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
-        <div class="flex items-center justify-between mb-6">
-            <h3 class="text-xl font-semibold text-gray-900">Transaksi Terbaru</h3>
-            <a href="{{ route('transactions.index') }}" class="text-red-600 hover:text-red-700 font-medium">
-                Lihat Semua
-            </a>
-        </div>
+
 
         <div class="overflow-x-auto">
             <table class="w-full">
@@ -362,6 +303,8 @@
         @endforeach
     </div>
 </div>
+
+@endif
 @endsection
 
 @push('styles')
