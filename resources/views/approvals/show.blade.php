@@ -471,7 +471,7 @@
                     element.innerHTML = `
                 <div>
                     <span class="text-sm text-gray-600">Reference ID:</span>
-                    <p class="text-sm font-medium text-gray-900">${referenceId} - ${ticket.jenis_tiket}<br>${ticket.customer_id} - ${ticket.nama_pelanggan}</p>
+                    <p class="text-sm font-medium text-gray-900">${referenceId} - ${ticket.jenis_tiket}<br>${ticket.subscription_id} - ${ticket.nama_pelanggan}</p>
                 </div>
             `;
                 }

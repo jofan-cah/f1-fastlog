@@ -782,7 +782,7 @@
                     </div>
                     <div class="text-sm">
                         <span class="font-medium">ID Pelanggan:</span>
-                        <span class="font-mono text-gray-900">${ticket.customer_id}</span>
+                        <span class="font-mono text-gray-900">${ticket.subscription_id}</span>
                     </div>
                     <div class="text-sm">
                         <span class="font-medium">Nama Pelanggan:</span>
@@ -798,7 +798,7 @@
             }
         }
 
-      
+
         // Keyboard shortcuts
         document.addEventListener('DOMContentLoaded', function() {
             document.addEventListener('keydown', function(e) {
