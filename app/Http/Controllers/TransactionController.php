@@ -689,8 +689,9 @@ class TransactionController extends Controller
      */
     public function edit(Transaction $transaction)
     {
+        // dd(auth()->user()->userLevel->level_name);
         // Check permission - only creator can edit pending transactions
-        if ($transaction->created_by !== auth()->id() || $transaction->status !== Transaction::STATUS_PENDING) {
+        if (auth()->user()->userLevel->level_name !== 'Admin' && auth()->user()->userLevel->level_name !== 'Logistik' ) {
             abort(403, 'Cannot edit this transaction');
         }
 
