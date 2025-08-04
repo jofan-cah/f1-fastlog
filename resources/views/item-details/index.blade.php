@@ -97,7 +97,7 @@
                         <i class="fas fa-wrench text-white text-lg"></i>
                     </div>
                     <div class="ml-4">
-                        <p class="text-sm font-medium text-gray-600">Service</p>
+                        <p class="text-sm font-medium text-gray-600">Servicef</p>
                         <p class="text-2xl font-bold text-gray-900">
                             {{ $totalByStatus['maintenance'] ?? 0 }}
                         </p>
