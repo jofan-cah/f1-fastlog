@@ -168,7 +168,7 @@
                     @endif
 
                     @if ($transaction->reference_id)
-                        <div>
+                        <div data-reference-id="{{ $transaction->reference_id }}">
                             <span class="text-sm text-gray-600">Reference ID:</span>
                             <p class="text-sm font-medium text-gray-900">{{ $transaction->reference_id }}</p>
                         </div>
@@ -443,6 +443,45 @@
 
 @push('scripts')
     <script>
+        // Config API URL
+        const API_BASE_URL = 'https://befast.fiberone.net.id';
+
+        // Auto search ketika page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Cari semua element yang ada reference_id
+            const referenceElements = document.querySelectorAll('[data-reference-id]');
+
+            referenceElements.forEach(element => {
+                const referenceId = element.getAttribute('data-reference-id');
+                if (referenceId) {
+                    searchAndReplaceReferenceId(element, referenceId);
+                }
+            });
+        });
+
+        async function searchAndReplaceReferenceId(element, referenceId) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/ticket/find/${referenceId}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    const ticket = result.data;
+
+                    // Replace isi element dengan format inline (ID - Keterangan)
+                    element.innerHTML = `
+                <div>
+                    <span class="text-sm text-gray-600">Reference ID:</span>
+                    <p class="text-sm font-medium text-gray-900">${referenceId} - ${ticket.jenis_tiket}<br>${ticket.customer_id} - ${ticket.nama_pelanggan}</p>
+                </div>
+            `;
+                }
+                // Kalau gagal, biarkan tetap tampil reference_id asli dengan format yang sama
+            } catch (error) {
+                console.error('Error fetching ticket data:', error);
+                // Kalau error, biarkan tetap tampil reference_id asli
+            }
+        }
+
         function transactionDetail() {
             return {
                 processing: false,

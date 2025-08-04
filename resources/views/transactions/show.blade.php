@@ -147,7 +147,7 @@
                             @endif
 
                             @if ($transaction->reference_id)
-                                <div>
+                                <div data-reference-id="{{ $transaction->reference_id }}">
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Reference ID</label>
                                     <div class="p-3 bg-gray-50 rounded-xl border">
                                         <span
@@ -747,7 +747,58 @@
                 }
             }
         }
+        // Config API URL
+        // Config API URL
+        const API_BASE_URL = 'https://befast.fiberone.net.id';
 
+        // Auto search ketika page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Cari semua element yang ada reference_id
+            const referenceElements = document.querySelectorAll('[data-reference-id]');
+
+            referenceElements.forEach(element => {
+                const referenceId = element.getAttribute('data-reference-id');
+                if (referenceId) {
+                    searchAndReplaceReferenceId(element, referenceId);
+                }
+            });
+        });
+
+        async function searchAndReplaceReferenceId(element, referenceId) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/ticket/find/${referenceId}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    const ticket = result.data;
+
+                    // Replace isi element dengan data dari API
+                    element.innerHTML = `
+                <label class="block text-sm font-medium text-gray-700 mb-1">Reference ID</label>
+                <div class="p-3 bg-gray-50 rounded-xl border space-y-2">
+                    <div class="text-sm">
+                        <span class="font-medium">Jenis Tiket:</span>
+                        <span class="font-mono text-gray-900">${ticket.jenis_tiket}</span>
+                    </div>
+                    <div class="text-sm">
+                        <span class="font-medium">ID Pelanggan:</span>
+                        <span class="font-mono text-gray-900">${ticket.customer_id}</span>
+                    </div>
+                    <div class="text-sm">
+                        <span class="font-medium">Nama Pelanggan:</span>
+                        <span class="font-mono text-gray-900">${ticket.nama_pelanggan}</span>
+                    </div>
+                </div>
+            `;
+                }
+                // Kalau gagal, biarkan tetap tampil reference_id asli
+            } catch (error) {
+                console.error('Error fetching ticket data:', error);
+                // Kalau error, biarkan tetap tampil reference_id asli
+            }
+        }
+
+      
         // Keyboard shortcuts
         document.addEventListener('DOMContentLoaded', function() {
             document.addEventListener('keydown', function(e) {
