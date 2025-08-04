@@ -145,14 +145,14 @@ class TransactionDetail extends Model
                 return [
                     'impact' => 'positive',
                     'text' => 'Peningkatan Status',
-                    'icon' => 'fas fa-arrow-up',
+                    'icon' => 'fas fa-arrow-right',
                     'class' => 'text-green-600'
                 ];
             case 'negative':
                 return [
                     'impact' => 'negative',
                     'text' => 'Penurunan Status',
-                    'icon' => 'fas fa-arrow-down',
+                    'icon' => 'fas fa-arrow-right',
                     'class' => 'text-red-600'
                 ];
             case 'neutral':

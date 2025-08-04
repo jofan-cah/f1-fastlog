@@ -85,8 +85,12 @@ class ItemDetailController extends Controller
         if (!in_array($perPage, $allowedPerPage)) {
             $perPage = 25;
         }
+        $totalByStatus = ItemDetail::selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
 
         $itemDetails = $query->orderBy('created_at', 'desc')->paginate($perPage);
+
         $itemDetails->appends($request->query());
 
         // Filter options
@@ -119,7 +123,8 @@ class ItemDetailController extends Controller
             'kondisiOptions',
             'poNumbers',
             'perPageOptions',
-            'perPage'
+            'perPage',
+            'totalByStatus'
         ));
     }
     // Tampilkan detail item

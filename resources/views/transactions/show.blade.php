@@ -163,7 +163,7 @@
                                         item(s)</span>
                                 </div>
                             </div>
-                          
+
                         </div>
 
                         @if ($transaction->notes)
@@ -404,8 +404,6 @@
                         </div>
                     </div>
                 </div>
-
-
 
                 <!-- Transaction Summary -->
                 <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">

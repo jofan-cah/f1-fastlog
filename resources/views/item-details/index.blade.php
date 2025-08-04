@@ -52,7 +52,8 @@
                     <div class="ml-4">
                         <p class="text-sm font-medium text-gray-600">Tersedia</p>
                         <p class="text-2xl font-bold text-gray-900">
-                            {{ $itemDetails->where('status', 'available')->count() }}</p>
+                            {{ $totalByStatus['available'] ?? 0 }}
+                        </p>
                     </div>
                 </div>
             </div>
@@ -65,7 +66,10 @@
                     </div>
                     <div class="ml-4">
                         <p class="text-sm font-medium text-gray-600">Terpakai</p>
-                        <p class="text-2xl font-bold text-gray-900">{{ $itemDetails->where('status', 'used')->count() }}</p>
+                        <p class="text-2xl font-bold text-gray-900">
+
+                            {{ $totalByStatus['used'] ?? 0 }}
+                        </p>
                     </div>
                 </div>
             </div>
@@ -78,7 +82,9 @@
                     </div>
                     <div class="ml-4">
                         <p class="text-sm font-medium text-gray-600">Rusak</p>
-                        <p class="text-2xl font-bold text-gray-900">{{ $itemDetails->where('status', 'damaged')->count() }}
+                        <p class="text-2xl font-bold text-gray-900">
+                            {{ $totalByStatus['damaged'] ?? 0 }}
+
                         </p>
                     </div>
                 </div>
@@ -93,7 +99,8 @@
                     <div class="ml-4">
                         <p class="text-sm font-medium text-gray-600">Maintenance</p>
                         <p class="text-2xl font-bold text-gray-900">
-                            {{ $itemDetails->where('status', 'maintenance')->count() }}</p>
+                            {{ $totalByStatus['maintenance'] ?? 0 }}
+                        </p>
                     </div>
                 </div>
             </div>
@@ -172,23 +179,23 @@
                                         @break
 
                                         @case('available')
-                                            Tersedia
+                                            Ready To Use
                                         @break
 
                                         @case('used')
-                                            Terpakai
+                                            Used
                                         @break
 
                                         @case('damaged')
-                                            Rusak
+                                            Faulty
                                         @break
 
                                         @case('maintenance')
-                                            Maintenance
+                                            Service
                                         @break
 
                                         @case('reserved')
-                                            Reserved
+                                            Booking
                                         @break
 
                                         @default
@@ -217,18 +224,18 @@
 
                 <!-- Filter by PO -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <!-- TAMBAHKAN: Per Page Filter -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Per Halaman</label>
-                    <select name="per_page"
-                        class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
-                        @foreach ($perPageOptions as $option)
-                            <option value="{{ $option }}" {{ $perPage == $option ? 'selected' : '' }}>
-                                {{ $option }} items
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
+                    <!-- TAMBAHKAN: Per Page Filter -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Per Halaman</label>
+                        <select name="per_page"
+                            class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+                            @foreach ($perPageOptions as $option)
+                                <option value="{{ $option }}" {{ $perPage == $option ? 'selected' : '' }}>
+                                    {{ $option }} items
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Tanggal Mulai</label>
                         <input type="date" name="start_date" value="{{ request('start_date') }}"
@@ -292,10 +299,10 @@
                                 Status
                             </th>
                             <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                               Kondisi
+                                Kondisi
                             </th>
                             <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                 Lokasi
+                                Lokasi
                             </th>
                             <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 PO / Received Date
@@ -361,7 +368,7 @@
                                 </td>
                                 <!-- Alternative: Simplified Badge Version -->
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    @if ($itemDetail->kondisi == 'good' || $itemDetail->kondisi=== null)
+                                    @if ($itemDetail->kondisi == 'good' || $itemDetail->kondisi === null)
                                         <span
                                             class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                             <span class="w-1.5 h-1.5 bg-green-400 rounded-full mr-1.5"></span>
