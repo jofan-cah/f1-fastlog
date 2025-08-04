@@ -36,8 +36,8 @@
                     <span class="text-white text-sm font-medium">A</span>
                 </div>
                 <div class="hidden md:block">
-                    <p class="text-sm font-medium text-gray-900">{{ Auth::user()->name ?? 'Admin User' }}</p>
-                    <p class="text-xs text-gray-500">{{ Auth::user()->role ?? 'Super Admin' }}</p>
+                    <p class="text-sm font-medium text-gray-900">{{ Auth::user()->username ?? 'Admin User' }}</p>
+                    <p class="text-xs text-gray-500">{{ Auth::user()->user_level_id->level_name ?? 'Super Admin' }}</p>
                 </div>
 
                 <!-- Dropdown Menu -->
