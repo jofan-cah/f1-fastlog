@@ -30,6 +30,8 @@ class ItemDetail extends Model
     protected $casts = [
         'custom_attributes' => 'array',
     ];
+    const STATUS_DAMAGED = 'damaged';
+
 
     // Relationship: ItemDetail belongs to GoodsReceivedDetail
     public function goodsReceivedDetail(): BelongsTo
@@ -86,6 +88,50 @@ class ItemDetail extends Model
         ];
 
         return $statuses[$this->status] ?? $statuses['available'];
+    }
+
+    // Helper methods untuk damaged
+    public function isDamaged(): bool
+    {
+        return $this->status === self::STATUS_DAMAGED;
+    }
+
+    public function canBeRepaired(): bool
+    {
+        return in_array($this->status, [self::STATUS_DAMAGED, 'repair']);
+    }
+
+    public function getDamageInfo(): ?array
+    {
+        if (!$this->isDamaged()) {
+            return null;
+        }
+
+        // Cari transaction DAMAGED terakhir untuk item ini
+        $damageTransaction = Transaction::where('transaction_type', Transaction::TYPE_DAMAGED)
+            ->whereHas('transactionDetails', function ($query) {
+                $query->where('item_detail_id', $this->item_detail_id);
+            })
+            ->latest()
+            ->first();
+
+        if (!$damageTransaction) {
+            return [
+                'damage_level' => 'unknown',
+                'damage_reason' => 'unknown',
+                'damage_date' => null,
+                'repair_estimate' => null
+            ];
+        }
+
+        return [
+            'damage_level' => $damageTransaction->damage_level,
+            'damage_reason' => $damageTransaction->damage_reason,
+            'damage_date' => $damageTransaction->transaction_date,
+            'repair_estimate' => $damageTransaction->repair_estimate,
+            'transaction_id' => $damageTransaction->transaction_id,
+            'level_info' => $damageTransaction->getDamageLevelInfo()
+        ];
     }
 
     // Helper method: Check if item is available

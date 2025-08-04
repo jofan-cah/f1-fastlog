@@ -25,22 +25,21 @@ class TransactionController extends Controller
         $currentType = $request->get('type');
         $allowedTypes = Transaction::getUserAllowedTypes();
 
-        // ✅ NEW: Get search and filter parameters including date
+        // Get search and filter parameters including date
         $search = $request->get('search');
         $statusFilter = $request->get('status');
         $dateFrom = $request->get('date_from');
         $dateTo = $request->get('date_to');
 
-        // ✅ SUPER SIMPLE: LVL003 hanya boleh IN dan OUT
+        // Check user level untuk filtering menu
         $user = auth()->user();
         $userLevel = $user->userLevel->level_name ?? '';
-        // dd($userLevel);
 
         if ($userLevel == 'Teknisi' && $currentType && !in_array($currentType, ['IN', 'OUT'])) {
             return redirect()->route('dashboard');
         }
 
-        // Define transaction type configurations
+        // ✅ UPDATED: Define transaction type configurations - TAMBAH DAMAGED
         $typeConfigs = [
             'IN' => [
                 'text' => 'Barang Masuk',
@@ -63,10 +62,17 @@ class TransactionController extends Controller
                 'gradient' => 'from-yellow-600 to-yellow-700',
                 'class' => 'bg-yellow-100 text-yellow-800'
             ],
+            'DAMAGED' => [  // 🆕 BARU
+                'text' => 'Barang Rusak',
+                'description' => 'Kelola transaksi barang yang rusak',
+                'icon' => 'fas fa-exclamation-triangle',
+                'gradient' => 'from-orange-600 to-orange-700',
+                'class' => 'bg-orange-100 text-orange-800'
+            ],
             'LOST' => [
                 'text' => 'Barang Hilang',
                 'description' => 'Kelola transaksi barang yang hilang',
-                'icon' => 'fas fa-exclamation-triangle',
+                'icon' => 'fas fa-question-circle',
                 'gradient' => 'from-red-600 to-red-700',
                 'class' => 'bg-red-100 text-red-800'
             ],
@@ -85,7 +91,7 @@ class TransactionController extends Controller
         // Build query
         $query = Transaction::with(['item', 'createdBy', 'approvedBy']);
 
-        // ✅ FIXED: Teknisi tidak bisa lihat transaksi
+        // FIXED: Teknisi tidak bisa lihat transaksi
         if (auth()->user()->userLevel && strtolower(auth()->user()->userLevel->level_name) === 'teknisi') {
             $query->whereRaw('1 = 0'); // Empty result for teknisi
         }
@@ -95,7 +101,7 @@ class TransactionController extends Controller
             $query->where('transaction_type', $currentType);
         }
 
-        // ✅ NEW: Apply search filter
+        // Apply search filter
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('transaction_number', 'like', "%{$search}%")
@@ -109,12 +115,12 @@ class TransactionController extends Controller
             });
         }
 
-        // ✅ NEW: Apply status filter
+        // Apply status filter
         if ($statusFilter) {
             $query->where('status', $statusFilter);
         }
 
-        // ✅ NEW: Apply date filters
+        // Apply date filters
         if ($dateFrom) {
             $query->whereDate('transaction_date', '>=', $dateFrom);
         }
@@ -123,14 +129,14 @@ class TransactionController extends Controller
             $query->whereDate('transaction_date', '<=', $dateTo);
         }
 
-        // Get transactions
+        // Get transactions dengan enhanced data untuk DAMAGED
         $transactions = $query->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($transaction) {
                 $typeInfo = $transaction->getTypeInfo();
                 $statusInfo = $transaction->getStatusInfo();
 
-                return [
+                $baseData = [
                     'id' => $transaction->transaction_id,
                     'transaction_number' => $transaction->transaction_number,
                     'transaction_type' => $transaction->transaction_type,
@@ -157,9 +163,24 @@ class TransactionController extends Controller
                     'can_approve' => Transaction::canUserApprove() && $transaction->status === Transaction::STATUS_PENDING,
                     'can_cancel' => $transaction->created_by === auth()->id() && $transaction->canBeCancelled(),
                 ];
+
+                // ✅ ENHANCED: Add damage info untuk DAMAGED transactions
+                if ($transaction->transaction_type === Transaction::TYPE_DAMAGED) {
+                    $damageInfo = $transaction->getDamageLevelInfo();
+                    $baseData['damage_info'] = [
+                        'level' => $transaction->damage_level,
+                        'reason' => $transaction->damage_reason,
+                        'level_text' => $damageInfo['text'],
+                        'level_class' => $damageInfo['class'],
+                        'level_icon' => $damageInfo['icon'],
+                        'repair_estimate' => $transaction->repair_estimate,
+                    ];
+                }
+
+                return $baseData;
             });
 
-        // ✅ NEW: Get statistics with all filters applied
+        // Get statistics dengan all filters applied
         $stats = $this->getTransactionStats($currentType, $search, $statusFilter, $dateFrom, $dateTo);
 
         // Get available transaction types and statuses
@@ -193,88 +214,702 @@ class TransactionController extends Controller
         ));
     }
 
-    // ✅ UPDATED: getTransactionStats with date filters
-    private function getTransactionStats($currentType = null, $search = null, $statusFilter = null, $dateFrom = null, $dateTo = null)
+    // ================================================================
+    // 2. UPDATED CREATE METHOD - Tambah DAMAGED support
+    // ================================================================
+
+    public function create(Request $request)
+    {
+        $allowedTypes = Transaction::getUserAllowedTypes();
+
+        // Get categories for manual selection
+        $categories = \App\Models\Category::where('is_active', true)
+            ->orderBy('category_name')
+            ->get(['category_id', 'category_name']);
+
+        // If QR data provided, pre-fill form
+        $qrData = null;
+        $itemDetail = null;
+
+        if ($request->has('qr_data')) {
+            try {
+                $qrData = json_decode($request->qr_data, true);
+                if ($qrData && isset($qrData['item_detail_id'])) {
+                    $itemDetail = ItemDetail::with(['item.category'])
+                        ->where('item_detail_id', $qrData['item_detail_id'])
+                        ->first();
+                }
+            } catch (\Exception $e) {
+                // Invalid QR data, continue without pre-filling
+            }
+        }
+
+        // Get transaction types dengan proper labels
+        $transactionTypes = Transaction::getTransactionTypes();
+
+        // Filter allowed types for current user
+        $filteredTypes = [];
+        foreach ($allowedTypes as $type) {
+            if (isset($transactionTypes[$type])) {
+                $filteredTypes[$type] = $transactionTypes[$type];
+            }
+        }
+
+        // ✅ ENHANCED: Get options untuk DAMAGED form
+        $damageLevels = Transaction::getDamageLevels();
+        $damageReasons = Transaction::getDamageReasons();
+
+        return view('transactions.create', compact(
+            'allowedTypes',
+            'categories',
+            'qrData',
+            'itemDetail',
+            'filteredTypes',
+            'transactionTypes',
+            'damageLevels',      // 🆕 BARU
+            'damageReasons'      // 🆕 BARU
+        ));
+    }
+
+    // ================================================================
+    // 3. UPDATED STORE METHOD - Tambah DAMAGED validation
+    // ================================================================
+
+    public function store(Request $request)
+    {
+        // ✅ UPDATED: Enhanced validation dengan DAMAGED support
+        $rules = [
+            'transaction_type' => 'required|in:IN,OUT,REPAIR,LOST,RETURN,DAMAGED',  // Tambah DAMAGED
+            'items' => 'required|array|min:1',
+            'items.*.item_detail_id' => 'required|exists:item_details,item_detail_id',
+            'items.*.notes' => 'nullable|string',
+            'reference_id' => 'nullable|string|max:100',
+            'reference_type' => 'nullable|string|max:50',
+            'from_location' => 'nullable|string|max:100',
+            'to_location' => 'nullable|string|max:100',
+            'notes' => 'nullable|string',
+            'kondisi' => 'nullable|in:good,no_good,fair,broken',
+        ];
+
+        // ✅ ENHANCED: Conditional validation untuk DAMAGED
+        if ($request->transaction_type === 'DAMAGED') {
+            $rules['damage_level'] = 'required|in:light,medium,heavy,total';
+            $rules['damage_reason'] = 'required|string|max:50';
+            $rules['repair_estimate'] = 'nullable|numeric|min:0';
+            $rules['notes'] = 'required|string|min:10';  // Required dan min 10 karakter
+
+            // Repair estimate wajib untuk heavy damage
+            if ($request->damage_level === 'heavy') {
+                $rules['repair_estimate'] = 'required|numeric|min:0';
+            }
+        }
+
+        $request->validate($rules);
+
+        try {
+            DB::beginTransaction();
+
+            $items = $request->items;
+
+            // Validate all items exist and check status
+            $itemDetails = [];
+            foreach ($items as $itemData) {
+                $itemDetail = ItemDetail::where('item_detail_id', $itemData['item_detail_id'])->first();
+
+                if (!$itemDetail) {
+                    throw new \Exception("Item detail {$itemData['item_detail_id']} not found");
+                }
+
+                // Status validation logic (keep existing validation)
+                if ($itemDetail->status === 'stock') {
+                    throw new \Exception("Item {$itemDetail->serial_number} dengan status 'Stock' tidak dapat ditransaksikan.");
+                }
+
+                // ✅ ENHANCED: Additional validation untuk DAMAGED
+                if ($request->transaction_type === 'DAMAGED') {
+                    // Tidak bisa damaged item yang sudah damaged
+                    if ($itemDetail->status === 'damaged') {
+                        throw new \Exception("Item {$itemDetail->serial_number} sudah dalam status rusak.");
+                    }
+                    // Tidak bisa damaged item yang lost
+                    if ($itemDetail->status === 'lost') {
+                        throw new \Exception("Item {$itemDetail->serial_number} dengan status hilang tidak dapat ditransaksikan.");
+                    }
+                }
+
+                $itemDetails[] = [
+                    'detail' => $itemDetail,
+                    'notes' => $itemData['notes'] ?? null,
+                    'kondisi' => $request->kondisi ?? 'good',
+                ];
+            }
+
+            // ✅ ENHANCED: Create main transaction dengan damage fields
+            $transactionData = [
+                'transaction_id' => Transaction::generateTransactionId(),
+                'transaction_number' => Transaction::generateTransactionNumber($request->transaction_type),
+                'transaction_type' => $request->transaction_type,
+                'reference_id' => $request->reference_id,
+                'reference_type' => $request->reference_type,
+                'item_id' => $itemDetails[0]['detail']->item_id,
+                'quantity' => count($items),
+                'from_location' => $request->from_location,
+                'to_location' => $request->to_location,
+                'notes' => $request->notes,
+                'status' => Transaction::STATUS_PENDING,
+                'created_by' => auth()->id(),
+                'transaction_date' => now(),
+            ];
+
+            // ✅ ENHANCED: Tambah damage fields jika DAMAGED transaction
+            if ($request->transaction_type === 'DAMAGED') {
+                $transactionData['damage_level'] = $request->damage_level;
+                $transactionData['damage_reason'] = $request->damage_reason;
+                $transactionData['repair_estimate'] = $request->repair_estimate;
+            }
+
+            $transaction = Transaction::create($transactionData);
+
+            // Create transaction details
+            foreach ($itemDetails as $itemInfo) {
+                TransactionDetail::create([
+                    'transaction_detail_id' => TransactionDetail::generateTransactionDetailId(),
+                    'transaction_id' => $transaction->transaction_id,
+                    'item_detail_id' => $itemInfo['detail']->item_detail_id,
+                    'status_before' => $itemInfo['detail']->status,  // ✅ FIXED: Gunakan status asli
+                    'status_after' => null,  // Will be set when approved
+                    'kondisi_before' => $itemInfo['detail']->kondisi ?? 'good',
+                    'kondisi_after' => null,  // Will be set when approved
+                    'notes' => $itemInfo['notes'],
+                ]);
+            }
+
+            // Log activity dengan enhanced info
+            ActivityLog::logActivity(
+                'transactions',
+                $transaction->transaction_id,
+                'create_transaction',
+                null,
+                [
+                    'transaction_type' => $transaction->transaction_type,
+                    'items_count' => count($items),
+                    'item_detail_ids' => collect($items)->pluck('item_detail_id')->toArray(),
+                    'damage_info' => $request->transaction_type === 'DAMAGED' ? [
+                        'level' => $request->damage_level,
+                        'reason' => $request->damage_reason,
+                        'estimate' => $request->repair_estimate
+                    ] : null
+                ]
+            );
+
+            DB::commit();
+
+            // ✅ ENHANCED: Return response dengan damage info
+            $itemsCount = count($items);
+            $message = $itemsCount === 1
+                ? 'Transaksi berhasil dibuat dengan 1 item'
+                : "Transaksi berhasil dibuat dengan {$itemsCount} items";
+
+            if ($request->transaction_type === 'DAMAGED') {
+                // ✅ SAFE: Check damage_level exists dan tidak empty
+                $damageLevel = $request->damage_level ?? '';
+                $damageReason = $request->damage_reason ?? '';
+
+                if (!empty($damageLevel)) {
+                    $damageLevels = Transaction::getDamageLevels();
+
+                    // ✅ SAFE: Check key exists in array
+                    if (isset($damageLevels[$damageLevel]) && is_array($damageLevels[$damageLevel])) {
+                        $levelInfo = $damageLevels[$damageLevel];
+                        $levelText = $levelInfo['text'] ?? $damageLevel;
+                    } else {
+                        $levelText = ucfirst($damageLevel); // Fallback
+                    }
+
+                    // ✅ SAFE: Build message dengan safe values
+                    $message .= " (Level: {$levelText}";
+                    if (!empty($damageReason)) {
+                        $message .= " - {$damageReason}";
+                    }
+                    $message .= ")";
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'transaction' => [
+                    'transaction_id' => $transaction->transaction_id,
+                    'transaction_number' => $transaction->transaction_number,
+                    'items_count' => $itemsCount,
+                    'status' => $transaction->status,
+                    'damage_info' => $request->transaction_type === 'DAMAGED' ? [
+                        'level' => $request->damage_level,
+                        'reason' => $request->damage_reason,
+                        'estimate' => $request->repair_estimate
+                    ] : null
+                ]
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to create transaction: ' . $e->getMessage(), [
+                'request_data' => $request->all(),
+                'items_count' => count($request->items ?? [])
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    // ================================================================
+    // 4. UPDATED EDIT METHOD - Tambah permission check untuk DAMAGED
+    // ================================================================
+
+    public function edit(Transaction $transaction)
+    {
+        // Check permission - enhanced untuk DAMAGED
+        $userLevel = auth()->user()->userLevel->level_name ?? '';
+
+        if (!in_array($userLevel, ['Admin', 'Logistik'])) {
+            abort(403, 'Cannot edit this transaction');
+        }
+
+        // ✅ ENHANCED: Load transaction dengan damage info
+        $allowedTypes = Transaction::getUserAllowedTypes();
+        $transaction->load(['transactionDetails.itemDetail.item']);
+
+        // Get options untuk form
+        $damageLevels = Transaction::getDamageLevels();
+        $damageReasons = Transaction::getDamageReasons();
+
+        return view('transactions.edit', compact(
+            'transaction',
+            'allowedTypes',
+            'damageLevels',      // 🆕 BARU
+            'damageReasons'      // 🆕 BARU
+        ));
+    }
+
+    // ================================================================
+    // 5. UPDATED UPDATE METHOD - Tambah DAMAGED fields
+    // ================================================================
+
+    public function update(Request $request, Transaction $transaction)
+    {
+        // Check permission
+        if ($transaction->created_by !== auth()->id() || $transaction->status !== Transaction::STATUS_PENDING) {
+            abort(403, 'Cannot update this transaction');
+        }
+
+        // ✅ ENHANCED: Validation dengan DAMAGED support
+        $rules = [
+            'transaction_type' => 'required|in:' . implode(',', Transaction::getUserAllowedTypes()),
+            'notes' => 'nullable|string|max:1000',
+            'reference_id' => 'nullable|string|max:100',
+            'reference_type' => 'nullable|string|max:50',
+            'from_location' => 'nullable|string|max:100',
+            'to_location' => 'nullable|string|max:100',
+        ];
+
+        // Conditional validation untuk DAMAGED
+        if ($request->transaction_type === 'DAMAGED') {
+            $rules['damage_level'] = 'required|in:light,medium,heavy,total';
+            $rules['damage_reason'] = 'required|string|max:50';
+            $rules['repair_estimate'] = 'nullable|numeric|min:0';
+            $rules['notes'] = 'required|string|min:10';
+
+            if ($request->damage_level === 'heavy') {
+                $rules['repair_estimate'] = 'required|numeric|min:0';
+            }
+        }
+
+        $request->validate($rules);
+
+        try {
+            DB::beginTransaction();
+
+            $oldData = $transaction->toArray();
+
+            // ✅ ENHANCED: Update dengan damage fields
+            $updateData = [
+                'transaction_type' => $request->transaction_type,
+                'reference_id' => $request->reference_id,
+                'reference_type' => $request->reference_type,
+                'from_location' => $request->from_location,
+                'to_location' => $request->to_location,
+                'notes' => $request->notes,
+            ];
+
+            // Add damage fields jika DAMAGED
+            if ($request->transaction_type === 'DAMAGED') {
+                $updateData['damage_level'] = $request->damage_level;
+                $updateData['damage_reason'] = $request->damage_reason;
+                $updateData['repair_estimate'] = $request->repair_estimate;
+            } else {
+                // Clear damage fields jika bukan DAMAGED
+                $updateData['damage_level'] = null;
+                $updateData['damage_reason'] = null;
+                $updateData['repair_estimate'] = null;
+            }
+
+            $transaction->update($updateData);
+
+            // Update transaction detail notes if provided
+            if ($request->has('detail_notes')) {
+                foreach ($request->detail_notes as $detailId => $notes) {
+                    $transaction->transactionDetails()
+                        ->where('transaction_detail_id', $detailId)
+                        ->update(['notes' => $notes]);
+                }
+            }
+
+            // Log activity
+            ActivityLog::logActivity(
+                'transactions',
+                $transaction->transaction_id,
+                'update',
+                $oldData,
+                array_merge($transaction->toArray(), [
+                    'damage_info_updated' => $request->transaction_type === 'DAMAGED'
+                ])
+            );
+
+            DB::commit();
+
+            return redirect()->route('transactions.show', $transaction)
+                ->with('success', 'Transaksi berhasil diupdate');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to update transaction: ' . $e->getMessage());
+
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'Gagal update transaksi: ' . $e->getMessage());
+        }
+    }
+
+    // ================================================================
+    // 6. HELPER METHOD - Enhanced stats dengan DAMAGED
+    // ================================================================
+
+    private function getTransactionStats($type = null, $search = null, $status = null, $dateFrom = null, $dateTo = null)
     {
         $query = Transaction::query();
 
-        // Teknisi tidak bisa lihat stats
-        if (auth()->user()->userLevel && strtolower(auth()->user()->userLevel->level_name) === 'teknisi') {
-            $query->whereRaw('1 = 0');
+        // Apply same filters as main query
+        if ($type) {
+            $query->where('transaction_type', $type);
         }
-
-        // Apply type filter
-        if ($currentType) {
-            $query->where('transaction_type', $currentType);
-        }
-
-        // Apply search filter
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('transaction_number', 'like', "%{$search}%")
                     ->orWhereHas('item', function ($itemQuery) use ($search) {
                         $itemQuery->where('item_name', 'like', "%{$search}%")
                             ->orWhere('item_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('createdBy', function ($userQuery) use ($search) {
-                        $userQuery->where('full_name', 'like', "%{$search}%");
                     });
             });
         }
-
-        // Apply date filters
+        if ($status) {
+            $query->where('status', $status);
+        }
         if ($dateFrom) {
             $query->whereDate('transaction_date', '>=', $dateFrom);
         }
-
         if ($dateTo) {
             $query->whereDate('transaction_date', '<=', $dateTo);
         }
 
-        // Get base stats
-        $totalQuery = clone $query;
-        $pendingQuery = clone $query;
-        $approvedTodayQuery = clone $query;
-        $totalApprovedQuery = clone $query;
+        // ✅ ENHANCED: Get stats dengan DAMAGED breakdown
+        $stats = [
+            'total' => $query->count(),
+            'pending' => (clone $query)->where('status', 'pending')->count(),
+            'approved' => (clone $query)->where('status', 'approved')->count(),
+            'by_type' => (clone $query)->groupBy('transaction_type')
+                ->selectRaw('transaction_type, COUNT(*) as count')
+                ->pluck('count', 'transaction_type')
+                ->toArray(),
+        ];
 
-        $total = $totalQuery->count();
-        $pending = $pendingQuery->where('status', Transaction::STATUS_PENDING)->count();
-
-        // Approved today - consider date filter
-        if ($dateFrom || $dateTo) {
-            // If date filter applied, show approved in that range
-            $approvedToday = $approvedTodayQuery->where('status', Transaction::STATUS_APPROVED)->count();
-        } else {
-            // Default behavior - approved today only
-            $approvedToday = $approvedTodayQuery
-                ->where('status', Transaction::STATUS_APPROVED)
-                ->whereDate('approved_date', today())
-                ->count();
+        // ✅ ENHANCED: Damage specific stats jika type = DAMAGED
+        if ($type === 'DAMAGED') {
+            $stats['damage_breakdown'] = [
+                'by_level' => (clone $query)->where('transaction_type', 'DAMAGED')
+                    ->groupBy('damage_level')
+                    ->selectRaw('damage_level, COUNT(*) as count')
+                    ->pluck('count', 'damage_level')
+                    ->toArray(),
+                'by_reason' => (clone $query)->where('transaction_type', 'DAMAGED')
+                    ->groupBy('damage_reason')
+                    ->selectRaw('damage_reason, COUNT(*) as count')
+                    ->pluck('count', 'damage_reason')
+                    ->toArray(),
+                'total_repair_estimate' => (clone $query)->where('transaction_type', 'DAMAGED')
+                    ->sum('repair_estimate'),
+            ];
         }
 
-        $totalApproved = $totalApprovedQuery->where('status', Transaction::STATUS_APPROVED)->count();
-
-        // Calculate success rate
-        $successRate = $total > 0 ? round(($totalApproved / $total) * 100, 1) : 0;
-
-        return [
-            'total_transactions' => $total,
-            'pending_count' => $pending,
-            'approved_today' => $approvedToday,
-            'success_rate' => $successRate,
-
-            // Additional breakdown stats
-            'approved_count' => $totalApproved,
-            'rejected_count' => (clone $query)->where('status', Transaction::STATUS_REJECTED)->count(),
-
-            // Date range info for frontend
-            'date_range' => [
-                'from' => $dateFrom,
-                'to' => $dateTo,
-                'is_filtered' => $dateFrom || $dateTo
-            ]
-        ];
+        return $stats;
     }
+
+
+    // public function index(Request $request)
+    // {
+    //     $currentType = $request->get('type');
+    //     $allowedTypes = Transaction::getUserAllowedTypes();
+
+    //     // ✅ NEW: Get search and filter parameters including date
+    //     $search = $request->get('search');
+    //     $statusFilter = $request->get('status');
+    //     $dateFrom = $request->get('date_from');
+    //     $dateTo = $request->get('date_to');
+
+    //     // ✅ SUPER SIMPLE: LVL003 hanya boleh IN dan OUT
+    //     $user = auth()->user();
+    //     $userLevel = $user->userLevel->level_name ?? '';
+    //     // dd($userLevel);
+
+    //     if ($userLevel == 'Teknisi' && $currentType && !in_array($currentType, ['IN', 'OUT'])) {
+    //         return redirect()->route('dashboard');
+    //     }
+
+    //     // Define transaction type configurations
+    //     $typeConfigs = [
+    //         'IN' => [
+    //             'text' => 'Barang Masuk',
+    //             'description' => 'Kelola transaksi barang masuk ke sistem',
+    //             'icon' => 'fas fa-arrow-down',
+    //             'gradient' => 'from-green-600 to-green-700',
+    //             'class' => 'bg-green-100 text-green-800'
+    //         ],
+    //         'OUT' => [
+    //             'text' => 'Barang Keluar',
+    //             'description' => 'Kelola transaksi barang keluar dari sistem',
+    //             'icon' => 'fas fa-arrow-up',
+    //             'gradient' => 'from-blue-600 to-blue-700',
+    //             'class' => 'bg-blue-100 text-blue-800'
+    //         ],
+    //         'REPAIR' => [
+    //             'text' => 'Barang Repair',
+    //             'description' => 'Kelola transaksi barang yang perlu diperbaiki',
+    //             'icon' => 'fas fa-wrench',
+    //             'gradient' => 'from-yellow-600 to-yellow-700',
+    //             'class' => 'bg-yellow-100 text-yellow-800'
+    //         ],
+    //         'LOST' => [
+    //             'text' => 'Barang Hilang',
+    //             'description' => 'Kelola transaksi barang yang hilang',
+    //             'icon' => 'fas fa-exclamation-triangle',
+    //             'gradient' => 'from-red-600 to-red-700',
+    //             'class' => 'bg-red-100 text-red-800'
+    //         ],
+    //         'RETURN' => [
+    //             'text' => 'Pengembalian',
+    //             'description' => 'Kelola transaksi pengembalian barang',
+    //             'icon' => 'fas fa-undo',
+    //             'gradient' => 'from-purple-600 to-purple-700',
+    //             'class' => 'bg-purple-100 text-purple-800'
+    //         ]
+    //     ];
+
+    //     // Get current type config
+    //     $currentTypeConfig = $currentType ? ($typeConfigs[$currentType] ?? null) : null;
+
+    //     // Build query
+    //     $query = Transaction::with(['item', 'createdBy', 'approvedBy']);
+
+    //     // ✅ FIXED: Teknisi tidak bisa lihat transaksi
+    //     if (auth()->user()->userLevel && strtolower(auth()->user()->userLevel->level_name) === 'teknisi') {
+    //         $query->whereRaw('1 = 0'); // Empty result for teknisi
+    //     }
+
+    //     // Apply type filter if specified
+    //     if ($currentType && in_array($currentType, $allowedTypes)) {
+    //         $query->where('transaction_type', $currentType);
+    //     }
+
+    //     // ✅ NEW: Apply search filter
+    //     if ($search) {
+    //         $query->where(function ($q) use ($search) {
+    //             $q->where('transaction_number', 'like', "%{$search}%")
+    //                 ->orWhereHas('item', function ($itemQuery) use ($search) {
+    //                     $itemQuery->where('item_name', 'like', "%{$search}%")
+    //                         ->orWhere('item_code', 'like', "%{$search}%");
+    //                 })
+    //                 ->orWhereHas('createdBy', function ($userQuery) use ($search) {
+    //                     $userQuery->where('full_name', 'like', "%{$search}%");
+    //                 });
+    //         });
+    //     }
+
+    //     // ✅ NEW: Apply status filter
+    //     if ($statusFilter) {
+    //         $query->where('status', $statusFilter);
+    //     }
+
+    //     // ✅ NEW: Apply date filters
+    //     if ($dateFrom) {
+    //         $query->whereDate('transaction_date', '>=', $dateFrom);
+    //     }
+
+    //     if ($dateTo) {
+    //         $query->whereDate('transaction_date', '<=', $dateTo);
+    //     }
+
+    //     // Get transactions
+    //     $transactions = $query->orderBy('created_at', 'desc')
+    //         ->get()
+    //         ->map(function ($transaction) {
+    //             $typeInfo = $transaction->getTypeInfo();
+    //             $statusInfo = $transaction->getStatusInfo();
+
+    //             return [
+    //                 'id' => $transaction->transaction_id,
+    //                 'transaction_number' => $transaction->transaction_number,
+    //                 'transaction_type' => $transaction->transaction_type,
+    //                 'status' => $transaction->status,
+    //                 'item_name' => $transaction->item->item_name ?? 'Unknown',
+    //                 'item_code' => $transaction->item->item_code ?? 'N/A',
+    //                 'created_by_name' => $transaction->createdBy->full_name ?? 'Unknown',
+    //                 'approved_by_name' => $transaction->approvedBy->full_name ?? null,
+    //                 'transaction_date' => $transaction->transaction_date->format('d M Y H:i'),
+    //                 'approved_date' => $transaction->approved_date ? $transaction->approved_date->format('d M Y H:i') : null,
+
+    //                 // Type info
+    //                 'type_text' => $typeInfo['text'],
+    //                 'type_icon' => $typeInfo['icon'],
+    //                 'type_class' => $typeInfo['class'],
+
+    //                 // Status info
+    //                 'status_text' => $statusInfo['text'],
+    //                 'status_icon' => $statusInfo['icon'],
+    //                 'status_class' => $statusInfo['class'],
+
+    //                 // Action permissions
+    //                 'can_edit' => $transaction->created_by === auth()->id() && $transaction->status === Transaction::STATUS_PENDING,
+    //                 'can_approve' => Transaction::canUserApprove() && $transaction->status === Transaction::STATUS_PENDING,
+    //                 'can_cancel' => $transaction->created_by === auth()->id() && $transaction->canBeCancelled(),
+    //             ];
+    //         });
+
+    //     // ✅ NEW: Get statistics with all filters applied
+    //     $stats = $this->getTransactionStats($currentType, $search, $statusFilter, $dateFrom, $dateTo);
+
+    //     // Get available transaction types and statuses
+    //     $transactionTypes = Transaction::getTransactionTypes();
+    //     $transactionStatuses = Transaction::getStatuses();
+
+    //     // Handle AJAX requests
+    //     if ($request->ajax()) {
+    //         return response()->json([
+    //             'success' => true,
+    //             'transactions' => $transactions,
+    //             'stats' => $stats,
+    //             'filters' => [
+    //                 'search' => $search,
+    //                 'status' => $statusFilter,
+    //                 'type' => $currentType,
+    //                 'date_from' => $dateFrom,
+    //                 'date_to' => $dateTo
+    //             ]
+    //         ]);
+    //     }
+
+    //     return view('transactions.index', compact(
+    //         'transactions',
+    //         'stats',
+    //         'currentType',
+    //         'currentTypeConfig',
+    //         'transactionTypes',
+    //         'transactionStatuses',
+    //         'allowedTypes'
+    //     ));
+    // }
+
+    // // ✅ UPDATED: getTransactionStats with date filters
+    // private function getTransactionStats($currentType = null, $search = null, $statusFilter = null, $dateFrom = null, $dateTo = null)
+    // {
+    //     $query = Transaction::query();
+
+    //     // Teknisi tidak bisa lihat stats
+    //     if (auth()->user()->userLevel && strtolower(auth()->user()->userLevel->level_name) === 'teknisi') {
+    //         $query->whereRaw('1 = 0');
+    //     }
+
+    //     // Apply type filter
+    //     if ($currentType) {
+    //         $query->where('transaction_type', $currentType);
+    //     }
+
+    //     // Apply search filter
+    //     if ($search) {
+    //         $query->where(function ($q) use ($search) {
+    //             $q->where('transaction_number', 'like', "%{$search}%")
+    //                 ->orWhereHas('item', function ($itemQuery) use ($search) {
+    //                     $itemQuery->where('item_name', 'like', "%{$search}%")
+    //                         ->orWhere('item_code', 'like', "%{$search}%");
+    //                 })
+    //                 ->orWhereHas('createdBy', function ($userQuery) use ($search) {
+    //                     $userQuery->where('full_name', 'like', "%{$search}%");
+    //                 });
+    //         });
+    //     }
+
+    //     // Apply date filters
+    //     if ($dateFrom) {
+    //         $query->whereDate('transaction_date', '>=', $dateFrom);
+    //     }
+
+    //     if ($dateTo) {
+    //         $query->whereDate('transaction_date', '<=', $dateTo);
+    //     }
+
+    //     // Get base stats
+    //     $totalQuery = clone $query;
+    //     $pendingQuery = clone $query;
+    //     $approvedTodayQuery = clone $query;
+    //     $totalApprovedQuery = clone $query;
+
+    //     $total = $totalQuery->count();
+    //     $pending = $pendingQuery->where('status', Transaction::STATUS_PENDING)->count();
+
+    //     // Approved today - consider date filter
+    //     if ($dateFrom || $dateTo) {
+    //         // If date filter applied, show approved in that range
+    //         $approvedToday = $approvedTodayQuery->where('status', Transaction::STATUS_APPROVED)->count();
+    //     } else {
+    //         // Default behavior - approved today only
+    //         $approvedToday = $approvedTodayQuery
+    //             ->where('status', Transaction::STATUS_APPROVED)
+    //             ->whereDate('approved_date', today())
+    //             ->count();
+    //     }
+
+    //     $totalApproved = $totalApprovedQuery->where('status', Transaction::STATUS_APPROVED)->count();
+
+    //     // Calculate success rate
+    //     $successRate = $total > 0 ? round(($totalApproved / $total) * 100, 1) : 0;
+
+    //     return [
+    //         'total_transactions' => $total,
+    //         'pending_count' => $pending,
+    //         'approved_today' => $approvedToday,
+    //         'success_rate' => $successRate,
+
+    //         // Additional breakdown stats
+    //         'approved_count' => $totalApproved,
+    //         'rejected_count' => (clone $query)->where('status', Transaction::STATUS_REJECTED)->count(),
+
+    //         // Date range info for frontend
+    //         'date_range' => [
+    //             'from' => $dateFrom,
+    //             'to' => $dateTo,
+    //             'is_filtered' => $dateFrom || $dateTo
+    //         ]
+    //     ];
+    // }
 
     // public function index(Request $request)
     // {
@@ -435,178 +1070,178 @@ class TransactionController extends Controller
     /**
      * Show create transaction form - Updated for dual method
      */
-    public function create(Request $request)
-    {
-        $allowedTypes = Transaction::getUserAllowedTypes();
+    // public function create(Request $request)
+    // {
+    //     $allowedTypes = Transaction::getUserAllowedTypes();
 
-        // Get categories for manual selection
-        $categories = \App\Models\Category::where('is_active', true)
-            ->orderBy('category_name')
-            ->get(['category_id', 'category_name']);
+    //     // Get categories for manual selection
+    //     $categories = \App\Models\Category::where('is_active', true)
+    //         ->orderBy('category_name')
+    //         ->get(['category_id', 'category_name']);
 
-        // If QR data provided, pre-fill form
-        $qrData = null;
-        $itemDetail = null;
+    //     // If QR data provided, pre-fill form
+    //     $qrData = null;
+    //     $itemDetail = null;
 
-        if ($request->has('qr_data')) {
-            try {
-                $qrData = json_decode($request->qr_data, true);
-                if ($qrData && isset($qrData['item_detail_id'])) {
-                    $itemDetail = ItemDetail::with(['item.category'])
-                        ->where('item_detail_id', $qrData['item_detail_id'])
-                        ->first();
-                }
-            } catch (\Exception $e) {
-                // Invalid QR data, continue without pre-filling
-            }
-        }
+    //     if ($request->has('qr_data')) {
+    //         try {
+    //             $qrData = json_decode($request->qr_data, true);
+    //             if ($qrData && isset($qrData['item_detail_id'])) {
+    //                 $itemDetail = ItemDetail::with(['item.category'])
+    //                     ->where('item_detail_id', $qrData['item_detail_id'])
+    //                     ->first();
+    //             }
+    //         } catch (\Exception $e) {
+    //             // Invalid QR data, continue without pre-filling
+    //         }
+    //     }
 
-        // Get transaction types with proper labels
-        $transactionTypes = Transaction::getTransactionTypes();
+    //     // Get transaction types with proper labels
+    //     $transactionTypes = Transaction::getTransactionTypes();
 
-        // Filter allowed types for current user
-        $filteredTypes = [];
-        foreach ($allowedTypes as $type) {
-            if (isset($transactionTypes[$type])) {
-                $filteredTypes[$type] = $transactionTypes[$type];
-            }
-        }
+    //     // Filter allowed types for current user
+    //     $filteredTypes = [];
+    //     foreach ($allowedTypes as $type) {
+    //         if (isset($transactionTypes[$type])) {
+    //             $filteredTypes[$type] = $transactionTypes[$type];
+    //         }
+    //     }
 
-        return view('transactions.create', compact(
-            'allowedTypes',
-            'categories',
-            'qrData',
-            'itemDetail',
-            'filteredTypes',
-            'transactionTypes' // Add this line
-        ));
-    }
+    //     return view('transactions.create', compact(
+    //         'allowedTypes',
+    //         'categories',
+    //         'qrData',
+    //         'itemDetail',
+    //         'filteredTypes',
+    //         'transactionTypes' // Add this line
+    //     ));
+    // }
 
-    public function store(Request $request)
-    {
-        // Simplified validation - always expect items array
-        $request->validate([
-            'transaction_type' => 'required|in:IN,OUT,REPAIR,LOST,RETURN',
-            'items' => 'required|array|min:1',
-            'items.*.item_detail_id' => 'required|exists:item_details,item_detail_id',
-            'items.*.notes' => 'nullable|string',
-            'reference_id' => 'nullable|string|max:100',
-            'from_location' => 'nullable|string|max:100',
-            'to_location' => 'nullable|string|max:100',
-            'notes' => 'nullable|string',
-            'kondisi' => 'nullable|in:good,no_good'
-        ]);
+    // public function store(Request $request)
+    // {
+    //     // Simplified validation - always expect items array
+    //     $request->validate([
+    //         'transaction_type' => 'required|in:IN,OUT,REPAIR,LOST,RETURN',
+    //         'items' => 'required|array|min:1',
+    //         'items.*.item_detail_id' => 'required|exists:item_details,item_detail_id',
+    //         'items.*.notes' => 'nullable|string',
+    //         'reference_id' => 'nullable|string|max:100',
+    //         'from_location' => 'nullable|string|max:100',
+    //         'to_location' => 'nullable|string|max:100',
+    //         'notes' => 'nullable|string',
+    //         'kondisi' => 'nullable|in:good,no_good'
+    //     ]);
 
-        // dd($request->all());
-        // dd( $request->kondisi);
+    //     // dd($request->all());
+    //     // dd( $request->kondisi);
 
-        try {
-            DB::beginTransaction();
+    //     try {
+    //         DB::beginTransaction();
 
-            $items = $request->items;
+    //         $items = $request->items;
 
-            // Validate all items exist and check status
-            $itemDetails = [];
-            foreach ($items as $itemData) {
-                $itemDetail = ItemDetail::where('item_detail_id', $itemData['item_detail_id'])->first();
+    //         // Validate all items exist and check status
+    //         $itemDetails = [];
+    //         foreach ($items as $itemData) {
+    //             $itemDetail = ItemDetail::where('item_detail_id', $itemData['item_detail_id'])->first();
 
-                if (!$itemDetail) {
-                    throw new \Exception("Item detail {$itemData['item_detail_id']} not found");
-                }
+    //             if (!$itemDetail) {
+    //                 throw new \Exception("Item detail {$itemData['item_detail_id']} not found");
+    //             }
 
-                // Status validation logic (keep existing validation)
-                if ($itemDetail->status === 'stock') {
-                    throw new \Exception("Item {$itemDetail->serial_number} dengan status 'Stock' tidak dapat ditransaksikan.");
-                }
+    //             // Status validation logic (keep existing validation)
+    //             if ($itemDetail->status === 'stock') {
+    //                 throw new \Exception("Item {$itemDetail->serial_number} dengan status 'Stock' tidak dapat ditransaksikan.");
+    //             }
 
-                // Other validations (keep existing)...
+    //             // Other validations (keep existing)...
 
-                $itemDetails[] = [
-                    'detail' => $itemDetail,
-                    'notes' => $itemData['notes'] ?? null,
-                    'kondisi' => $request->kondisi ?? 'good',
-                ];
-            }
+    //             $itemDetails[] = [
+    //                 'detail' => $itemDetail,
+    //                 'notes' => $itemData['notes'] ?? null,
+    //                 'kondisi' => $request->kondisi ?? 'good',
+    //             ];
+    //         }
 
-            // Create main transaction
-            $transaction = Transaction::create([
-                'transaction_id' => Transaction::generateTransactionId(),
-                'transaction_number' => Transaction::generateTransactionNumber($request->transaction_type),
-                'transaction_type' => $request->transaction_type,
-                'reference_id' => $request->reference_id,
-                'item_id' => $itemDetails[0]['detail']->item_id,
-                'quantity' => count($items),
-                'from_location' => $request->from_location,
-                // 'kondisi' => $request->kondisi ?? 'good',
-                'to_location' => $request->to_location,
-                'notes' => $request->notes,
-                'status' => Transaction::STATUS_PENDING,
-                'created_by' => auth()->id(),
-                'transaction_date' => now(),
-            ]);
+    //         // Create main transaction
+    //         $transaction = Transaction::create([
+    //             'transaction_id' => Transaction::generateTransactionId(),
+    //             'transaction_number' => Transaction::generateTransactionNumber($request->transaction_type),
+    //             'transaction_type' => $request->transaction_type,
+    //             'reference_id' => $request->reference_id,
+    //             'item_id' => $itemDetails[0]['detail']->item_id,
+    //             'quantity' => count($items),
+    //             'from_location' => $request->from_location,
+    //             // 'kondisi' => $request->kondisi ?? 'good',
+    //             'to_location' => $request->to_location,
+    //             'notes' => $request->notes,
+    //             'status' => Transaction::STATUS_PENDING,
+    //             'created_by' => auth()->id(),
+    //             'transaction_date' => now(),
+    //         ]);
 
-            // Create transaction details
-            foreach ($itemDetails as $itemInfo) {
-                TransactionDetail::create([
-                    'transaction_detail_id' => TransactionDetail::generateTransactionDetailId(),
-                    'transaction_id' => $transaction->transaction_id,
-                    'item_detail_id' => $itemInfo['detail']->item_detail_id,
-                    'status_before' => $request->kondisi !== 'good' ? 'no_good' : 'good',
-                    'status_after' => $request->kondisi,
-                    'notes' => $itemInfo['notes'],
-                ]);
+    //         // Create transaction details
+    //         foreach ($itemDetails as $itemInfo) {
+    //             TransactionDetail::create([
+    //                 'transaction_detail_id' => TransactionDetail::generateTransactionDetailId(),
+    //                 'transaction_id' => $transaction->transaction_id,
+    //                 'item_detail_id' => $itemInfo['detail']->item_detail_id,
+    //                 'status_before' => $request->kondisi !== 'good' ? 'no_good' : 'good',
+    //                 'status_after' => $request->kondisi,
+    //                 'notes' => $itemInfo['notes'],
+    //             ]);
 
-                // Update kondisi di tabel item_details
-                $itemInfo['detail']->kondisi = $itemInfo['kondisi'];
-                $itemInfo['detail']->save();
-            }
-
-
+    //             // Update kondisi di tabel item_details
+    //             $itemInfo['detail']->kondisi = $itemInfo['kondisi'];
+    //             $itemInfo['detail']->save();
+    //         }
 
 
 
-            // Log activity
-            ActivityLog::logActivity(
-                'transactions',
-                $transaction->transaction_id,
-                'create_transaction',
-                null,
-                [
-                    'transaction_type' => $transaction->transaction_type,
-                    'items_count' => count($items),
-                    'item_detail_ids' => collect($items)->pluck('item_detail_id')->toArray()
-                ]
-            );
 
-            DB::commit();
 
-            // Return response
-            $itemsCount = count($items);
-            return response()->json([
-                'success' => true,
-                'message' => $itemsCount === 1
-                    ? 'Transaksi berhasil dibuat dengan 1 item'
-                    : "Transaksi berhasil dibuat dengan {$itemsCount} items",
-                'transaction' => [
-                    'transaction_id' => $transaction->transaction_id,
-                    'transaction_number' => $transaction->transaction_number,
-                    'items_count' => $itemsCount,
-                    'status' => $transaction->status
-                ]
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Failed to create transaction: ' . $e->getMessage(), [
-                'request_data' => $request->all(),
-                'items_count' => count($request->items ?? [])
-            ]);
+    //         // Log activity
+    //         ActivityLog::logActivity(
+    //             'transactions',
+    //             $transaction->transaction_id,
+    //             'create_transaction',
+    //             null,
+    //             [
+    //                 'transaction_type' => $transaction->transaction_type,
+    //                 'items_count' => count($items),
+    //                 'item_detail_ids' => collect($items)->pluck('item_detail_id')->toArray()
+    //             ]
+    //         );
 
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
-        }
-    }
+    //         DB::commit();
+
+    //         // Return response
+    //         $itemsCount = count($items);
+    //         return response()->json([
+    //             'success' => true,
+    //             'message' => $itemsCount === 1
+    //                 ? 'Transaksi berhasil dibuat dengan 1 item'
+    //                 : "Transaksi berhasil dibuat dengan {$itemsCount} items",
+    //             'transaction' => [
+    //                 'transaction_id' => $transaction->transaction_id,
+    //                 'transaction_number' => $transaction->transaction_number,
+    //                 'items_count' => $itemsCount,
+    //                 'status' => $transaction->status
+    //             ]
+    //         ]);
+    //     } catch (\Exception $e) {
+    //         DB::rollBack();
+    //         Log::error('Failed to create transaction: ' . $e->getMessage(), [
+    //             'request_data' => $request->all(),
+    //             'items_count' => count($request->items ?? [])
+    //         ]);
+
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => $e->getMessage()
+    //         ], 400);
+    //     }
+    // }
 
     /**
      * Create transaction from QR scan (AJAX)
@@ -687,80 +1322,80 @@ class TransactionController extends Controller
     /**
      * Show edit form (only for pending transactions)
      */
-    public function edit(Transaction $transaction)
-    {
-        // dd(auth()->user()->userLevel->level_name);
-        // Check permission - only creator can edit pending transactions
-        if (auth()->user()->userLevel->level_name !== 'Admin' && auth()->user()->userLevel->level_name !== 'Logistik' ) {
-            abort(403, 'Cannot edit this transaction');
-        }
+    // public function edit(Transaction $transaction)
+    // {
+    //     // dd(auth()->user()->userLevel->level_name);
+    //     // Check permission - only creator can edit pending transactions
+    //     if (auth()->user()->userLevel->level_name !== 'Admin' && auth()->user()->userLevel->level_name !== 'Logistik' ) {
+    //         abort(403, 'Cannot edit this transaction');
+    //     }
 
-        $allowedTypes = Transaction::getUserAllowedTypes();
-        $transaction->load(['transactionDetails.itemDetail.item']);
+    //     $allowedTypes = Transaction::getUserAllowedTypes();
+    //     $transaction->load(['transactionDetails.itemDetail.item']);
 
-        return view('transactions.edit', compact('transaction', 'allowedTypes'));
-    }
+    //     return view('transactions.edit', compact('transaction', 'allowedTypes'));
+    // }
 
-    /**
-     * Update transaction (only pending transactions)
-     */
-    public function update(Request $request, Transaction $transaction)
-    {
-        // Check permission
-        if ($transaction->created_by !== auth()->id() || $transaction->status !== Transaction::STATUS_PENDING) {
-            abort(403, 'Cannot update this transaction');
-        }
+    // /**
+    //  * Update transaction (only pending transactions)
+    //  */
+    // public function update(Request $request, Transaction $transaction)
+    // {
+    //     // Check permission
+    //     if ($transaction->created_by !== auth()->id() || $transaction->status !== Transaction::STATUS_PENDING) {
+    //         abort(403, 'Cannot update this transaction');
+    //     }
 
-        $request->validate([
-            'transaction_type' => 'required|in:' . implode(',', Transaction::getUserAllowedTypes()),
-            'notes' => 'nullable|string|max:1000',
-            'reference_id' => 'nullable|string|max:100',
-            'reference_type' => 'nullable|string|max:50',
-            'to_location' => 'nullable|string|max:100',
-        ]);
+    //     $request->validate([
+    //         'transaction_type' => 'required|in:' . implode(',', Transaction::getUserAllowedTypes()),
+    //         'notes' => 'nullable|string|max:1000',
+    //         'reference_id' => 'nullable|string|max:100',
+    //         'reference_type' => 'nullable|string|max:50',
+    //         'to_location' => 'nullable|string|max:100',
+    //     ]);
 
-        try {
-            DB::beginTransaction();
+    //     try {
+    //         DB::beginTransaction();
 
-            $oldData = $transaction->toArray();
+    //         $oldData = $transaction->toArray();
 
-            $transaction->update([
-                'transaction_type' => $request->transaction_type,
-                'reference_id' => $request->reference_id,
-                'reference_type' => $request->reference_type,
-                'to_location' => $request->to_location,
-                'notes' => $request->notes,
-            ]);
+    //         $transaction->update([
+    //             'transaction_type' => $request->transaction_type,
+    //             'reference_id' => $request->reference_id,
+    //             'reference_type' => $request->reference_type,
+    //             'to_location' => $request->to_location,
+    //             'notes' => $request->notes,
+    //         ]);
 
-            // Update transaction detail notes if provided
-            if ($request->has('detail_notes')) {
-                $transaction->transactionDetails()->update([
-                    'notes' => $request->detail_notes
-                ]);
-            }
+    //         // Update transaction detail notes if provided
+    //         if ($request->has('detail_notes')) {
+    //             $transaction->transactionDetails()->update([
+    //                 'notes' => $request->detail_notes
+    //             ]);
+    //         }
 
-            // Log activity
-            ActivityLog::logActivity(
-                'transactions',
-                $transaction->transaction_id,
-                'update',
-                $oldData,
-                $transaction->toArray()
-            );
+    //         // Log activity
+    //         ActivityLog::logActivity(
+    //             'transactions',
+    //             $transaction->transaction_id,
+    //             'update',
+    //             $oldData,
+    //             $transaction->toArray()
+    //         );
 
-            DB::commit();
+    //         DB::commit();
 
-            return redirect()->route('transactions.show', $transaction)
-                ->with('success', 'Transaksi berhasil diupdate');
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Failed to update transaction: ' . $e->getMessage());
+    //         return redirect()->route('transactions.show', $transaction)
+    //             ->with('success', 'Transaksi berhasil diupdate');
+    //     } catch (\Exception $e) {
+    //         DB::rollBack();
+    //         Log::error('Failed to update transaction: ' . $e->getMessage());
 
-            return redirect()->back()
-                ->withInput()
-                ->with('error', 'Gagal update transaksi: ' . $e->getMessage());
-        }
-    }
+    //         return redirect()->back()
+    //             ->withInput()
+    //             ->with('error', 'Gagal update transaksi: ' . $e->getMessage());
+    //     }
+    // }
 
     /**
      * Cancel transaction (only creator for pending transactions)

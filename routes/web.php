@@ -354,20 +354,18 @@ Route::middleware('auth')->group(function () {
         Route::get('/po-details/{po}', [GoodsReceivedController::class, 'getPODetails'])->name('po-details');
     });
     Route::prefix('api/goods-received')->group(function () {
-    // Serial Number Management
-    Route::post('serial-number-template', [GoodsReceivedController::class, 'getSerialNumberTemplate'])
-        ->name('api.goods-received.serial-template');
+        // Serial Number Management
+        Route::post('serial-number-template', [GoodsReceivedController::class, 'getSerialNumberTemplate'])
+            ->name('api.goods-received.serial-template');
 
-    Route::post('validate-serial-number', [GoodsReceivedController::class, 'validateSerialNumber'])
-        ->name('api.goods-received.validate-serial');
+        Route::post('validate-serial-number', [GoodsReceivedController::class, 'validateSerialNumber'])
+            ->name('api.goods-received.validate-serial');
 
-    Route::post('bulk-validate-serial-numbers', [GoodsReceivedController::class, 'bulkValidateSerialNumbers'])
-        ->name('api.goods-received.bulk-validate-serials');
+        Route::post('bulk-validate-serial-numbers', [GoodsReceivedController::class, 'bulkValidateSerialNumbers'])
+            ->name('api.goods-received.bulk-validate-serials');
 
-    Route::get('serial-number-stats', [GoodsReceivedController::class, 'getSerialNumberStats'])
-        ->name('api.goods-received.serial-stats');
-
-
+        Route::get('serial-number-stats', [GoodsReceivedController::class, 'getSerialNumberStats'])
+            ->name('api.goods-received.serial-stats');
     });
 
     // ================================================================
@@ -425,6 +423,18 @@ Route::middleware('auth')->group(function () {
         Route::post('/create-from-qr', [TransactionController::class, 'createFromQR'])->name('create-from-qr');
         Route::post('/scan-qr', [TransactionController::class, 'scanQR'])->name('scan-qr');
         Route::get('/available-items', [TransactionController::class, 'getAvailableItems'])->name('available-items');
+        Route::get('/types', function () {
+            return response()->json(Transaction::getUserAllowedTypes());
+        })->name('types');
+        // ✅ ENHANCED: Tambah endpoint untuk damage info
+        Route::get('/damage-levels', function () {
+            return response()->json(Transaction::getDamageLevels());
+        })->name('damage-levels');
+
+        Route::get('/damage-reasons', function () {
+            return response()->json(Transaction::getDamageReasons());
+        })->name('damage-reasons');
+
         Route::get('/types', function () {
             return response()->json(Transaction::getUserAllowedTypes());
         })->name('types');

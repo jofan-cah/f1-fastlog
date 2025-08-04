@@ -9,7 +9,8 @@
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-4">
-                    <div class="w-12 h-12 bg-gradient-to-br from-red-600 to-red-700 rounded-lg flex items-center justify-center">
+                    <div
+                        class="w-12 h-12 bg-gradient-to-br from-red-600 to-red-700 rounded-lg flex items-center justify-center">
                         <i class="fas fa-plus text-white text-xl"></i>
                     </div>
                     <div>
@@ -61,7 +62,8 @@
                             <p class="text-sm text-gray-600">Barcode scanner fisik</p>
                             <div class="flex items-center mt-1">
                                 <div :class="getScannerStatusClass()" class="w-2 h-2 rounded-full mr-2"></div>
-                                <span class="text-xs" :class="getScannerStatusClass()" x-text="getScannerStatusText()"></span>
+                                <span class="text-xs" :class="getScannerStatusClass()"
+                                    x-text="getScannerStatusText()"></span>
                             </div>
                         </div>
                     </div>
@@ -115,7 +117,8 @@
                                 <h3 class="font-medium text-gray-900">Hardware Scanner</h3>
                                 <div class="flex items-center space-x-2 text-sm">
                                     <span class="text-gray-600">Status:</span>
-                                    <span :class="getScannerStatusClass()" class="font-medium" x-text="getScannerStatusText()"></span>
+                                    <span :class="getScannerStatusClass()" class="font-medium"
+                                        x-text="getScannerStatusText()"></span>
                                 </div>
                             </div>
                         </div>
@@ -131,7 +134,8 @@
 
                             <button x-show="scannerStatus === 'connected' || scannerStatus === 'scanning'"
                                 @click="toggleHardwareScanner()"
-                                :class="hardwareScannerActive ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'"
+                                :class="hardwareScannerActive ? 'bg-red-600 hover:bg-red-700' :
+                                    'bg-green-600 hover:bg-green-700'"
                                 class="px-4 py-2 text-white rounded-lg text-sm">
                                 <i :class="hardwareScannerActive ? 'fas fa-stop' : 'fas fa-play'" class="mr-2"></i>
                                 <span x-text="hardwareScannerActive ? 'Stop' : 'Start'"></span>
@@ -142,7 +146,8 @@
                     <!-- Scanning Status -->
                     <div x-show="hardwareScannerActive" class="text-center py-8">
                         <div class="inline-flex items-center space-x-3">
-                            <div class="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+                            <div class="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin">
+                            </div>
                             <span class="text-purple-700 font-medium">Ready to scan...</span>
                         </div>
 
@@ -187,8 +192,11 @@
                                     </div>
                                     <div>
                                         <h4 class="font-medium text-gray-900" x-text="item.item_name"></h4>
-                                        <p class="text-sm text-gray-600" x-text="item.item_code + ' • ' + item.serial_number"></p>
-                                        <p class="text-xs text-gray-500" x-text="'Status: ' + item.current_status + ' • Lokasi: ' + (item.location || 'N/A')"></p>
+                                        <p class="text-sm text-gray-600"
+                                            x-text="item.item_code + ' • ' + item.serial_number"></p>
+                                        <p class="text-xs text-gray-500"
+                                            x-text="'Status: ' + item.current_status + ' • Lokasi: ' + (item.location || 'N/A')">
+                                        </p>
                                     </div>
                                 </div>
                                 <div class="flex items-center space-x-2">
@@ -245,7 +253,8 @@
         </div>
 
         <!-- Transaction Form -->
-        <form x-show="selectedItems.length > 0" @submit.prevent="submitTransaction()" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <form x-show="selectedItems.length > 0" @submit.prevent="submitTransaction()"
+            class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 class="text-lg font-semibold text-gray-900 mb-6">Detail Transaksi</h2>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -261,11 +270,14 @@
                         <div class="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50">
                             <div class="flex items-center justify-between">
                                 <div>
-                                    <span class="font-medium text-gray-900" x-text="getTransactionTypeInfo(form.transaction_type).label"></span>
-                                    <p class="text-sm text-gray-600 mt-1" x-text="getTransactionTypeInfo(form.transaction_type).description"></p>
+                                    <span class="font-medium text-gray-900"
+                                        x-text="getTransactionTypeInfo(form.transaction_type).label"></span>
+                                    <p class="text-sm text-gray-600 mt-1"
+                                        x-text="getTransactionTypeInfo(form.transaction_type).description"></p>
                                 </div>
                                 <div class="flex items-center space-x-2">
-                                    <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium" x-text="form.transaction_type"></span>
+                                    <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full font-medium"
+                                        x-text="form.transaction_type"></span>
                                     <i class="fas fa-lock text-gray-400" title="Fixed from URL parameter"></i>
                                 </div>
                             </div>
@@ -376,6 +388,72 @@
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500">
                 </div>
 
+                <!-- DAMAGED Fields (show only for DAMAGED type) -->
+                <div x-show="form.transaction_type === 'DAMAGED'" class="md:col-span-2">
+                    <div
+                        class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                        <div class="md:col-span-2">
+                            <h4 class="font-medium text-orange-900 mb-3 flex items-center">
+                                <i class="fas fa-exclamation-triangle text-orange-600 mr-2"></i>
+                                Detail Kerusakan
+                            </h4>
+                        </div>
+
+                        <!-- Damage Level -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Level Kerusakan <span class="text-red-500">*</span>
+                            </label>
+                            <select x-model="form.damage_level" :required="form.transaction_type === 'DAMAGED'"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500">
+                                <option value="">Pilih level kerusakan...</option>
+                                <option value="light">Ringan - Kerusakan kecil, mudah diperbaiki</option>
+                                <option value="medium">Sedang - Perlu repair khusus</option>
+                                <option value="heavy">Berat - Repair mahal/sulit</option>
+                                <option value="total">Total - Tidak bisa diperbaiki</option>
+                            </select>
+                        </div>
+
+                        <!-- Damage Reason -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Alasan Kerusakan <span class="text-red-500">*</span>
+                            </label>
+                            <select x-model="form.damage_reason" :required="form.transaction_type === 'DAMAGED'"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500">
+                                <option value="">Pilih alasan...</option>
+                                <option value="accident">Kecelakaan/Terjatuh</option>
+                                <option value="wear">Keausan Normal</option>
+                                <option value="misuse">Pemakaian Salah</option>
+                                <option value="environment">Faktor Lingkungan</option>
+                                <option value="manufacturing">Cacat Produksi</option>
+                                <option value="electrical">Kerusakan Elektrik</option>
+                                <option value="mechanical">Kerusakan Mekanik</option>
+                                <option value="water_damage">Kerusakan Air</option>
+                                <option value="other">Lainnya</option>
+                            </select>
+                        </div>
+
+                        <!-- Repair Estimate (show only for heavy damage) -->
+                        <div x-show="form.damage_level === 'heavy'" class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Estimasi Biaya Repair <span class="text-red-500">*</span>
+                            </label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">Rp</span>
+                                <input type="number" x-model="form.repair_estimate"
+                                    :required="form.transaction_type === 'DAMAGED' && form.damage_level === 'heavy'"
+                                    placeholder="0"
+                                    class="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500">
+                            </div>
+                            <p class="text-xs text-gray-600 mt-1">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Wajib diisi untuk kerusakan berat
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- From Location -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Lokasi Asal</label>
@@ -393,7 +471,8 @@
                 <!-- Kondisi (show only for certain transaction types) -->
                 <div x-show="['IN', 'OUT', 'RETURN'].includes(form.transaction_type)">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Kondisi Barang</label>
-                    <select x-model="form.kondisi" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500">
+                    <select x-model="form.kondisi"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500">
                         <option value="good">Normal</option>
                         <option value="no_good">Observasi </option>
                     </select>
@@ -401,7 +480,8 @@
 
                 <!-- Lost Reason (show only for LOST type) -->
                 <div x-show="form.transaction_type === 'LOST'">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Alasan Hilang <span class="text-red-500">*</span></label>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Alasan Hilang <span
+                            class="text-red-500">*</span></label>
                     <select x-model="form.lost_reason" :required="form.transaction_type === 'LOST'"
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500">
                         <option value="">Pilih alasan...</option>
@@ -421,7 +501,8 @@
                     <span x-show="form.transaction_type === 'LOST'" class="text-red-500">*</span>
                 </label>
                 <textarea x-model="form.notes" rows="3"
-                    :placeholder="form.transaction_type === 'LOST' ? 'Jelaskan detail kronologi barang hilang...' : 'Catatan untuk transaksi ini...'"
+                    :placeholder="form.transaction_type === 'LOST' ? 'Jelaskan detail kronologi barang hilang...' :
+                        'Catatan untuk transaksi ini...'"
                     :required="form.transaction_type === 'LOST'"
                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"></textarea>
 
@@ -442,7 +523,8 @@
                     class="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg disabled:opacity-50">
                     <span x-show="!loading" class="flex items-center">
                         <i class="fas fa-save mr-2"></i>
-                        <span x-text="selectedItems.length === 1 ? 'Buat Transaksi (1 item)' : `Buat Transaksi (${selectedItems.length} items)`"></span>
+                        <span
+                            x-text="selectedItems.length === 1 ? 'Buat Transaksi (1 item)' : `Buat Transaksi (${selectedItems.length} items)`"></span>
                     </span>
                     <span x-show="loading" class="flex items-center">
                         <i class="fas fa-spinner fa-spin mr-2"></i>
@@ -487,8 +569,7 @@
                 lastFetched: null,
 
                 // Available Transaction Types
-                availableTransactionTypes: [
-                    {
+                availableTransactionTypes: [{
                         value: 'IN',
                         label: 'Barang Masuk',
                         description: 'Penerimaan barang baru dari supplier/vendor'
@@ -522,7 +603,12 @@
                         value: 'MAINTENANCE',
                         label: 'Maintenance',
                         description: 'Perawatan rutin dan preventive maintenance'
-                    }
+                    },
+                    {
+                        value: 'DAMAGED', // 🆕 BARU - TAMBAH INI
+                        label: 'Barang Rusak',
+                        description: 'Barang yang mengalami kerusakan dan perlu evaluasi'
+                    },
                 ],
 
                 // Form
@@ -534,7 +620,10 @@
                     to_location: '',
                     notes: '',
                     kondisi: 'good',
-                    lost_reason: ''
+                    lost_reason: '',
+                    damage_level: '', // light, medium, heavy, total
+                    damage_reason: '', // accident, wear, misuse, etc
+                    repair_estimate: '' // estimasi biaya repair
                 },
 
                 loading: false,
@@ -972,6 +1061,10 @@
                             notes: this.form.notes || null,
                             kondisi: this.form.kondisi || 'good',
                             lost_reason: this.form.lost_reason || null,
+                            // 🆕 TAMBAH DAMAGED FIELDS KE PAYLOAD
+                            damage_level: this.form.damage_level || null,
+                            damage_reason: this.form.damage_reason || null,
+                            repair_estimate: this.form.repair_estimate || null,
                             items: this.selectedItems.map(item => ({
                                 item_detail_id: item.item_detail_id,
                                 notes: null
@@ -1001,6 +1094,11 @@
                             successMessage += `Type: ${typeInfo.label}\n`;
                             successMessage += `Items: ${itemsCount} barang\n`;
 
+                            // 🆕 TAMBAH DAMAGE INFO KE SUCCESS MESSAGE
+                            if (this.form.transaction_type === 'DAMAGED' && this.form.damage_level) {
+                                successMessage += `Damage Level: ${this.form.damage_level}\n`;
+                                successMessage += `Damage Reason: ${this.form.damage_reason}\n`;
+                            }
                             if (this.form.reference_id) {
                                 successMessage += `Reference: ${this.form.reference_id}\n`;
                             }
@@ -1014,7 +1112,8 @@
                             // Redirect to transactions list
                             window.location.href = '{{ route('transactions.index') }}';
                         } else {
-                            this.showNotification('Error: ' + (data.message || 'Failed to create transaction'), 'error');
+                            this.showNotification('Error: ' + (data.message || 'Failed to create transaction'),
+                                'error');
                         }
 
                     } catch (error) {
@@ -1051,7 +1150,8 @@
                     }
 
                     // Check reference untuk tipe OUT
-                    if (this.form.transaction_type === 'OUT' && this.form.reference_type === 'ticket' && !this.form.reference_id) {
+                    if (this.form.transaction_type === 'OUT' && this.form.reference_type === 'ticket' && !this.form
+                        .reference_id) {
                         errors.push('Reference ID diperlukan untuk barang keluar');
                     }
 
@@ -1065,6 +1165,22 @@
                         }
                     }
 
+                    // 🆕 TAMBAH VALIDATION UNTUK DAMAGED
+                    if (this.form.transaction_type === 'DAMAGED') {
+                        if (!this.form.damage_level) {
+                            errors.push('Level kerusakan diperlukan untuk barang rusak');
+                        }
+                        if (!this.form.damage_reason) {
+                            errors.push('Alasan kerusakan diperlukan untuk barang rusak');
+                        }
+                        if (!this.form.notes?.trim() || this.form.notes.trim().length < 10) {
+                            errors.push('Catatan detail minimal 10 karakter untuk barang rusak');
+                        }
+                        // Repair estimate wajib untuk heavy damage
+                        if (this.form.damage_level === 'heavy' && !this.form.repair_estimate) {
+                            errors.push('Estimasi biaya repair wajib untuk kerusakan berat');
+                        }
+                    }
                     return errors;
                 },
 
@@ -1087,7 +1203,11 @@
                         to_location: '',
                         notes: '',
                         kondisi: 'good',
-                        lost_reason: ''
+                        lost_reason: '',
+                        // 🆕 RESET DAMAGED FIELDS
+                        damage_level: '',
+                        damage_reason: '',
+                        repair_estimate: ''
                     };
 
                     // Clear API data
@@ -1174,6 +1294,11 @@
                         case 'MAINTENANCE':
                             this.form.from_location = this.form.from_location || 'Warehouse';
                             this.form.to_location = this.form.to_location || 'Maintenance Area';
+                            break;
+
+                        case 'DAMAGED':
+                            this.form.from_location = this.form.from_location || 'Current Location';
+                            this.form.to_location = this.form.to_location || 'Damage Assessment';
                             break;
                     }
                 },
@@ -1305,7 +1430,7 @@
 
                 playBeepSound() {
                     try {
-                        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        const audioContext = new(window.AudioContext || window.webkitAudioContext)();
                         const oscillator = audioContext.createOscillator();
                         const gainNode = audioContext.createGain();
 
@@ -1334,7 +1459,8 @@
                         info: 'bg-blue-500'
                     };
 
-                    notification.className = `fixed top-4 right-4 ${colors[type]} text-white px-4 py-2 rounded-lg shadow-lg z-50 transform transition-transform duration-300`;
+                    notification.className =
+                        `fixed top-4 right-4 ${colors[type]} text-white px-4 py-2 rounded-lg shadow-lg z-50 transform transition-transform duration-300`;
                     notification.textContent = message;
                     notification.style.transform = 'translateX(100%)';
 

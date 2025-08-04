@@ -1477,4 +1477,102 @@ class Stock extends Model
             'suggestion' => 'Consider implementing dedicated stock_movements table for detailed movement tracking'
         ];
     }
+
+    // Method untuk hitung damaged count real-time
+    public function getDamagedCount(): int
+    {
+        return $this->item->itemDetails()
+            ->where('status', ItemDetail::STATUS_DAMAGED)
+            ->count();
+    }
+
+    public function getDamageRate(): float
+    {
+        if ($this->total_quantity === 0) return 0;
+
+        $damagedCount = $this->getDamagedCount();
+        return ($damagedCount / $this->total_quantity) * 100;
+    }
+
+    public function getHealthStatus(): array
+    {
+        $damageRate = $this->getDamageRate();
+
+        if ($damageRate >= 20) {
+            return [
+                'status' => 'critical',
+                'text' => 'High Damage Rate',
+                'class' => 'bg-red-100 text-red-800',
+                'percentage' => round($damageRate, 1)
+            ];
+        } elseif ($damageRate >= 10) {
+            return [
+                'status' => 'warning',
+                'text' => 'Moderate Damage',
+                'class' => 'bg-yellow-100 text-yellow-800',
+                'percentage' => round($damageRate, 1)
+            ];
+        } else {
+            return [
+                'status' => 'good',
+                'text' => 'Good Condition',
+                'class' => 'bg-green-100 text-green-800',
+                'percentage' => round($damageRate, 1)
+            ];
+        }
+    }
+
+    // Enhanced stock info dengan damaged
+    public function getStockInfo(): array
+    {
+        $stock = $this->stock;
+        $damagedCount = $this->getDamagedCount();
+
+        if (!$stock) {
+            return [
+                'available' => 0,
+                'used' => 0,
+                'damaged' => $damagedCount,  // 🆕 BARU
+                'total' => 0,
+                'status' => 'no_stock',
+                'status_text' => 'Belum ada stok',
+                'status_class' => 'badge-secondary'
+            ];
+        }
+
+        $available = $stock->quantity_available ?? 0;
+        $used = $stock->quantity_used ?? 0;
+        $total = $stock->total_quantity ?? 0;
+
+        // Enhanced status logic dengan damaged
+        $status = 'sufficient';
+        $statusText = 'Stok Cukup';
+        $statusClass = 'badge-success';
+
+        if ($total == 0) {
+            $status = 'empty';
+            $statusText = 'Stok Habis';
+            $statusClass = 'badge-danger';
+        } elseif ($available <= $this->min_stock) {
+            $status = 'low';
+            $statusText = 'Stok Rendah';
+            $statusClass = 'badge-warning';
+        } elseif ($this->getDamageRate() >= 20) {  // 🆕 Check damage rate
+            $status = 'damaged';
+            $statusText = 'Banyak Rusak';
+            $statusClass = 'badge-danger';
+        }
+
+        return [
+            'available' => $available,
+            'used' => $used,
+            'damaged' => $damagedCount,  // 🆕 BARU
+            'total' => $total,
+            'min_stock' => $this->min_stock,
+            'damage_rate' => $this->getDamageRate(),  // 🆕 BARU
+            'status' => $status,
+            'status_text' => $statusText,
+            'status_class' => $statusClass
+        ];
+    }
 }

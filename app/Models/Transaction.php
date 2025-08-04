@@ -31,6 +31,9 @@ class Transaction extends Model
         'approved_by',
         'transaction_date',
         'approved_date',
+        'damage_level',        // 🆕 BARU
+        'damage_reason',       // 🆕 BARU
+        'repair_estimate',     // 🆕 BARU
     ];
 
     protected $casts = [
@@ -39,6 +42,7 @@ class Transaction extends Model
         'approved_date' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'repair_estimate' => 'decimal:2',  // 🆕 BARU
     ];
 
     // Transaction types constants
@@ -47,6 +51,8 @@ class Transaction extends Model
     const TYPE_REPAIR = 'REPAIR';
     const TYPE_LOST = 'LOST';
     const TYPE_RETURN = 'RETURN';
+    const TYPE_DAMAGED = 'DAMAGED';
+
 
     // Transaction statuses constants
     const STATUS_PENDING = 'pending';
@@ -54,6 +60,25 @@ class Transaction extends Model
     const STATUS_REJECTED = 'rejected';
     const STATUS_COMPLETED = 'completed';
     const STATUS_CANCELLED = 'cancelled';
+
+    const DAMAGE_LEVELS = [
+        'light' => 'Ringan',
+        'medium' => 'Sedang',
+        'heavy' => 'Berat',
+        'total' => 'Total'
+    ];
+
+    const DAMAGE_REASONS = [
+        'accident' => 'Kecelakaan/Terjatuh',
+        'wear' => 'Keausan Normal',
+        'misuse' => 'Pemakaian Salah',
+        'environment' => 'Faktor Lingkungan',
+        'manufacturing' => 'Cacat Produksi',
+        'electrical' => 'Kerusakan Elektrik',
+        'mechanical' => 'Kerusakan Mekanik',
+        'water_damage' => 'Kerusakan Air',
+        'other' => 'Lainnya'
+    ];
 
     // ================================================================
     // MODEL EVENTS - AUTO SYNC WHEN APPROVED
@@ -277,6 +302,8 @@ class Transaction extends Model
             case self::TYPE_LOST:
                 // Barang hilang - jadi 'lost'
                 return 'lost';
+            case self::TYPE_DAMAGED:  // 🆕 BARU
+                return 'damaged';
 
             default:
                 // Tidak ada perubahan status
@@ -296,6 +323,7 @@ class Transaction extends Model
             self::TYPE_REPAIR => 'Barang Repair',
             self::TYPE_LOST => 'Barang Hilang',
             self::TYPE_RETURN => 'Pengembalian',
+            self::TYPE_DAMAGED => 'Barang Rusak',
         ];
     }
 
@@ -342,6 +370,13 @@ class Transaction extends Model
                 'class' => 'bg-purple-100 text-purple-800',
                 'badge_class' => 'badge-info',
                 'icon' => 'fas fa-undo'
+            ],
+            self::TYPE_DAMAGED => [  // 🆕 BARU
+                'text' => 'Barang Rusak',
+                'class' => 'bg-red-100 text-red-800',
+                'badge_class' => 'badge-danger',
+                'icon' => 'fas fa-exclamation-triangle',
+                'gradient' => 'from-red-600 to-red-700'
             ],
         ];
 
@@ -411,9 +446,9 @@ class Transaction extends Model
 
         switch (strtolower($levelName)) {
             case 'admin':
-                return [self::TYPE_IN, self::TYPE_OUT, self::TYPE_REPAIR, self::TYPE_LOST, self::TYPE_RETURN];
+                return [self::TYPE_IN, self::TYPE_OUT, self::TYPE_REPAIR, self::TYPE_LOST, self::TYPE_RETURN,self::TYPE_DAMAGED];
             case 'logistik':
-                return [self::TYPE_IN, self::TYPE_OUT, self::TYPE_REPAIR, self::TYPE_LOST, self::TYPE_RETURN];
+                return [self::TYPE_IN, self::TYPE_OUT, self::TYPE_REPAIR, self::TYPE_LOST, self::TYPE_RETURN,self::TYPE_DAMAGED];
             case 'teknisi':
                 return [self::TYPE_IN, self::TYPE_OUT];
             default:
@@ -756,21 +791,21 @@ class Transaction extends Model
         }
     }
     // Get kondisi options (simple)
-public static function getKondisiOptions(): array
-{
-    return [
-        'good' => [
-            'text' => 'Good',
-            'class' => 'bg-green-100 text-green-800',
-            'icon' => 'fas fa-check-circle'
-        ],
-        'no_good' => [
-            'text' => 'No Good',
-            'class' => 'bg-red-100 text-red-800',
-            'icon' => 'fas fa-times-circle'
-        ]
-    ];
-}
+    public static function getKondisiOptions(): array
+    {
+        return [
+            'good' => [
+                'text' => 'Good',
+                'class' => 'bg-green-100 text-green-800',
+                'icon' => 'fas fa-check-circle'
+            ],
+            'no_good' => [
+                'text' => 'No Good',
+                'class' => 'bg-red-100 text-red-800',
+                'icon' => 'fas fa-times-circle'
+            ]
+        ];
+    }
 
     // SIMPLE: Auto determine kondisi based on transaction type
     private function getNewKondisi(): string
@@ -784,6 +819,19 @@ public static function getKondisiOptions(): array
             case self::TYPE_REPAIR:
                 // Kalau ke repair = no_good
                 return 'no_good';
+            case self::TYPE_DAMAGED:  // 🆕 BARU
+                // Auto-sync kondisi berdasarkan damage level
+                switch ($this->damage_level) {
+                    case 'light':
+                        return 'fair';
+                    case 'medium':
+                        return 'no_good';
+                    case 'heavy':
+                    case 'total':
+                        return 'broken';
+                    default:
+                        return 'no_good';
+                }
 
             case self::TYPE_OUT:
             case self::TYPE_LOST:
@@ -793,6 +841,72 @@ public static function getKondisiOptions(): array
         }
     }
 
+    public static function getDamageLevels(): array
+    {
+        return self::DAMAGE_LEVELS;
+    }
+
+    public static function getDamageReasons(): array
+    {
+        return self::DAMAGE_REASONS;
+    }
+    public function getDamageLevelInfo(): array
+    {
+        $levels = [
+            'light' => [
+                'text' => 'Ringan',
+                'description' => 'Kerusakan kecil, mudah diperbaiki',
+                'class' => 'bg-yellow-100 text-yellow-800',
+                'icon' => 'fas fa-tools'
+            ],
+            'medium' => [
+                'text' => 'Sedang',
+                'description' => 'Kerusakan menengah, perlu repair khusus',
+                'class' => 'bg-orange-100 text-orange-800',
+                'icon' => 'fas fa-wrench'
+            ],
+            'heavy' => [
+                'text' => 'Berat',
+                'description' => 'Kerusakan parah, repair mahal',
+                'class' => 'bg-red-100 text-red-800',
+                'icon' => 'fas fa-exclamation-triangle'
+            ],
+            'total' => [
+                'text' => 'Total',
+                'description' => 'Rusak total, tidak bisa diperbaiki',
+                'class' => 'bg-gray-100 text-gray-800',
+                'icon' => 'fas fa-times-circle'
+            ]
+        ];
+
+        return $levels[$this->damage_level] ?? $levels['medium'];
+    }
+
+      public function validateDamagedTransaction(): array
+    {
+        $errors = [];
+
+        if ($this->transaction_type === self::TYPE_DAMAGED) {
+            if (empty($this->damage_level)) {
+                $errors[] = 'Damage level wajib untuk transaksi barang rusak';
+            }
+
+            if (empty($this->damage_reason)) {
+                $errors[] = 'Alasan kerusakan wajib untuk transaksi barang rusak';
+            }
+
+            if (empty($this->notes) || strlen($this->notes) < 10) {
+                $errors[] = 'Catatan detail minimal 10 karakter untuk transaksi barang rusak';
+            }
+
+            // Repair estimate wajib untuk heavy damage
+            if ($this->damage_level === 'heavy' && empty($this->repair_estimate)) {
+                $errors[] = 'Estimasi biaya repair wajib untuk kerusakan berat';
+            }
+        }
+
+        return $errors;
+    }
 
     /**
      * Helper method: Get penjelasan perubahan untuk logging
