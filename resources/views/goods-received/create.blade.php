@@ -45,7 +45,7 @@
             </div>
             <div>
                 <h1 class="text-2xl font-bold text-gray-900">Terima Barang</h1>
-                <p class="text-gray-600 mt-1">Catat penerimaan barang dengan serial number tracking</p>
+                <p class="text-gray-600 mt-1" x-text="receiptType === 'po_based' ? 'Catat penerimaan barang berdasarkan Purchase Order' : 'Catat penerimaan barang langsung dari supplier'"></p>
             </div>
         </div>
         <div class="flex flex-col sm:flex-row gap-3">
@@ -57,9 +57,69 @@
         </div>
     </div>
 
+    <!-- Receipt Type Selection -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+            <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                <i class="fas fa-clipboard-list mr-2 text-blue-600"></i>
+                Jenis Penerimaan
+            </h3>
+        </div>
+        <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- PO Based Receipt -->
+                <div class="relative">
+                    <input type="radio" id="receipt_po_based" x-model="receiptType" value="po_based"
+                           class="peer absolute opacity-0">
+                    <label for="receipt_po_based"
+                           class="flex flex-col p-4 border-2 border-gray-200 rounded-xl cursor-pointer peer-checked:border-green-500 peer-checked:bg-green-50 hover:border-green-300 transition-all">
+                        <div class="flex items-center space-x-3 mb-2">
+                            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-file-invoice text-blue-600"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-900">Berdasarkan PO</h4>
+                                <p class="text-sm text-gray-600">Terima barang sesuai Purchase Order</p>
+                            </div>
+                        </div>
+                        <ul class="text-xs text-gray-500 space-y-1">
+                            <li>• Items otomatis dari PO yang dipilih</li>
+                            <li>• Tracking progress PO completion</li>
+                            <li>• Validasi terhadap quantity ordered</li>
+                        </ul>
+                    </label>
+                </div>
+
+                <!-- Direct Receipt -->
+                <div class="relative">
+                    <input type="radio" id="receipt_direct" x-model="receiptType" value="direct"
+                           class="peer absolute opacity-0">
+                    <label for="receipt_direct"
+                           class="flex flex-col p-4 border-2 border-gray-200 rounded-xl cursor-pointer peer-checked:border-green-500 peer-checked:bg-green-50 hover:border-green-300 transition-all">
+                        <div class="flex items-center space-x-3 mb-2">
+                            <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-truck-loading text-purple-600"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold text-gray-900">Penerimaan Langsung</h4>
+                                <p class="text-sm text-gray-600">Terima barang tanpa PO</p>
+                            </div>
+                        </div>
+                        <ul class="text-xs text-gray-500 space-y-1">
+                            <li>• Pilih supplier dan items manual</li>
+                            <li>• Untuk barang urgent atau donasi</li>
+                            <li>• Input harga dan quantity bebas</li>
+                        </ul>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- GR Form -->
     <form method="POST" action="{{ route('goods-received.store') }}" x-ref="grForm" @submit.prevent="submitForm()">
         @csrf
+        <input type="hidden" name="receipt_type" x-model="receiptType">
 
         <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
             <!-- Left Column - Form (3/4 width) -->
@@ -81,9 +141,9 @@
                                     Nomor GR
                                 </label>
                                 <div class="p-3 bg-gray-50 rounded-lg border">
-                                    <span class="text-sm font-mono text-gray-900">{{ $receiveNumber }}</span>
+                                    <span class="text-sm font-mono text-gray-900" x-text="receiveNumber"></span>
                                 </div>
-                                <input type="hidden" name="receive_number" value="{{ $receiveNumber }}">
+                                <input type="hidden" name="receive_number" x-model="receiveNumber">
                             </div>
 
                             <!-- Receive Date -->
@@ -96,8 +156,8 @@
                                     class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
                             </div>
 
-                            <!-- Purchase Order -->
-                            <div class="md:col-span-2">
+                            <!-- PO Selection (Only for PO-based) -->
+                            <div x-show="receiptType === 'po_based'" class="md:col-span-2">
                                 <label for="po_id" class="block text-sm font-medium text-gray-700 mb-2">
                                     Purchase Order <span class="text-red-500">*</span>
                                 </label>
@@ -115,6 +175,57 @@
                                     @endforeach
                                 </select>
                             </div>
+
+                            <!-- Supplier Selection (Only for Direct Receipt) -->
+                            <div x-show="receiptType === 'direct'" class="md:col-span-2">
+                                <label for="supplier_id" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Supplier <span class="text-red-500">*</span>
+                                </label>
+                                <select id="supplier_id" name="supplier_id" x-model="selectedSupplierId"
+                                    @change="onSupplierChange()"
+                                    class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                                    <option value="">Pilih Supplier</option>
+                                    @foreach ($suppliers as $supplier)
+                                        <option value="{{ $supplier->supplier_id }}">
+                                            {{ $supplier->supplier_name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <!-- External References (Only for Direct Receipt) -->
+                            <template x-if="receiptType === 'direct'">
+                                <div class="md:col-span-2">
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <label for="delivery_note_number" class="block text-sm font-medium text-gray-700 mb-2">
+                                                No. Surat Jalan
+                                            </label>
+                                            <input type="text" id="delivery_note_number" name="delivery_note_number"
+                                                placeholder="Nomor surat jalan..."
+                                                class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                                        </div>
+
+                                        <div>
+                                            <label for="invoice_number" class="block text-sm font-medium text-gray-700 mb-2">
+                                                No. Invoice
+                                            </label>
+                                            <input type="text" id="invoice_number" name="invoice_number"
+                                                placeholder="Nomor invoice..."
+                                                class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                                        </div>
+
+                                        <div>
+                                            <label for="external_reference" class="block text-sm font-medium text-gray-700 mb-2">
+                                                Referensi Lain
+                                            </label>
+                                            <input type="text" id="external_reference" name="external_reference"
+                                                placeholder="Referensi eksternal..."
+                                                class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all">
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
                         </div>
 
                         <!-- Notes -->
@@ -136,8 +247,15 @@
                                 <i class="fas fa-boxes mr-2 text-purple-600"></i>
                                 Items yang Diterima
                             </h3>
-                            <div x-show="selectedPO" class="text-sm text-gray-600">
+                            <div x-show="receiptType === 'po_based' && selectedPO" class="text-sm text-gray-600">
                                 <span x-text="selectedPO ? selectedPO.po_number : ''"></span>
+                            </div>
+                            <div x-show="receiptType === 'direct'" class="flex items-center space-x-2">
+                                <button type="button" @click="addDirectItem()"
+                                    class="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm">
+                                    <i class="fas fa-plus mr-1"></i>
+                                    Tambah Item
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -146,15 +264,15 @@
                     <div x-show="loadingPO" class="p-8 text-center">
                         <div class="inline-flex items-center">
                             <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600 mr-3"></div>
-                            <span class="text-gray-600">Memuat data PO...</span>
+                            <span class="text-gray-600">Memuat data...</span>
                         </div>
                     </div>
 
-                    <!-- No PO Selected -->
-                    <div x-show="!selectedPOId && !loadingPO" class="p-8 text-center">
+                    <!-- No Selection State -->
+                    <div x-show="!hasSelectedSource() && !loadingPO" class="p-8 text-center">
                         <i class="fas fa-file-invoice text-4xl text-gray-300 mb-4"></i>
-                        <h3 class="text-lg font-medium text-gray-900 mb-2">Pilih Purchase Order</h3>
-                        <p class="text-gray-500">Pilih PO terlebih dahulu untuk menampilkan items yang dapat diterima</p>
+                        <h3 class="text-lg font-medium text-gray-900 mb-2" x-text="receiptType === 'po_based' ? 'Pilih Purchase Order' : 'Pilih Supplier'"></h3>
+                        <p class="text-gray-500" x-text="receiptType === 'po_based' ? 'Pilih PO terlebih dahulu untuk menampilkan items yang dapat diterima' : 'Pilih supplier dan mulai menambahkan items'"></p>
                     </div>
 
                     <!-- Items Table -->
@@ -163,15 +281,16 @@
                             <thead class="bg-gray-50 border-b">
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sisa Order</th>
+                                    <th x-show="receiptType === 'po_based'" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sisa Order</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty Terima</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Harga</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Serial Numbers</th>
+                                    <th x-show="receiptType === 'direct'" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200">
-                                <template x-for="(item, index) in availableItems" :key="item.item_id">
+                                <template x-for="(item, index) in availableItems" :key="getItemKey(item, index)">
                                     <tr class="hover:bg-gray-50">
                                         <td class="px-6 py-4">
                                             <div class="flex items-center space-x-3">
@@ -186,7 +305,8 @@
                                             </div>
                                         </td>
 
-                                        <td class="px-6 py-4">
+                                        <!-- Remaining Quantity (PO-based only) -->
+                                        <td x-show="receiptType === 'po_based'" class="px-6 py-4">
                                             <div class="text-sm font-medium text-gray-900" x-text="formatNumber(item.remaining_quantity)"></div>
                                             <div class="text-xs text-gray-500" x-text="item.unit"></div>
                                             <div class="text-xs text-gray-400">
@@ -194,13 +314,14 @@
                                             </div>
                                         </td>
 
+                                        <!-- Quantity Received -->
                                         <td class="px-6 py-4">
                                             <div class="space-y-2">
                                                 <input type="number"
                                                     :name="`items[${index}][quantity_received]`"
                                                     x-model="item.quantity_received"
                                                     @input="updateItemCalculations(index)"
-                                                    :max="item.remaining_quantity"
+                                                    :max="receiptType === 'po_based' ? item.remaining_quantity : null"
                                                     step="1"
                                                     min="0"
                                                     placeholder="0"
@@ -209,27 +330,43 @@
                                                 <!-- Hidden inputs -->
                                                 <input type="hidden" :name="`items[${index}][item_id]`" x-model="item.item_id">
                                                 <input type="hidden" :name="`items[${index}][unit_price]`" x-model="item.unit_price">
+                                                <input type="hidden" x-show="receiptType === 'po_based'" :name="`items[${index}][po_detail_id]`" x-model="item.po_detail_id">
 
                                                 <!-- Validation -->
-                                                <div x-show="item.quantity_received > item.remaining_quantity"
+                                                <div x-show="receiptType === 'po_based' && item.quantity_received > item.remaining_quantity"
                                                      class="text-xs text-red-600">
                                                     Melebihi sisa order
                                                 </div>
                                             </div>
                                         </td>
 
+                                        <!-- Unit Price -->
                                         <td class="px-6 py-4">
-                                            <div class="text-sm font-medium text-gray-900" x-text="formatCurrency(item.unit_price)"></div>
-                                            <div class="text-xs text-gray-500" x-text="`per ${item.unit}`"></div>
+                                            <div x-show="receiptType === 'po_based'">
+                                                <div class="text-sm font-medium text-gray-900" x-text="formatCurrency(item.unit_price)"></div>
+                                                <div class="text-xs text-gray-500" x-text="`per ${item.unit}`"></div>
+                                            </div>
+                                            <div x-show="receiptType === 'direct'">
+                                                <input type="number"
+                                                    :name="`items[${index}][unit_price]`"
+                                                    x-model="item.unit_price"
+                                                    @input="updateItemCalculations(index)"
+                                                    step="0.01"
+                                                    min="0"
+                                                    placeholder="0.00"
+                                                    class="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                                                <div class="text-xs text-gray-500 mt-1" x-text="`per ${item.unit}`"></div>
+                                            </div>
                                         </td>
 
+                                        <!-- Total -->
                                         <td class="px-6 py-4">
                                             <div class="text-sm font-medium text-gray-900" x-text="formatCurrency(item.total)"></div>
                                         </td>
 
+                                        <!-- Serial Numbers -->
                                         <td class="px-6 py-4">
                                             <div class="space-y-2">
-                                                <!-- Button untuk manage serial numbers -->
                                                 <button type="button"
                                                     @click="openSerialNumberModal(index)"
                                                     :disabled="!item.quantity_received || item.quantity_received <= 0"
@@ -253,6 +390,14 @@
                                                 </div>
                                             </div>
                                         </td>
+
+                                        <!-- Actions (Direct Receipt only) -->
+                                        <td x-show="receiptType === 'direct'" class="px-6 py-4">
+                                            <button type="button" @click="removeDirectItem(index)"
+                                                class="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
                                     </tr>
                                 </template>
                             </tbody>
@@ -264,7 +409,7 @@
                         <div class="space-y-4">
                             <h4 class="text-sm font-medium text-gray-900">Informasi Tambahan (Opsional)</h4>
 
-                            <template x-for="(item, index) in availableItems" :key="'info-' + item.item_id">
+                            <template x-for="(item, index) in availableItems" :key="'info-' + getItemKey(item, index)">
                                 <div x-show="item.quantity_received > 0" class="bg-gray-50 rounded-lg p-4">
                                     <div class="text-sm font-medium text-gray-900 mb-3" x-text="item.item_name"></div>
 
@@ -323,16 +468,17 @@
 
             <!-- Right Column - Summary & Actions (1/4 width) -->
             <div class="space-y-6">
-                <!-- PO Info Card -->
+                <!-- Source Info Card -->
                 <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
                     <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
                         <h3 class="text-lg font-semibold text-gray-900 flex items-center">
-                            <i class="fas fa-file-invoice mr-2 text-blue-600"></i>
-                            Purchase Order
+                            <i class="fas fa-info-circle mr-2" :class="receiptType === 'po_based' ? 'text-blue-600' : 'text-purple-600'"></i>
+                            <span x-text="receiptType === 'po_based' ? 'Purchase Order' : 'Supplier Info'"></span>
                         </h3>
                     </div>
                     <div class="p-6">
-                        <div x-show="selectedPO" class="space-y-4">
+                        <!-- PO Info -->
+                        <div x-show="receiptType === 'po_based' && selectedPO" class="space-y-4">
                             <div>
                                 <label class="text-sm font-medium text-gray-700">Nomor PO</label>
                                 <p class="text-sm text-gray-900 mt-1" x-text="selectedPO?.po_number"></p>
@@ -346,9 +492,29 @@
                                 <p class="text-sm text-gray-900 mt-1" x-text="selectedPO?.po_date"></p>
                             </div>
                         </div>
-                        <div x-show="!selectedPO" class="text-center py-4">
-                            <i class="fas fa-file-invoice text-3xl text-gray-300 mb-2"></i>
-                            <p class="text-gray-500 text-sm">Pilih PO untuk melihat informasi</p>
+
+                        <!-- Supplier Info (Direct Receipt) -->
+                        <div x-show="receiptType === 'direct' && selectedSupplier" class="space-y-4">
+                            <div>
+                                <label class="text-sm font-medium text-gray-700">Supplier</label>
+                                <p class="text-sm text-gray-900 mt-1" x-text="selectedSupplier?.supplier_name"></p>
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium text-gray-700">Jenis Penerimaan</label>
+                                <p class="text-sm text-gray-900 mt-1">Penerimaan Langsung</p>
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium text-gray-700">Status</label>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                    Direct Receipt
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- No Selection -->
+                        <div x-show="!hasSelectedSource()" class="text-center py-4">
+                            <i class="text-3xl text-gray-300 mb-2" :class="receiptType === 'po_based' ? 'fas fa-file-invoice' : 'fas fa-building'"></i>
+                            <p class="text-gray-500 text-sm" x-text="receiptType === 'po_based' ? 'Pilih PO untuk melihat informasi' : 'Pilih supplier untuk melanjutkan'"></p>
                         </div>
                     </div>
                 </div>
@@ -407,7 +573,7 @@
 
                         <button type="button"
                                 @click="generateAllSerialNumbers()"
-                                :disabled="!selectedPOId || totalReceived === 0"
+                                :disabled="!hasSelectedSource() || totalReceived === 0"
                                 class="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed">
                             <i class="fas fa-magic"></i>
                             <span>Auto Generate SN</span>
@@ -424,7 +590,7 @@
                     <ul class="text-sm text-blue-800 space-y-2">
                         <li class="flex items-start">
                             <i class="fas fa-check text-blue-600 mr-2 mt-0.5 text-xs"></i>
-                            <span>Semua barang yang diterima akan masuk sebagai stock tersedia</span>
+                            <span x-text="receiptType === 'po_based' ? 'Barang diterima akan dicocokkan dengan PO yang dipilih' : 'Semua barang yang diterima akan masuk sebagai stock tersedia'"></span>
                         </li>
                         <li class="flex items-start">
                             <i class="fas fa-check text-blue-600 mr-2 mt-0.5 text-xs"></i>
@@ -434,11 +600,100 @@
                             <i class="fas fa-check text-blue-600 mr-2 mt-0.5 text-xs"></i>
                             <span>Setiap unit akan dibuatkan ItemDetail dengan QR code</span>
                         </li>
+                        <li x-show="receiptType === 'direct'" class="flex items-start">
+                            <i class="fas fa-check text-blue-600 mr-2 mt-0.5 text-xs"></i>
+                            <span>Penerimaan langsung tidak terkait dengan PO</span>
+                        </li>
                     </ul>
                 </div>
             </div>
         </div>
     </form>
+
+    <!-- Add Item Modal (For Direct Receipt) -->
+    <div x-show="showAddItemModal"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 scale-90"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-90"
+         class="fixed inset-0 z-50 overflow-y-auto">
+
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div class="absolute inset-0 bg-gray-500 opacity-75" @click="closeAddItemModal()"></div>
+            </div>
+
+            <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900">Tambah Item</h3>
+                        <button @click="closeAddItemModal()" class="text-gray-400 hover:text-gray-600">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+
+                    <div class="space-y-4">
+                        <!-- Item Selection -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Pilih Item <span class="text-red-500">*</span>
+                            </label>
+                            <select x-model="newItemId" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Pilih Item</option>
+                                @foreach ($items as $item)
+                                    <option value="{{ $item->item_id }}"
+                                            data-item-code="{{ $item->item_code }}"
+                                            data-item-name="{{ $item->item_name }}"
+                                            data-category-name="{{ $item->category->category_name ?? 'N/A' }}"
+                                            data-unit="{{ $item->unit }}">
+                                        {{ $item->item_code }} - {{ $item->item_name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <!-- Quantity -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Quantity <span class="text-red-500">*</span>
+                            </label>
+                            <input type="number" x-model="newItemQuantity" min="1" step="1" placeholder="0"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <!-- Unit Price -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Harga Satuan <span class="text-red-500">*</span>
+                            </label>
+                            <input type="number" x-model="newItemPrice" min="0" step="0.01" placeholder="0.00"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+
+                    <!-- Modal Actions -->
+                    <div class="mt-6 flex flex-col sm:flex-row gap-3">
+                        <button type="button"
+                            @click="confirmAddItem()"
+                            :disabled="!newItemId || !newItemQuantity || newItemQuantity <= 0 || !newItemPrice || newItemPrice < 0"
+                            class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="fas fa-plus mr-2"></i>
+                            Tambah Item
+                        </button>
+
+                        <button type="button"
+                            @click="closeAddItemModal()"
+                            class="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors">
+                            <i class="fas fa-times mr-2"></i>
+                            Batal
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Serial Number Modal -->
     <div x-show="showSerialModal"
@@ -585,11 +840,27 @@
 function goodsReceivedCreate() {
     return {
         // Basic properties
+        receiptType: '{{ old('receipt_type', $receiptType ?? 'po_based') }}',
+        receiveNumber: '{{ $receiveNumber }}',
+
+        // PO-based properties
         selectedPOId: '{{ old('po_id', request('po_id')) }}',
         selectedPO: null,
+
+        // Direct receipt properties
+        selectedSupplierId: '{{ old('supplier_id') }}',
+        selectedSupplier: null,
+
+        // Common properties
         availableItems: [],
         loadingPO: false,
         submitting: false,
+
+        // Direct receipt - Add item modal
+        showAddItemModal: false,
+        newItemId: '',
+        newItemQuantity: 1,
+        newItemPrice: 0,
 
         // Serial number management
         showSerialModal: false,
@@ -625,7 +896,11 @@ function goodsReceivedCreate() {
         },
 
         get canSubmit() {
-            if (!this.selectedPOId || this.itemsWithReceiving === 0) return false;
+            // Must have selected source
+            if (!this.hasSelectedSource()) return false;
+
+            // Must have items with receiving
+            if (this.itemsWithReceiving === 0) return false;
 
             // Check if all items with quantity_received have complete serial numbers
             return this.availableItems.every(item => {
@@ -651,13 +926,82 @@ function goodsReceivedCreate() {
         init() {
             console.log('Initializing goods received create form');
 
-            // Load PO if pre-selected
-            if (this.selectedPOId) {
+            // Watch receipt type changes
+            this.$watch('receiptType', () => {
+                this.onReceiptTypeChange();
+            });
+
+            // Load initial data based on receipt type
+            if (this.receiptType === 'po_based' && this.selectedPOId) {
                 this.onPOChange();
+            } else if (this.receiptType === 'direct' && this.selectedSupplierId) {
+                this.onSupplierChange();
             }
+
+            // Update receive number when receipt type changes
+            this.updateReceiveNumber();
 
             // Initialize serial numbers storage for each item
             this.initializeSerialNumbers();
+        },
+
+        // NEW: Handle receipt type change
+        onReceiptTypeChange() {
+            // Clear existing data when switching types
+            this.availableItems = [];
+            this.selectedPO = null;
+            this.selectedSupplier = null;
+            this.selectedPOId = '';
+            this.selectedSupplierId = '';
+
+            // Update receive number based on new type
+            this.updateReceiveNumber();
+
+            console.log('Receipt type changed to:', this.receiptType);
+        },
+
+        // NEW: Update receive number based on receipt type
+        async updateReceiveNumber() {
+            try {
+                const response = await fetch('/api/goods-received/generate-receive-number', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: JSON.stringify({
+                        receipt_type: this.receiptType
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    this.receiveNumber = data.data.receive_number;
+                    console.log('Updated receive number:', this.receiveNumber);
+                }
+            } catch (error) {
+                console.error('Error updating receive number:', error);
+            }
+        },
+
+        // NEW: Check if has selected source (PO or Supplier)
+        hasSelectedSource() {
+            if (this.receiptType === 'po_based') {
+                return !!this.selectedPOId;
+            } else if (this.receiptType === 'direct') {
+                return !!this.selectedSupplierId;
+            }
+            return false;
+        },
+
+        // NEW: Get unique item key for template loops
+        getItemKey(item, index) {
+            if (this.receiptType === 'po_based') {
+                return `po-${item.po_detail_id || item.item_id}-${index}`;
+            } else {
+                return `direct-${item.item_id}-${index}`;
+            }
         },
 
         initializeSerialNumbers() {
@@ -669,8 +1013,9 @@ function goodsReceivedCreate() {
             });
         },
 
+        // EXISTING: PO Change handler (for PO-based receipts)
         async onPOChange() {
-            if (!this.selectedPOId) {
+            if (!this.selectedPOId || this.receiptType !== 'po_based') {
                 this.selectedPO = null;
                 this.availableItems = [];
                 return;
@@ -736,6 +1081,106 @@ function goodsReceivedCreate() {
                 this.availableItems = [];
             } finally {
                 this.loadingPO = false;
+            }
+        },
+
+        // NEW: Supplier Change handler (for direct receipts)
+        async onSupplierChange() {
+            if (!this.selectedSupplierId || this.receiptType !== 'direct') {
+                this.selectedSupplier = null;
+                return;
+            }
+
+            console.log('Loading supplier details for ID:', this.selectedSupplierId);
+
+            try {
+                // Find supplier from available suppliers
+                const supplierSelect = document.getElementById('supplier_id');
+                const selectedOption = supplierSelect.options[supplierSelect.selectedIndex];
+
+                if (selectedOption && selectedOption.value) {
+                    this.selectedSupplier = {
+                        supplier_id: selectedOption.value,
+                        supplier_name: selectedOption.text
+                    };
+
+                    this.showNotification(`Supplier ${this.selectedSupplier.supplier_name} dipilih`, 'success');
+                }
+            } catch (error) {
+                console.error('Error setting supplier:', error);
+                this.showNotification('Gagal memilih supplier: ' + error.message, 'error');
+                this.selectedSupplier = null;
+            }
+        },
+
+        // NEW: Add Direct Item
+        addDirectItem() {
+            this.showAddItemModal = true;
+            this.newItemId = '';
+            this.newItemQuantity = 1;
+            this.newItemPrice = 0;
+        },
+
+        // NEW: Close Add Item Modal
+        closeAddItemModal() {
+            this.showAddItemModal = false;
+            this.newItemId = '';
+            this.newItemQuantity = 1;
+            this.newItemPrice = 0;
+        },
+
+        // NEW: Confirm Add Item
+        confirmAddItem() {
+            if (!this.newItemId || !this.newItemQuantity || this.newItemQuantity <= 0 || !this.newItemPrice || this.newItemPrice < 0) {
+                this.showNotification('Semua field harus diisi dengan benar', 'error');
+                return;
+            }
+
+            // Check if item already exists in the list
+            const existingItemIndex = this.availableItems.findIndex(item => item.item_id === this.newItemId);
+
+            if (existingItemIndex !== -1) {
+                this.showNotification('Item sudah ada dalam daftar', 'error');
+                return;
+            }
+
+            // Get item data from select option
+            const itemSelect = document.getElementById('new_item_select') || document.querySelector(`option[value="${this.newItemId}"]`);
+            const selectedOption = document.querySelector(`option[value="${this.newItemId}"]`);
+
+            if (!selectedOption) {
+                this.showNotification('Item tidak ditemukan', 'error');
+                return;
+            }
+
+            // Create new item object
+            const newItem = {
+                item_id: this.newItemId,
+                item_code: selectedOption.dataset.itemCode || 'N/A',
+                item_name: selectedOption.dataset.itemName || 'Unknown Item',
+                category_name: selectedOption.dataset.categoryName || 'N/A',
+                unit: selectedOption.dataset.unit || 'pcs',
+
+                // Direct receipt specific
+                quantity_received: parseInt(this.newItemQuantity),
+                unit_price: parseFloat(this.newItemPrice),
+                total: parseInt(this.newItemQuantity) * parseFloat(this.newItemPrice),
+                serialNumbers: []
+            };
+
+            // Add to available items
+            this.availableItems.push(newItem);
+
+            this.showNotification(`Item ${newItem.item_name} berhasil ditambahkan`, 'success');
+            this.closeAddItemModal();
+        },
+
+        // NEW: Remove Direct Item
+        removeDirectItem(index) {
+            if (index >= 0 && index < this.availableItems.length) {
+                const removedItem = this.availableItems[index];
+                this.availableItems.splice(index, 1);
+                this.showNotification(`Item ${removedItem.item_name} dihapus`, 'info');
             }
         },
 
@@ -871,11 +1316,13 @@ function goodsReceivedCreate() {
                 const response = await fetch('/api/goods-received/serial-number-template', {
                     method: 'POST',
                     headers: {
+                        'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                     },
-                    body: new URLSearchParams({
+                    body: JSON.stringify({
                         item_id: this.currentItemForSerial.item_id,
-                        quantity: this.currentItemForSerial.quantity_received
+                        quantity: this.currentItemForSerial.quantity_received,
+                        format: 'f1' // Use F1 format by default
                     })
                 });
 
@@ -927,10 +1374,17 @@ function goodsReceivedCreate() {
 
                 if (quantity > 0) {
                     try {
-                        const response = await fetch(`/api/goods-received/serial-number-template?item_id=${item.item_id}&quantity=${quantity}`, {
+                        const response = await fetch('/api/goods-received/serial-number-template', {
+                            method: 'POST',
                             headers: {
+                                'Content-Type': 'application/json',
                                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                            }
+                            },
+                            body: JSON.stringify({
+                                item_id: item.item_id,
+                                quantity: quantity,
+                                format: 'f1'
+                            })
                         });
 
                         const data = await response.json();
@@ -957,10 +1411,26 @@ function goodsReceivedCreate() {
                 const formData = new FormData();
 
                 // Basic form fields
-                formData.append('receive_number', document.querySelector('input[name="receive_number"]').value);
-                formData.append('po_id', this.selectedPOId);
+                formData.append('receive_number', this.receiveNumber);
+                formData.append('receipt_type', this.receiptType);
                 formData.append('receive_date', document.querySelector('input[name="receive_date"]').value);
                 formData.append('notes', document.querySelector('textarea[name="notes"]').value);
+
+                // Receipt type specific fields
+                if (this.receiptType === 'po_based') {
+                    formData.append('po_id', this.selectedPOId);
+                } else if (this.receiptType === 'direct') {
+                    formData.append('supplier_id', this.selectedSupplierId);
+
+                    // Optional external references
+                    const deliveryNote = document.querySelector('input[name="delivery_note_number"]')?.value;
+                    const invoiceNumber = document.querySelector('input[name="invoice_number"]')?.value;
+                    const externalRef = document.querySelector('input[name="external_reference"]')?.value;
+
+                    if (deliveryNote) formData.append('delivery_note_number', deliveryNote);
+                    if (invoiceNumber) formData.append('invoice_number', invoiceNumber);
+                    if (externalRef) formData.append('external_reference', externalRef);
+                }
 
                 // Items data
                 this.availableItems.forEach((item, index) => {
@@ -969,6 +1439,11 @@ function goodsReceivedCreate() {
                         formData.append(`items[${index}][item_id]`, item.item_id);
                         formData.append(`items[${index}][quantity_received]`, qtyReceived);
                         formData.append(`items[${index}][unit_price]`, item.unit_price);
+
+                        // PO-specific fields
+                        if (this.receiptType === 'po_based' && item.po_detail_id) {
+                            formData.append(`items[${index}][po_detail_id]`, item.po_detail_id);
+                        }
 
                         // Optional fields
                         const batchNumber = document.querySelector(`input[name="items[${index}][batch_number]"]`)?.value;

@@ -262,9 +262,17 @@ Route::middleware('auth')->group(function () {
 
     // READ - All levels can view (filtered by controller based on user level)
     Route::middleware('permission:purchase_orders,read')->group(function () {
+            Route::get('{purchaseOrder}/download-pdf', [PurchaseOrderController::class, 'downloadPDF'])
+        ->name('purchase-orders.download-pdf');
+
+    Route::get('{purchaseOrder}/view-pdf', [PurchaseOrderController::class, 'viewPDF'])
+        ->name('purchase-orders.view-pdf');
         Route::get('/purchase-orders', [PurchaseOrderController::class, 'index'])->name('purchase-orders.index');
         Route::get('/purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'show'])->name('purchase-orders.show');
         Route::get('/purchase-orders/{purchaseOrder}/print', [PurchaseOrderController::class, 'print'])->name('purchase-orders.print');
+
+
+
     });
 
     // UPDATE - Basic updates (Logistik untuk draft, Admin untuk override)

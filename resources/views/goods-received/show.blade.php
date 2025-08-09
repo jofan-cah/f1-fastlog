@@ -105,17 +105,7 @@
                             <div class="text-lg font-semibold text-gray-900">{{ $goodsReceived->receive_number }}</div>
                         </div>
 
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Purchase Order</label>
-                            <div class="flex items-center space-x-2">
-                                <span class="text-lg font-semibold text-blue-600">{{ $goodsReceived->purchaseOrder->po_number }}</span>
-                                <a href="{{ route('purchase-orders.show', $goodsReceived->purchaseOrder->po_id) }}"
-                                   class="text-blue-600 hover:text-blue-800 text-sm">
-                                    <i class="fas fa-external-link-alt"></i>
-                                </a>
-                            </div>
-                            <div class="text-sm text-gray-500">Tanggal PO: {{ $goodsReceived->purchaseOrder->po_date->format('d/m/Y') }}</div>
-                        </div>
+
 
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Tanggal Penerimaan</label>
@@ -259,18 +249,18 @@
                             <div class="text-lg font-bold text-gray-900">{{ number_format($summaryInfo['total_quantity']) }}</div>
                             <div class="text-xs text-gray-600">Total Qty</div>
                         </div>
-                        <div class="text-center">
-                            <div class="text-lg font-bold text-blue-600">{{ number_format($summaryInfo['total_to_stock']) }}</div>
+                        {{-- <div class="text-center">
+                            <div class="text-lg font-bold text-blue-600">{{ number_format($summaryInfo['total_to_stock']) ?? '' }}</div>
                             <div class="text-xs text-gray-600">Ke Stok</div>
-                        </div>
-                        <div class="text-center">
+                        </div> --}}
+                        {{-- <div class="text-center">
                             <div class="text-lg font-bold text-green-600">{{ number_format($summaryInfo['total_to_ready']) }}</div>
                             <div class="text-xs text-gray-600">Siap Pakai</div>
                         </div>
                         <div class="text-center">
                             <div class="text-lg font-bold text-purple-600">Rp {{ number_format($summaryInfo['total_value'], 0, ',', '.') }}</div>
                             <div class="text-xs text-gray-600">Total Nilai</div>
-                        </div>
+                        </div> --}}
                     </div>
                 </div>
             </div>
@@ -345,41 +335,97 @@
                         Progress PO
                     </h3>
                 </div>
-                <div class="p-6">
-                    @php
-                        $poSummary = $goodsReceived->purchaseOrder->getSummaryInfo();
-                    @endphp
-                    <div class="space-y-4">
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-600">Status PO</span>
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $goodsReceived->purchaseOrder->getStatusInfo()['class'] }}">
-                                {{ $goodsReceived->purchaseOrder->getStatusInfo()['text'] }}
-                            </span>
-                        </div>
+              <div class="p-6">
+    @if($goodsReceived->isPOBased() && $goodsReceived->purchaseOrder)
+        {{-- PO-based receipt --}}
+        @php
+            $poSummary = $goodsReceived->purchaseOrder->getSummaryInfo() ?? [];
+        @endphp
+        <div class="space-y-4">
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-600">Status PO</span>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $goodsReceived->purchaseOrder->getStatusInfo()['class'] }}">
+                    {{ $goodsReceived->purchaseOrder->getStatusInfo()['text'] }}
+                </span>
+            </div>
 
-                        <div>
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-sm text-gray-600">Progress Penerimaan</span>
-                                <span class="text-sm font-medium">{{ $poSummary['completion_percentage'] }}%</span>
-                            </div>
-                            <div class="w-full bg-gray-200 rounded-full h-3">
-                                <div class="bg-gradient-to-r from-blue-600 to-green-600 h-3 rounded-full transition-all duration-300"
-                                     style="width: {{ $poSummary['completion_percentage'] }}%"></div>
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-4 pt-2">
-                            <div class="text-center">
-                                <div class="text-lg font-bold text-gray-900">{{ number_format($poSummary['total_received']) }}</div>
-                                <div class="text-xs text-gray-600">Diterima</div>
-                            </div>
-                            <div class="text-center">
-                                <div class="text-lg font-bold text-gray-600">{{ number_format($poSummary['total_quantity']) }}</div>
-                                <div class="text-xs text-gray-600">Total Order</div>
-                            </div>
-                        </div>
-                    </div>
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm text-gray-600">Progress Penerimaan</span>
+                    <span class="text-sm font-medium">{{ $poSummary['completion_percentage'] ?? 0 }}%</span>
                 </div>
+                <div class="w-full bg-gray-200 rounded-full h-3">
+                    <div class="bg-gradient-to-r from-blue-600 to-green-600 h-3 rounded-full transition-all duration-300"
+                         style="width: {{ $poSummary['completion_percentage'] ?? 0 }}%"></div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 pt-2">
+                <div class="text-center">
+                    <div class="text-lg font-bold text-gray-900">{{ number_format($poSummary['total_received'] ?? 0) }}</div>
+                    <div class="text-xs text-gray-600">Diterima</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-lg font-bold text-gray-600">{{ number_format($poSummary['total_quantity'] ?? 0) }}</div>
+                    <div class="text-xs text-gray-600">Total Order</div>
+                </div>
+            </div>
+        </div>
+    @else
+        {{-- Direct receipt --}}
+        <div class="space-y-4">
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-600">Jenis Penerimaan</span>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                    Penerimaan Langsung
+                </span>
+            </div>
+
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-600">Status</span>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $goodsReceived->getStatusInfo()['class'] }}">
+                    {{ $goodsReceived->getStatusInfo()['text'] }}
+                </span>
+            </div>
+
+            {{-- External References --}}
+            @if($goodsReceived->delivery_note_number || $goodsReceived->invoice_number || $goodsReceived->external_reference)
+                <div class="pt-2 border-t border-gray-200">
+                    <h4 class="text-sm font-medium text-gray-900 mb-2">Referensi Eksternal</h4>
+                    @if($goodsReceived->delivery_note_number)
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">No. Surat Jalan:</span>
+                            <span class="font-medium">{{ $goodsReceived->delivery_note_number }}</span>
+                        </div>
+                    @endif
+                    @if($goodsReceived->invoice_number)
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">No. Invoice:</span>
+                            <span class="font-medium">{{ $goodsReceived->invoice_number }}</span>
+                        </div>
+                    @endif
+                    @if($goodsReceived->external_reference)
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Referensi Lain:</span>
+                            <span class="font-medium">{{ $goodsReceived->external_reference }}</span>
+                        </div>
+                    @endif
+                </div>
+            @endif
+
+            <div class="grid grid-cols-2 gap-4 pt-2 border-t border-gray-200">
+                <div class="text-center">
+                    <div class="text-lg font-bold text-gray-900">{{ number_format($summaryInfo['total_quantity']) }}</div>
+                    <div class="text-xs text-gray-600">Total Diterima</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-lg font-bold text-green-600">{{ number_format($summaryInfo['total_value'], 0, ',', '.') }}</div>
+                    <div class="text-xs text-gray-600">Total Nilai (Rp)</div>
+                </div>
+            </div>
+        </div>
+    @endif
+</div>
             </div>
 
             <!-- Quick Actions -->
@@ -391,11 +437,11 @@
                     </h3>
                 </div>
                 <div class="p-6 space-y-3">
-                    <button @click="showPrintModal()"
+                    {{-- <button @click="showPrintModal()"
                             class="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all duration-200 flex items-center justify-center space-x-2">
                         <i class="fas fa-print"></i>
                         <span>Print GR</span>
-                    </button>
+                    </button> --}}
 
                     <button @click="showReceiptModal()"
                             class="w-full px-4 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-200 flex items-center justify-center space-x-2">
@@ -403,24 +449,24 @@
                         <span>Print Tanda Terima</span>
                     </button>
 
-                    @if($goodsReceived->status == 'partial')
+                    {{-- @if($goodsReceived->status == 'partial')
                         <a href="{{ route('goods-received.edit', $goodsReceived->gr_id) }}"
                            class="w-full px-4 py-3 bg-gradient-to-r from-yellow-600 to-yellow-700 text-white rounded-xl hover:from-yellow-700 hover:to-yellow-800 transition-all duration-200 flex items-center justify-center space-x-2">
                             <i class="fas fa-edit"></i>
                             <span>Edit Penerimaan</span>
                         </a>
-                    @endif
+                    @endif --}}
 
-                    <a href="{{ route('purchase-orders.show', $goodsReceived->purchaseOrder->po_id) }}"
+                    {{-- <a href="{{ route('purchase-orders.show', $goodsReceived->purchaseOrder->po_id) }}"
                        class="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 flex items-center justify-center space-x-2">
                         <i class="fas fa-file-invoice"></i>
                         <span>Lihat PO</span>
-                    </a>
+                    </a> --}}
 
-                    <a href="{{ route('goods-received.create', ['po_id' => $goodsReceived->po_id]) }}"
+                    {{-- <a href="{{ route('goods-received.create', ['po_id' => $goodsReceived->po_id]) }}"
                        class="w-full px-4 py-3 bg-gradient-to-r from-orange-600 to-orange-700 text-white rounded-xl hover:from-orange-700 hover:to-orange-800 transition-all duration-200 flex items-center justify-center space-x-2">
                         <i class="fas fa-plus"></i>
-                        <span>Penerimaan Lanjutan</span>
+                        <span>Penerimaan Lanjutan</span> --}}
                     </a>
                 </div>
             </div>
@@ -441,7 +487,7 @@
                             </div>
                             <div class="flex-1">
                                 <div class="text-sm font-medium text-gray-900">Barang Diterima</div>
-                                <div class="text-xs text-gray-500">{{ $goodsReceived->created_at->format('d/m/Y H:i') }}</div>
+                                {{-- <div class="text-xs text-gray-500">{{ $goodsReceived->created_at->format('d/m/Y H:i') }}</div> --}}
                                 <div class="text-xs text-gray-400">Oleh {{ $goodsReceived->receivedBy->full_name }}</div>
                             </div>
                         </div>
@@ -452,8 +498,8 @@
                             </div>
                             <div class="flex-1">
                                 <div class="text-sm font-medium text-gray-900">PO Dibuat</div>
-                                <div class="text-xs text-gray-500">{{ $goodsReceived->purchaseOrder->created_at->format('d/m/Y H:i') }}</div>
-                                <div class="text-xs text-gray-400">Oleh {{ $goodsReceived->purchaseOrder->createdBy->full_name }}</div>
+                                {{-- <div class="text-xs text-gray-500">{{ $goodsReceived->purchaseOrder->created_at->format('d/m/Y H:i') }}</div> --}}
+                                {{-- <div class="text-xs text-gray-400">Oleh {{ $goodsReceived->purchaseOrder->createdBy->full_name }}</div> --}}
                             </div>
                         </div>
                     </div>

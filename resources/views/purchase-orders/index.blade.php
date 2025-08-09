@@ -446,19 +446,13 @@
                                             </a>
                                         @endif
 
-                                        <button
-                                            @click="showPrintModal('{{ $po->po_id }}', '{{ addslashes($po->po_number) }}')"
-                                            class="text-purple-600 hover:text-purple-900 p-2 hover:bg-purple-50 rounded-lg transition-all duration-200"
-                                            title="Print PO">
-                                            <i class="fas fa-print"></i>
-                                        </button>
 
-                                        <button
+                                        {{-- <button
                                             @click="showDuplicateModal('{{ $po->po_id }}', '{{ addslashes($po->po_number) }}')"
                                             class="text-green-600 hover:text-green-900 p-2 hover:bg-green-50 rounded-lg transition-all duration-200"
                                             title="Duplikasi PO">
                                             <i class="fas fa-copy"></i>
-                                        </button>
+                                        </button> --}}
 
                                         @if ($po->canBeCancelled() && Auth::user()->user_level_id === 'LVL001')
                                             <button

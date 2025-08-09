@@ -113,489 +113,495 @@ class GoodsReceivedController extends Controller
     public function create(Request $request)
     {
         $poId = $request->get('po_id');
+        $receiptType = $request->get('receipt_type', 'po_based'); // NEW
 
-        // Get POs yang bisa di-receive
+        // Existing code untuk PO-based
         $availablePOs = PurchaseOrder::whereIn('status', ['sent', 'partial'])
             ->with(['supplier', 'poDetails.item'])
             ->orderBy('po_number')
             ->get();
 
-        // Selected PO
         $selectedPO = $poId ? PurchaseOrder::with(['supplier', 'poDetails.item'])->find($poId) : null;
 
-        // Generate receive number
-        $receiveNumber = GoodsReceived::generateReceiveNumber();
+        // UPDATED: Generate receive number berdasarkan type
+        $receiveNumber = GoodsReceived::generateReceiveNumber($receiptType);
+
+        // NEW: Data untuk direct receipts
+        $suppliers = Supplier::active()->orderBy('supplier_name')->get();
+        $items = Item::with('category')->active()->orderBy('item_name')->get();
 
         return view('goods-received.create', compact(
             'availablePOs',
             'selectedPO',
-            'receiveNumber'
+            'receiveNumber',
+            'receiptType',    // NEW
+            'suppliers',      // NEW
+            'items'          // NEW
         ));
     }
 
 
-//     public function getSerialNumberTemplate(Request $request)
-// {
-//     try {
-//         $itemId = $request->get('item_id');
-//         $quantity = (int) $request->get('quantity', 1);
+    //     public function getSerialNumberTemplate(Request $request)
+    // {
+    //     try {
+    //         $itemId = $request->get('item_id');
+    //         $quantity = (int) $request->get('quantity', 1);
 
-//         // Validation
-//         if (!$itemId || $quantity <= 0) {
-//             return response()->json([
-//                 'success' => false,
-//                 'message' => 'Item ID dan quantity wajib diisi'
-//             ], 400);
-//         }
+    //         // Validation
+    //         if (!$itemId || $quantity <= 0) {
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => 'Item ID dan quantity wajib diisi'
+    //             ], 400);
+    //         }
 
-//         if ($quantity > 100) { // Limit untuk safety
-//             return response()->json([
-//                 'success' => false,
-//                 'message' => 'Maksimal 100 serial numbers per request'
-//             ], 400);
-//         }
+    //         if ($quantity > 100) { // Limit untuk safety
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => 'Maksimal 100 serial numbers per request'
+    //             ], 400);
+    //         }
 
-//         // Validate item exists
-//         $item = Item::find($itemId);
-//         if (!$item) {
-//             return response()->json([
-//                 'success' => false,
-//                 'message' => 'Item tidak ditemukan'
-//             ], 404);
-//         }
+    //         // Validate item exists
+    //         $item = Item::find($itemId);
+    //         if (!$item) {
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => 'Item tidak ditemukan'
+    //             ], 404);
+    //         }
 
-//         // Generate unique F1 serial numbers
-//         $serialNumbers = $this->generateF1SerialNumbers($quantity);
+    //         // Generate unique F1 serial numbers
+    //         $serialNumbers = $this->generateF1SerialNumbers($quantity);
 
-//         // Validate all generated serial numbers are unique
-//         $validation = $this->validateGeneratedSerialNumbers($serialNumbers);
+    //         // Validate all generated serial numbers are unique
+    //         $validation = $this->validateGeneratedSerialNumbers($serialNumbers);
 
-//         if (!$validation['all_valid']) {
-//             // Regenerate if conflicts found
-//             Log::warning('Serial number conflicts detected, regenerating', [
-//                 'conflicts' => $validation['conflicts'],
-//                 'item_id' => $itemId
-//             ]);
+    //         if (!$validation['all_valid']) {
+    //             // Regenerate if conflicts found
+    //             Log::warning('Serial number conflicts detected, regenerating', [
+    //                 'conflicts' => $validation['conflicts'],
+    //                 'item_id' => $itemId
+    //             ]);
 
-//             $serialNumbers = $this->generateF1SerialNumbers($quantity, $validation['conflicts']);
-//         }
+    //             $serialNumbers = $this->generateF1SerialNumbers($quantity, $validation['conflicts']);
+    //         }
 
-//         Log::info('F1 Serial numbers generated successfully', [
-//             'item_id' => $itemId,
-//             'item_code' => $item->item_code,
-//             'quantity_requested' => $quantity,
-//             'quantity_generated' => count($serialNumbers),
-//             'generated_serials' => $serialNumbers,
-//             'format' => 'F1{6_random_chars}'
-//         ]);
+    //         Log::info('F1 Serial numbers generated successfully', [
+    //             'item_id' => $itemId,
+    //             'item_code' => $item->item_code,
+    //             'quantity_requested' => $quantity,
+    //             'quantity_generated' => count($serialNumbers),
+    //             'generated_serials' => $serialNumbers,
+    //             'format' => 'F1{6_random_chars}'
+    //         ]);
 
-//         return response()->json([
-//             'success' => true,
-//             'data' => [
-//                 'serial_numbers' => $serialNumbers,
-//                 'format' => 'F1{6 random alphanumeric}',
-//                 'pattern' => 'F1XXXXXX',
-//                 'total_generated' => count($serialNumbers),
-//                 'item_info' => [
-//                     'item_id' => $item->item_id,
-//                     'item_code' => $item->item_code,
-//                     'item_name' => $item->item_name
-//                 ],
-//                 'validation' => $validation
-//             ],
-//             'message' => "Generated {$quantity} unique F1 serial numbers"
-//         ]);
+    //         return response()->json([
+    //             'success' => true,
+    //             'data' => [
+    //                 'serial_numbers' => $serialNumbers,
+    //                 'format' => 'F1{6 random alphanumeric}',
+    //                 'pattern' => 'F1XXXXXX',
+    //                 'total_generated' => count($serialNumbers),
+    //                 'item_info' => [
+    //                     'item_id' => $item->item_id,
+    //                     'item_code' => $item->item_code,
+    //                     'item_name' => $item->item_name
+    //                 ],
+    //                 'validation' => $validation
+    //             ],
+    //             'message' => "Generated {$quantity} unique F1 serial numbers"
+    //         ]);
 
-//     } catch (\Exception $e) {
-//         Log::error('Failed to generate F1 serial numbers', [
-//             'error' => $e->getMessage(),
-//             'trace' => $e->getTraceAsString(),
-//             'item_id' => $request->get('item_id'),
-//             'quantity' => $request->get('quantity')
-//         ]);
+    //     } catch (\Exception $e) {
+    //         Log::error('Failed to generate F1 serial numbers', [
+    //             'error' => $e->getMessage(),
+    //             'trace' => $e->getTraceAsString(),
+    //             'item_id' => $request->get('item_id'),
+    //             'quantity' => $request->get('quantity')
+    //         ]);
 
-//         return response()->json([
-//             'success' => false,
-//             'message' => 'Gagal generate F1 serial numbers: ' . $e->getMessage()
-//         ], 500);
-//     }
-// }
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Gagal generate F1 serial numbers: ' . $e->getMessage()
+    //         ], 500);
+    //     }
+    // }
 
-/**
- * Generate F1 format serial numbers with collision avoidance
+    /**
+     * Generate F1 format serial numbers with collision avoidance
 //  */
-// private function generateF1SerialNumbers(int $quantity, array $excludeList = []): array
-// {
-//     $serialNumbers = [];
-//     $maxAttempts = $quantity * 20; // Increased attempts untuk safety
-//     $attempts = 0;
+    // private function generateF1SerialNumbers(int $quantity, array $excludeList = []): array
+    // {
+    //     $serialNumbers = [];
+    //     $maxAttempts = $quantity * 20; // Increased attempts untuk safety
+    //     $attempts = 0;
 
-//     // Get existing F1 serials from database untuk avoid collision
-//     $existingF1Serials = ItemDetail::where('serial_number', 'LIKE', 'F1%')
-//         ->pluck('serial_number')
-//         ->toArray();
+    //     // Get existing F1 serials from database untuk avoid collision
+    //     $existingF1Serials = ItemDetail::where('serial_number', 'LIKE', 'F1%')
+    //         ->pluck('serial_number')
+    //         ->toArray();
 
-//     $allExcludes = array_merge($excludeList, $existingF1Serials);
+    //     $allExcludes = array_merge($excludeList, $existingF1Serials);
 
-//     Log::debug('Starting F1 serial generation', [
-//         'quantity_needed' => $quantity,
-//         'existing_f1_count' => count($existingF1Serials),
-//         'exclude_list_count' => count($excludeList)
-//     ]);
+    //     Log::debug('Starting F1 serial generation', [
+    //         'quantity_needed' => $quantity,
+    //         'existing_f1_count' => count($existingF1Serials),
+    //         'exclude_list_count' => count($excludeList)
+    //     ]);
 
-//     while (count($serialNumbers) < $quantity && $attempts < $maxAttempts) {
-//         $attempts++;
+    //     while (count($serialNumbers) < $quantity && $attempts < $maxAttempts) {
+    //         $attempts++;
 
-//         // Generate F1 + 6 random alphanumeric characters
-//         $randomPart = $this->generateRandomAlphanumeric(6);
-//         $serialNumber = 'F1' . $randomPart;
+    //         // Generate F1 + 6 random alphanumeric characters
+    //         $randomPart = $this->generateRandomAlphanumeric(6);
+    //         $serialNumber = 'F1' . $randomPart;
 
-//         // Check uniqueness
-//         if (!in_array($serialNumber, $serialNumbers) &&
-//             !in_array($serialNumber, $allExcludes)) {
+    //         // Check uniqueness
+    //         if (!in_array($serialNumber, $serialNumbers) &&
+    //             !in_array($serialNumber, $allExcludes)) {
 
-//             $serialNumbers[] = $serialNumber;
+    //             $serialNumbers[] = $serialNumber;
 
-//             if (count($serialNumbers) % 10 == 0) {
-//                 Log::debug("Generated {$serialNumbers[count($serialNumbers)-1]} ({$attempts} attempts)");
-//             }
-//         }
-//     }
+    //             if (count($serialNumbers) % 10 == 0) {
+    //                 Log::debug("Generated {$serialNumbers[count($serialNumbers)-1]} ({$attempts} attempts)");
+    //             }
+    //         }
+    //     }
 
-//     if (count($serialNumbers) < $quantity) {
-//         Log::warning('Could not generate enough unique F1 serial numbers', [
-//             'requested' => $quantity,
-//             'generated' => count($serialNumbers),
-//             'total_attempts' => $attempts,
-//             'existing_f1_serials' => count($existingF1Serials)
-//         ]);
-//     }
+    //     if (count($serialNumbers) < $quantity) {
+    //         Log::warning('Could not generate enough unique F1 serial numbers', [
+    //             'requested' => $quantity,
+    //             'generated' => count($serialNumbers),
+    //             'total_attempts' => $attempts,
+    //             'existing_f1_serials' => count($existingF1Serials)
+    //         ]);
+    //     }
 
-//     Log::info('F1 serial generation completed', [
-//         'requested' => $quantity,
-//         'generated' => count($serialNumbers),
-//         'attempts_used' => $attempts,
-//         'success_rate' => round((count($serialNumbers) / $quantity) * 100, 2) . '%'
-//     ]);
+    //     Log::info('F1 serial generation completed', [
+    //         'requested' => $quantity,
+    //         'generated' => count($serialNumbers),
+    //         'attempts_used' => $attempts,
+    //         'success_rate' => round((count($serialNumbers) / $quantity) * 100, 2) . '%'
+    //     ]);
 
-//     return $serialNumbers;
-// }
+    //     return $serialNumbers;
+    // }
 
-/**
- * Generate random alphanumeric string (excluding confusing characters)
- */
-// private function generateRandomAlphanumeric(int $length): string
-// {
-//     // Exclude confusing characters: 0, O, I, 1, l, B, 8, 6, G, 5, S
-//     $characters = 'ACDEFHJKLMNPQRTUVWXYZ23479';
-//     $result = '';
+    /**
+     * Generate random alphanumeric string (excluding confusing characters)
+     */
+    // private function generateRandomAlphanumeric(int $length): string
+    // {
+    //     // Exclude confusing characters: 0, O, I, 1, l, B, 8, 6, G, 5, S
+    //     $characters = 'ACDEFHJKLMNPQRTUVWXYZ23479';
+    //     $result = '';
 
-//     for ($i = 0; $i < $length; $i++) {
-//         $result .= $characters[random_int(0, strlen($characters) - 1)];
-//     }
+    //     for ($i = 0; $i < $length; $i++) {
+    //         $result .= $characters[random_int(0, strlen($characters) - 1)];
+    //     }
 
-//     return $result;
-// }
+    //     return $result;
+    // }
 
-/**
- * Validate generated serial numbers for database conflicts
- */
-private function validateGeneratedSerialNumbers(array $serialNumbers): array
-{
-    $conflicts = [];
-    $validCount = 0;
+    /**
+     * Validate generated serial numbers for database conflicts
+     */
+    private function validateGeneratedSerialNumbers(array $serialNumbers): array
+    {
+        $conflicts = [];
+        $validCount = 0;
 
-    // Batch check untuk efficiency
-    $existingSerials = ItemDetail::whereIn('serial_number', $serialNumbers)
-        ->pluck('serial_number')
-        ->toArray();
-
-    foreach ($serialNumbers as $sn) {
-        if (in_array($sn, $existingSerials)) {
-            $conflicts[] = $sn;
-        } else {
-            $validCount++;
-        }
-    }
-
-    return [
-        'all_valid' => empty($conflicts),
-        'valid_count' => $validCount,
-        'conflict_count' => count($conflicts),
-        'conflicts' => $conflicts,
-        'total_checked' => count($serialNumbers)
-    ];
-}
-
-/**
- * Enhanced validate serial number dengan F1 format checking
- */
-// public function validateSerialNumber(Request $request)
-// {
-//     try {
-//         $serialNumber = trim($request->get('serial_number'));
-
-//         // Basic validation
-//         if (empty($serialNumber)) {
-//             return response()->json([
-//                 'valid' => false,
-//                 'message' => 'Serial number tidak boleh kosong',
-//                 'error_type' => 'empty'
-//             ]);
-//         }
-
-//         // F1 Format validation
-//         $formatValidation = $this->validateF1Format($serialNumber);
-//         if (!$formatValidation['valid']) {
-//             return response()->json([
-//                 'valid' => false,
-//                 'message' => $formatValidation['message'],
-//                 'error_type' => 'format',
-//                 'expected_format' => 'F1XXXXXX (F1 + 6 karakter alphanumeric)',
-//                 'examples' => ['F1A2C3D4', 'F1XYZ789', 'F1MNP234']
-//             ]);
-//         }
-
-//         // Database duplicate check
-//         $existingItem = ItemDetail::where('serial_number', $serialNumber)
-//             ->with('item')
-//             ->first();
-
-//         if ($existingItem) {
-//             return response()->json([
-//                 'valid' => false,
-//                 'message' => 'Serial number sudah digunakan',
-//                 'error_type' => 'duplicate',
-//                 'existing_info' => [
-//                     'item_code' => $existingItem->item->item_code ?? 'N/A',
-//                     'item_name' => $existingItem->item->item_name ?? 'N/A',
-//                     'status' => $existingItem->status ?? 'N/A',
-//                     'location' => $existingItem->location ?? 'N/A',
-//                     'created_at' => $existingItem->created_at?->format('d/m/Y H:i')
-//                 ]
-//             ]);
-//         }
-
-//         return response()->json([
-//             'valid' => true,
-//             'message' => 'Serial number tersedia dan format valid',
-//             'format_info' => [
-//                 'format' => 'F1 Format',
-//                 'prefix' => substr($serialNumber, 0, 2),
-//                 'random_part' => substr($serialNumber, 2),
-//                 'length' => strlen($serialNumber),
-//                 'pattern_match' => true
-//             ]
-//         ]);
-
-//     } catch (\Exception $e) {
-//         Log::error('Serial number validation error', [
-//             'serial_number' => $request->get('serial_number'),
-//             'error' => $e->getMessage(),
-//             'trace' => $e->getTraceAsString()
-//         ]);
-
-//         return response()->json([
-//             'valid' => false,
-//             'message' => 'Error validasi: ' . $e->getMessage(),
-//             'error_type' => 'system_error'
-//         ], 500);
-//     }
-// }
-
-/**
- * Validate F1 format specifically
- */
-private function validateF1Format(string $serialNumber): array
-{
-    // Must start with F1
-    if (!str_starts_with($serialNumber, 'F1')) {
-        return [
-            'valid' => false,
-            'message' => 'Serial number harus diawali dengan "F1"'
-        ];
-    }
-
-    // Must be exactly 8 characters (F1 + 6 random)
-    if (strlen($serialNumber) !== 8) {
-        return [
-            'valid' => false,
-            'message' => 'Serial number harus 8 karakter (F1 + 6 karakter random)'
-        ];
-    }
-
-    // Random part must be alphanumeric and uppercase
-    $randomPart = substr($serialNumber, 2);
-    if (!ctype_alnum($randomPart) || $randomPart !== strtoupper($randomPart)) {
-        return [
-            'valid' => false,
-            'message' => 'Karakter setelah F1 harus huruf besar atau angka'
-        ];
-    }
-
-    // Check for confusing characters
-    $confusingChars = ['0', 'O', 'I', '1', 'l', 'B', '8', '6', 'G', '5', 'S'];
-    foreach ($confusingChars as $char) {
-        if (str_contains($randomPart, $char)) {
-            return [
-                'valid' => false,
-                'message' => "Hindari karakter yang membingungkan: {$char}. Gunakan karakter lain."
-            ];
-        }
-    }
-
-    return [
-        'valid' => true,
-        'message' => 'Format F1 valid'
-    ];
-}
-
-/**
- * Bulk validate multiple serial numbers
- */
-public function bulkValidateSerialNumbers(Request $request)
-{
-    try {
-        $serialNumbers = $request->input('serial_numbers', []);
-
-        if (empty($serialNumbers)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Tidak ada serial numbers untuk divalidasi'
-            ], 400);
-        }
-
-        if (count($serialNumbers) > 1000) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Maksimal 100 serial numbers per batch'
-            ], 400);
-        }
-
-        $results = [];
-        $summary = [
-            'total' => count($serialNumbers),
-            'valid' => 0,
-            'invalid' => 0,
-            'duplicates_in_list' => 0,
-            'duplicates_in_db' => 0,
-            'format_errors' => 0
-        ];
-
-        // Check for duplicates within the submitted list
-        $serialCounts = array_count_values($serialNumbers);
-
-        // Batch check existing serials in database
+        // Batch check untuk efficiency
         $existingSerials = ItemDetail::whereIn('serial_number', $serialNumbers)
             ->pluck('serial_number')
             ->toArray();
 
-        foreach ($serialNumbers as $index => $serialNumber) {
-            $serialNumber = trim($serialNumber);
-
-            // Check for duplicates in the submitted list
-            if ($serialCounts[$serialNumber] > 1) {
-                $results[$index] = [
-                    'serial_number' => $serialNumber,
-                    'valid' => false,
-                    'message' => 'Duplikat dalam list yang disubmit',
-                    'error_type' => 'duplicate_in_list'
-                ];
-                $summary['duplicates_in_list']++;
-                $summary['invalid']++;
-                continue;
-            }
-
-            // Validate F1 format
-            $formatValidation = $this->validateF1Format($serialNumber);
-            if (!$formatValidation['valid']) {
-                $results[$index] = [
-                    'serial_number' => $serialNumber,
-                    'valid' => false,
-                    'message' => $formatValidation['message'],
-                    'error_type' => 'format'
-                ];
-                $summary['format_errors']++;
-                $summary['invalid']++;
-                continue;
-            }
-
-            // Check database (from batch query)
-            if (in_array($serialNumber, $existingSerials)) {
-                $results[$index] = [
-                    'serial_number' => $serialNumber,
-                    'valid' => false,
-                    'message' => 'Serial number sudah ada di database',
-                    'error_type' => 'duplicate_in_db'
-                ];
-                $summary['duplicates_in_db']++;
-                $summary['invalid']++;
+        foreach ($serialNumbers as $sn) {
+            if (in_array($sn, $existingSerials)) {
+                $conflicts[] = $sn;
             } else {
-                $results[$index] = [
-                    'serial_number' => $serialNumber,
-                    'valid' => true,
-                    'message' => 'Valid',
-                    'error_type' => null
-                ];
-                $summary['valid']++;
+                $validCount++;
             }
         }
 
-        Log::info('Bulk serial number validation completed', [
-            'total_submitted' => count($serialNumbers),
-            'summary' => $summary,
-            'all_valid' => $summary['invalid'] === 0
-        ]);
+        return [
+            'all_valid' => empty($conflicts),
+            'valid_count' => $validCount,
+            'conflict_count' => count($conflicts),
+            'conflicts' => $conflicts,
+            'total_checked' => count($serialNumbers)
+        ];
+    }
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'results' => $results,
+    /**
+     * Enhanced validate serial number dengan F1 format checking
+     */
+    // public function validateSerialNumber(Request $request)
+    // {
+    //     try {
+    //         $serialNumber = trim($request->get('serial_number'));
+
+    //         // Basic validation
+    //         if (empty($serialNumber)) {
+    //             return response()->json([
+    //                 'valid' => false,
+    //                 'message' => 'Serial number tidak boleh kosong',
+    //                 'error_type' => 'empty'
+    //             ]);
+    //         }
+
+    //         // F1 Format validation
+    //         $formatValidation = $this->validateF1Format($serialNumber);
+    //         if (!$formatValidation['valid']) {
+    //             return response()->json([
+    //                 'valid' => false,
+    //                 'message' => $formatValidation['message'],
+    //                 'error_type' => 'format',
+    //                 'expected_format' => 'F1XXXXXX (F1 + 6 karakter alphanumeric)',
+    //                 'examples' => ['F1A2C3D4', 'F1XYZ789', 'F1MNP234']
+    //             ]);
+    //         }
+
+    //         // Database duplicate check
+    //         $existingItem = ItemDetail::where('serial_number', $serialNumber)
+    //             ->with('item')
+    //             ->first();
+
+    //         if ($existingItem) {
+    //             return response()->json([
+    //                 'valid' => false,
+    //                 'message' => 'Serial number sudah digunakan',
+    //                 'error_type' => 'duplicate',
+    //                 'existing_info' => [
+    //                     'item_code' => $existingItem->item->item_code ?? 'N/A',
+    //                     'item_name' => $existingItem->item->item_name ?? 'N/A',
+    //                     'status' => $existingItem->status ?? 'N/A',
+    //                     'location' => $existingItem->location ?? 'N/A',
+    //                     'created_at' => $existingItem->created_at?->format('d/m/Y H:i')
+    //                 ]
+    //             ]);
+    //         }
+
+    //         return response()->json([
+    //             'valid' => true,
+    //             'message' => 'Serial number tersedia dan format valid',
+    //             'format_info' => [
+    //                 'format' => 'F1 Format',
+    //                 'prefix' => substr($serialNumber, 0, 2),
+    //                 'random_part' => substr($serialNumber, 2),
+    //                 'length' => strlen($serialNumber),
+    //                 'pattern_match' => true
+    //             ]
+    //         ]);
+
+    //     } catch (\Exception $e) {
+    //         Log::error('Serial number validation error', [
+    //             'serial_number' => $request->get('serial_number'),
+    //             'error' => $e->getMessage(),
+    //             'trace' => $e->getTraceAsString()
+    //         ]);
+
+    //         return response()->json([
+    //             'valid' => false,
+    //             'message' => 'Error validasi: ' . $e->getMessage(),
+    //             'error_type' => 'system_error'
+    //         ], 500);
+    //     }
+    // }
+
+    /**
+     * Validate F1 format specifically
+     */
+    private function validateF1Format(string $serialNumber): array
+    {
+        // Must start with F1
+        if (!str_starts_with($serialNumber, 'F1')) {
+            return [
+                'valid' => false,
+                'message' => 'Serial number harus diawali dengan "F1"'
+            ];
+        }
+
+        // Must be exactly 8 characters (F1 + 6 random)
+        if (strlen($serialNumber) !== 8) {
+            return [
+                'valid' => false,
+                'message' => 'Serial number harus 8 karakter (F1 + 6 karakter random)'
+            ];
+        }
+
+        // Random part must be alphanumeric and uppercase
+        $randomPart = substr($serialNumber, 2);
+        if (!ctype_alnum($randomPart) || $randomPart !== strtoupper($randomPart)) {
+            return [
+                'valid' => false,
+                'message' => 'Karakter setelah F1 harus huruf besar atau angka'
+            ];
+        }
+
+        // Check for confusing characters
+        $confusingChars = ['0', 'O', 'I', '1', 'l', 'B', '8', '6', 'G', '5', 'S'];
+        foreach ($confusingChars as $char) {
+            if (str_contains($randomPart, $char)) {
+                return [
+                    'valid' => false,
+                    'message' => "Hindari karakter yang membingungkan: {$char}. Gunakan karakter lain."
+                ];
+            }
+        }
+
+        return [
+            'valid' => true,
+            'message' => 'Format F1 valid'
+        ];
+    }
+
+    /**
+     * Bulk validate multiple serial numbers
+     */
+    public function bulkValidateSerialNumbers(Request $request)
+    {
+        try {
+            $serialNumbers = $request->input('serial_numbers', []);
+
+            if (empty($serialNumbers)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tidak ada serial numbers untuk divalidasi'
+                ], 400);
+            }
+
+            if (count($serialNumbers) > 1000) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Maksimal 100 serial numbers per batch'
+                ], 400);
+            }
+
+            $results = [];
+            $summary = [
+                'total' => count($serialNumbers),
+                'valid' => 0,
+                'invalid' => 0,
+                'duplicates_in_list' => 0,
+                'duplicates_in_db' => 0,
+                'format_errors' => 0
+            ];
+
+            // Check for duplicates within the submitted list
+            $serialCounts = array_count_values($serialNumbers);
+
+            // Batch check existing serials in database
+            $existingSerials = ItemDetail::whereIn('serial_number', $serialNumbers)
+                ->pluck('serial_number')
+                ->toArray();
+
+            foreach ($serialNumbers as $index => $serialNumber) {
+                $serialNumber = trim($serialNumber);
+
+                // Check for duplicates in the submitted list
+                if ($serialCounts[$serialNumber] > 1) {
+                    $results[$index] = [
+                        'serial_number' => $serialNumber,
+                        'valid' => false,
+                        'message' => 'Duplikat dalam list yang disubmit',
+                        'error_type' => 'duplicate_in_list'
+                    ];
+                    $summary['duplicates_in_list']++;
+                    $summary['invalid']++;
+                    continue;
+                }
+
+                // Validate F1 format
+                $formatValidation = $this->validateF1Format($serialNumber);
+                if (!$formatValidation['valid']) {
+                    $results[$index] = [
+                        'serial_number' => $serialNumber,
+                        'valid' => false,
+                        'message' => $formatValidation['message'],
+                        'error_type' => 'format'
+                    ];
+                    $summary['format_errors']++;
+                    $summary['invalid']++;
+                    continue;
+                }
+
+                // Check database (from batch query)
+                if (in_array($serialNumber, $existingSerials)) {
+                    $results[$index] = [
+                        'serial_number' => $serialNumber,
+                        'valid' => false,
+                        'message' => 'Serial number sudah ada di database',
+                        'error_type' => 'duplicate_in_db'
+                    ];
+                    $summary['duplicates_in_db']++;
+                    $summary['invalid']++;
+                } else {
+                    $results[$index] = [
+                        'serial_number' => $serialNumber,
+                        'valid' => true,
+                        'message' => 'Valid',
+                        'error_type' => null
+                    ];
+                    $summary['valid']++;
+                }
+            }
+
+            Log::info('Bulk serial number validation completed', [
+                'total_submitted' => count($serialNumbers),
                 'summary' => $summary,
                 'all_valid' => $summary['invalid'] === 0
-            ]
-        ]);
+            ]);
 
-    } catch (\Exception $e) {
-        Log::error('Bulk serial number validation error', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ]);
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'results' => $results,
+                    'summary' => $summary,
+                    'all_valid' => $summary['invalid'] === 0
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Bulk serial number validation error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
 
-        return response()->json([
-            'success' => false,
-            'message' => 'Bulk validation error: ' . $e->getMessage()
-        ], 500);
+            return response()->json([
+                'success' => false,
+                'message' => 'Bulk validation error: ' . $e->getMessage()
+            ], 500);
+        }
     }
-}
 
-/**
- * Get serial number statistics and insights
- */
-public function getSerialNumberStats()
-{
-    try {
-        $stats = [
-            'total_serial_numbers' => ItemDetail::count(),
-            'f1_format_count' => ItemDetail::where('serial_number', 'LIKE', 'F1%')->count(),
-            'format_distribution' => [],
-            'recent_f1_additions' => ItemDetail::where('serial_number', 'LIKE', 'F1%')
-                ->where('created_at', '>=', now()->subDays(7))
-                ->orderBy('created_at', 'desc')
-                ->limit(10)
-                ->select('serial_number', 'created_at')
-                ->get()
-                ->toArray(),
-            'usage_by_status' => ItemDetail::where('serial_number', 'LIKE', 'F1%')
-                ->selectRaw('status, COUNT(*) as count')
-                ->groupBy('status')
-                ->get()
-                ->pluck('count', 'status')
-                ->toArray()
-        ];
+    /**
+     * Get serial number statistics and insights
+     */
+    public function getSerialNumberStats()
+    {
+        try {
+            $stats = [
+                'total_serial_numbers' => ItemDetail::count(),
+                'f1_format_count' => ItemDetail::where('serial_number', 'LIKE', 'F1%')->count(),
+                'format_distribution' => [],
+                'recent_f1_additions' => ItemDetail::where('serial_number', 'LIKE', 'F1%')
+                    ->where('created_at', '>=', now()->subDays(7))
+                    ->orderBy('created_at', 'desc')
+                    ->limit(10)
+                    ->select('serial_number', 'created_at')
+                    ->get()
+                    ->toArray(),
+                'usage_by_status' => ItemDetail::where('serial_number', 'LIKE', 'F1%')
+                    ->selectRaw('status, COUNT(*) as count')
+                    ->groupBy('status')
+                    ->get()
+                    ->pluck('count', 'status')
+                    ->toArray()
+            ];
 
-        // Format distribution analysis
-        $formatPatterns = ItemDetail::selectRaw('
+            // Format distribution analysis
+            $formatPatterns = ItemDetail::selectRaw('
             CASE
                 WHEN serial_number LIKE "F1%" THEN "F1_Format"
                 WHEN LENGTH(serial_number) = 8 THEN "8_Chars_Other"
@@ -605,85 +611,83 @@ public function getSerialNumberStats()
             END as format_type,
             COUNT(*) as count
         ')
-        ->groupBy('format_type')
-        ->get()
-        ->pluck('count', 'format_type')
-        ->toArray();
+                ->groupBy('format_type')
+                ->get()
+                ->pluck('count', 'format_type')
+                ->toArray();
 
-        $stats['format_distribution'] = $formatPatterns;
+            $stats['format_distribution'] = $formatPatterns;
 
-        // Calculate F1 format percentage
-        $stats['f1_percentage'] = $stats['total_serial_numbers'] > 0
-            ? round(($stats['f1_format_count'] / $stats['total_serial_numbers']) * 100, 2)
-            : 0;
+            // Calculate F1 format percentage
+            $stats['f1_percentage'] = $stats['total_serial_numbers'] > 0
+                ? round(($stats['f1_format_count'] / $stats['total_serial_numbers']) * 100, 2)
+                : 0;
 
-        // Next available F1 serial (for debugging)
-        $stats['next_available_f1'] = $this->generateF1SerialNumbers(1)[0] ?? 'Error generating';
+            // Next available F1 serial (for debugging)
+            $stats['next_available_f1'] = $this->generateF1SerialNumbers(1)[0] ?? 'Error generating';
 
-        Log::info('Serial number statistics generated', [
-            'total_serials' => $stats['total_serial_numbers'],
-            'f1_count' => $stats['f1_format_count'],
-            'f1_percentage' => $stats['f1_percentage']
-        ]);
+            Log::info('Serial number statistics generated', [
+                'total_serials' => $stats['total_serial_numbers'],
+                'f1_count' => $stats['f1_format_count'],
+                'f1_percentage' => $stats['f1_percentage']
+            ]);
 
-        return response()->json([
-            'success' => true,
-            'data' => $stats
-        ]);
+            return response()->json([
+                'success' => true,
+                'data' => $stats
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Serial number stats error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
 
-    } catch (\Exception $e) {
-        Log::error('Serial number stats error', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ]);
-
-        return response()->json([
-            'success' => false,
-            'message' => 'Stats error: ' . $e->getMessage()
-        ], 500);
-    }
-}
-
-/**
- * Test F1 serial generation (untuk debugging)
- */
-public function testF1Generation(Request $request)
-{
-    try {
-        $quantity = (int) $request->get('quantity', 5);
-
-        if ($quantity > 20) {
             return response()->json([
                 'success' => false,
-                'message' => 'Test maksimal 20 serial numbers'
-            ], 400);
+                'message' => 'Stats error: ' . $e->getMessage()
+            ], 500);
         }
-
-        $start = microtime(true);
-        $serialNumbers = $this->generateF1SerialNumbers($quantity);
-        $end = microtime(true);
-
-        $validation = $this->validateGeneratedSerialNumbers($serialNumbers);
-
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'generated_serials' => $serialNumbers,
-                'quantity_requested' => $quantity,
-                'quantity_generated' => count($serialNumbers),
-                'generation_time_ms' => round(($end - $start) * 1000, 2),
-                'validation' => $validation,
-                'examples' => array_slice($serialNumbers, 0, 3)
-            ]
-        ]);
-
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Test error: ' . $e->getMessage()
-        ], 500);
     }
-}
+
+    /**
+     * Test F1 serial generation (untuk debugging)
+     */
+    public function testF1Generation(Request $request)
+    {
+        try {
+            $quantity = (int) $request->get('quantity', 5);
+
+            if ($quantity > 20) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Test maksimal 20 serial numbers'
+                ], 400);
+            }
+
+            $start = microtime(true);
+            $serialNumbers = $this->generateF1SerialNumbers($quantity);
+            $end = microtime(true);
+
+            $validation = $this->validateGeneratedSerialNumbers($serialNumbers);
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'generated_serials' => $serialNumbers,
+                    'quantity_requested' => $quantity,
+                    'quantity_generated' => count($serialNumbers),
+                    'generation_time_ms' => round(($end - $start) * 1000, 2),
+                    'validation' => $validation,
+                    'examples' => array_slice($serialNumbers, 0, 3)
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Test error: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 
     // Store goods received baru
     // public function store(Request $request)
@@ -806,9 +810,19 @@ public function testF1Generation(Request $request)
 
     public function store(Request $request)
     {
+        // ================================================================
+        // STEP 1: Detect receipt type (NEW - minimal addition)
+        // ================================================================
+        $receiptType = $request->get('receipt_type', 'po_based');
+        $isPOBased = $receiptType === 'po_based' && $request->filled('po_id');
+
+        // ================================================================
+        // STEP 2: Update validation rules (UPDATED - conditional rules)
+        // ================================================================
         $validator = Validator::make($request->all(), [
             'receive_number' => 'required|string|max:50|unique:goods_receiveds,receive_number',
-            'po_id' => 'required|string|exists:purchase_orders,po_id',
+            'po_id' => $isPOBased ? 'required|string|exists:purchase_orders,po_id' : 'nullable',
+            'supplier_id' => !$isPOBased ? 'required|string|exists:suppliers,supplier_id' : 'nullable',
             'receive_date' => 'required|date',
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
@@ -823,7 +837,8 @@ public function testF1Generation(Request $request)
         ], [
             'receive_number.required' => 'Nomor penerimaan wajib diisi.',
             'receive_number.unique' => 'Nomor penerimaan sudah digunakan.',
-            'po_id.required' => 'PO wajib dipilih.',
+            'po_id.required' => 'PO wajib dipilih untuk penerimaan berdasarkan PO.',
+            'supplier_id.required' => 'Supplier wajib dipilih untuk penerimaan langsung.',
             'receive_date.required' => 'Tanggal penerimaan wajib diisi.',
             'items.required' => 'Items wajib diisi.',
             'items.min' => 'Minimal 1 item harus dipilih.',
@@ -831,7 +846,9 @@ public function testF1Generation(Request $request)
             'items.*.quantity_received.min' => 'Quantity minimal 1.',
         ]);
 
-        // Custom validation untuk serial numbers
+        // ================================================================
+        // STEP 3: Existing custom validation (UNCHANGED)
+        // ================================================================
         $validator->after(function ($validator) use ($request) {
             if ($request->has('items')) {
                 foreach ($request->items as $index => $item) {
@@ -876,53 +893,72 @@ public function testF1Generation(Request $request)
         try {
             DB::beginTransaction();
 
-            $po = PurchaseOrder::find($request->po_id);
+            // ================================================================
+            // STEP 4: Handle supplier_id (UPDATED - conditional logic)
+            // ================================================================
+            if ($isPOBased) {
+                $po = PurchaseOrder::find($request->po_id);
+                $supplierId = $po->supplier_id;
+            } else {
+                $po = null;
+                $supplierId = $request->supplier_id; // NEW: direct supplier selection
+            }
 
-            // Generate GR ID
+            // Generate GR ID (UNCHANGED)
             $grId = $this->generateGRId();
 
-            // Create Goods Received
+            // ================================================================
+            // STEP 5: Create Goods Received (UPDATED - po_id nullable, add receipt_type)
+            // ================================================================
             $gr = GoodsReceived::create([
                 'gr_id' => $grId,
                 'receive_number' => $request->receive_number,
-                'po_id' => $request->po_id,
-                'supplier_id' => $po->supplier_id,
+                'po_id' => $isPOBased ? $request->po_id : null,          // UPDATED: nullable
+                'supplier_id' => $supplierId,
                 'receive_date' => $request->receive_date,
-                'status' => 'partial',
+                'status' => 'partial', // Will be updated based on completion
                 'notes' => $request->notes,
                 'received_by' => Auth::id(),
+                'receipt_type' => $receiptType,                          // NEW: track receipt type
             ]);
 
             $totalItemsGenerated = 0;
             $totalQRGenerated = 0;
             $qrGenerationResults = [];
 
-            // Create GR Details and ItemDetails
+            // ================================================================
+            // STEP 6: Create GR Details (UPDATED - po_detail_id nullable, add total_price)
+            // ================================================================
             foreach ($request->items as $itemData) {
-                // Create GR Detail
                 $grDetail = GoodsReceivedDetail::create([
                     'gr_detail_id' => GoodsReceivedDetail::generateDetailId(),
                     'gr_id' => $gr->gr_id,
                     'item_id' => $itemData['item_id'],
+                    'po_detail_id' => $isPOBased ? ($itemData['po_detail_id'] ?? null) : null, // UPDATED: nullable
                     'quantity_received' => $itemData['quantity_received'],
                     'quantity_to_stock' => $itemData['quantity_received'], // Semua ke stock
                     'quantity_to_ready' => 0, // Tidak ada yang langsung ready
                     'unit_price' => $itemData['unit_price'],
+                    'total_price' => $itemData['quantity_received'] * $itemData['unit_price'], // NEW: calculated field
                     'batch_number' => $itemData['batch_number'],
                     'expiry_date' => $itemData['expiry_date'],
                     'notes' => $itemData['notes'],
                 ]);
 
-                // Generate ItemDetail records untuk semua quantity_received
+                // ================================================================
+                // STEP 7: Generate ItemDetail records (UNCHANGED)
+                // ================================================================
                 $itemsGenerated = $this->generateItemDetailsForReceived(
                     $grDetail,
                     $itemData,
-                    $itemData['serial_numbers'] = array_map('strtoupper', $itemData['serial_numbers'] ?? [])
+                    array_map('strtoupper', $itemData['serial_numbers'] ?? [])
                 );
 
                 $totalItemsGenerated += $itemsGenerated;
 
-                // **NEW: Auto-generate QR codes setelah item details dibuat**
+                // ================================================================
+                // STEP 8: Auto-generate QR codes (UNCHANGED - existing logic)
+                // ================================================================
                 $qrResult = $grDetail->autoGenerateQRCodes();
                 $qrGenerationResults[] = [
                     'gr_detail_id' => $grDetail->gr_detail_id,
@@ -934,32 +970,52 @@ public function testF1Generation(Request $request)
                     $totalQRGenerated += $qrResult['generated_count'];
                 }
 
-                // Update PO detail quantity received
-                $grDetail->updatePODetail();
+                // ================================================================
+                // STEP 9: Update PO detail (UPDATED - only for PO-based)
+                // ================================================================
+                if ($isPOBased && method_exists($grDetail, 'updatePODetail')) {
+                    $grDetail->updatePODetail();
+                }
             }
 
-            // Process stock updates
+            // ================================================================
+            // STEP 10: Process stock updates (UNCHANGED)
+            // ================================================================
             $gr->processStockUpdates();
 
-            // Update PO status
-            $gr->updatePOStatus();
+            // ================================================================
+            // STEP 11: Update status (UPDATED - different logic for direct receipts)
+            // ================================================================
+            if ($isPOBased) {
+                // PO-based: update PO status and check completion
+                $gr->updatePOStatus();
 
-            // Update GR status based on PO completion
-            if ($gr->isCompleteReceive()) {
+                // Update GR status based on PO completion
+                if ($gr->isCompleteReceive()) {
+                    $gr->update(['status' => 'complete']);
+                }
+            } else {
+                // Direct receipts: always complete immediately
                 $gr->update(['status' => 'complete']);
             }
 
-            // Log activity dengan info QR generation
+            // ================================================================
+            // STEP 12: Log activity (UPDATED - add receipt_type info)
+            // ================================================================
             ActivityLog::logActivity('goods_receiveds', $gr->gr_id, 'create', null, array_merge($gr->toArray(), [
                 'total_item_details_generated' => $totalItemsGenerated,
                 'total_qr_codes_generated' => $totalQRGenerated,
-                'qr_generation_results' => $qrGenerationResults
+                'qr_generation_results' => $qrGenerationResults,
+                'receipt_type' => $receiptType  // NEW: track receipt type
             ]));
 
             DB::commit();
 
-            // Prepare success message dengan info QR
-            $successMessage = "Penerimaan barang berhasil dicatat! ";
+            // ================================================================
+            // STEP 13: Success response (UPDATED - receipt type aware message)
+            // ================================================================
+            $receiptTypeText = $isPOBased ? 'berdasarkan PO' : 'langsung';
+            $successMessage = "Penerimaan barang {$receiptTypeText} berhasil dicatat! ";
             $successMessage .= "Total {$totalItemsGenerated} item details telah dibuat ";
 
             if ($totalQRGenerated > 0) {
@@ -974,6 +1030,7 @@ public function testF1Generation(Request $request)
                 'data' => [
                     'gr_id' => $gr->gr_id,
                     'receive_number' => $gr->receive_number,
+                    'receipt_type' => $gr->receipt_type,  // NEW: include receipt type
                     'total_item_details' => $totalItemsGenerated,
                     'total_qr_generated' => $totalQRGenerated,
                     'qr_generation_summary' => [
@@ -986,7 +1043,6 @@ public function testF1Generation(Request $request)
             ]);
         } catch (\Exception $e) {
             DB::rollback();
-
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal mencatat penerimaan: ' . $e->getMessage(),
@@ -1532,62 +1588,129 @@ public function testF1Generation(Request $request)
         return "{$itemCode}-{$year}-" . str_pad($newNumber, 3, '0', STR_PAD_LEFT);
     }
     // Tampilkan detail goods received
-    public function show(GoodsReceived $goodsReceived)
-    {
-        $goodsReceived->load([
-            'purchaseOrder.poDetails.item',
-            'supplier',
-            'receivedBy.userLevel',
-            'grDetails.item.category'
-        ]);
+public function show(GoodsReceived $goodsReceived)
+{
+    // Load relationships dengan conditional loading
+    $relationships = [
+        'supplier',
+        'receivedBy.userLevel',
+        'grDetails.item.category'
+    ];
 
-        // Summary info
-        $summaryInfo = $goodsReceived->getSummaryInfo();
-
-        // Status info
-        $statusInfo = $goodsReceived->getStatusInfo();
-
-        return view('goods-received.show', compact(
-            'goodsReceived',
-            'summaryInfo',
-            'statusInfo'
-        ));
+    // Only load PO relationship jika PO-based
+    if ($goodsReceived->isPOBased() && $goodsReceived->po_id) {
+        $relationships[] = 'purchaseOrder.poDetails.item';
     }
+
+    $goodsReceived->load($relationships);
+
+    // Summary info
+    $summaryInfo = $goodsReceived->getSummaryInfo();
+
+    // Status info
+    $statusInfo = $goodsReceived->getStatusInfo();
+
+    return view('goods-received.show', compact(
+        'goodsReceived',
+        'summaryInfo',
+        'statusInfo'
+    ));
+}
+
 
     // Tampilkan form edit goods received
     public function edit(GoodsReceived $goodsReceived)
     {
+        // ================================================================
+        // STEP 1: Existing validation (UNCHANGED)
+        // ================================================================
         // Only allow edit if status is partial
         if ($goodsReceived->status === 'complete') {
             return back()->with('error', 'Penerimaan yang sudah complete tidak dapat diedit.');
         }
 
-        $goodsReceived->load(['grDetails.item', 'purchaseOrder.poDetails.item']);
+        // ================================================================
+        // STEP 2: Load existing relationships (UPDATED - conditional loading)
+        // ================================================================
+        $goodsReceived->load([
+            'grDetails.item',
+            'supplier',                    // Always load supplier
+            'receivedBy.userLevel'         // Always load receiver info
+        ]);
 
-        return view('goods-received.edit', compact('goodsReceived'));
+        // Load PO relationship only if PO-based
+        if ($goodsReceived->isPOBased()) {
+            $goodsReceived->load(['purchaseOrder.poDetails.item']);
+        }
+
+        // ================================================================
+        // STEP 3: Get data for dropdowns (NEW - for direct receipts)
+        // ================================================================
+        // Get all suppliers for dropdown (needed for direct receipts)
+        $suppliers = Supplier::active()->orderBy('supplier_name')->get();
+
+        // Get all items for dropdown (needed for direct receipts to add new items)
+        $items = Item::with('category')->active()->orderBy('item_name')->get();
+
+        // ================================================================
+        // STEP 4: Prepare view data (UPDATED - add new data)
+        // ================================================================
+        return view('goods-received.edit', compact(
+            'goodsReceived',
+            'suppliers',        // NEW: for direct receipts
+            'items'            // NEW: for adding items in direct receipts
+        ));
     }
 
     // Update goods received
     public function update(Request $request, GoodsReceived $goodsReceived)
     {
+        // ================================================================
+        // STEP 1: Existing validation (UNCHANGED)
+        // ================================================================
         if ($goodsReceived->status === 'complete') {
             return back()->with('error', 'Penerimaan yang sudah complete tidak dapat diedit.');
         }
 
-        $validator = Validator::make($request->all(), [
+        // ================================================================
+        // STEP 2: Detect receipt type (NEW - determine update rules)
+        // ================================================================
+        $isPOBased = $goodsReceived->isPOBased();
+
+        // ================================================================
+        // STEP 3: Dynamic validation rules (UPDATED - conditional based on receipt type)
+        // ================================================================
+        $rules = [
             'receive_date' => 'required|date',
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.quantity_received' => 'required|integer|min:1',
-            'items.*.quantity_to_stock' => 'required|integer|min:0',
-            'items.*.quantity_to_ready' => 'required|integer|min:0',
             'items.*.unit_price' => 'required|numeric|min:0',
             'items.*.batch_number' => 'nullable|string',
             'items.*.expiry_date' => 'nullable|date',
             'items.*.notes' => 'nullable|string',
+        ];
+
+        // Add conditional validation for direct receipts
+        if (!$isPOBased) {
+            $rules['supplier_id'] = 'required|string|exists:suppliers,supplier_id';
+            $rules['delivery_note_number'] = 'nullable|string|max:100';
+            $rules['invoice_number'] = 'nullable|string|max:100';
+            $rules['external_reference'] = 'nullable|string|max:200';
+        }
+
+        $validator = Validator::make($request->all(), $rules, [
+            'receive_date.required' => 'Tanggal penerimaan wajib diisi.',
+            'supplier_id.required' => 'Supplier wajib dipilih untuk penerimaan langsung.',
+            'items.required' => 'Items wajib diisi.',
+            'items.min' => 'Minimal 1 item harus dipilih.',
+            'items.*.quantity_received.required' => 'Quantity yang diterima wajib diisi.',
+            'items.*.quantity_received.min' => 'Quantity minimal 1.',
         ]);
 
-        // Custom validation untuk split quantities
+        // ================================================================
+        // STEP 4: Existing custom validation (UNCHANGED - quantity split logic)
+        // ================================================================
         $validator->after(function ($validator) use ($request) {
             if ($request->has('items')) {
                 foreach ($request->items as $index => $item) {
@@ -1613,50 +1736,98 @@ public function testF1Generation(Request $request)
 
             $oldData = $goodsReceived->toArray();
 
-            // Update GR header
-            $goodsReceived->update([
+            // ================================================================
+            // STEP 5: Update GR header (UPDATED - conditional fields)
+            // ================================================================
+            $updateData = [
                 'receive_date' => $request->receive_date,
                 'notes' => $request->notes,
-            ]);
+            ];
 
-            // Update GR details
+            // Add fields specific to direct receipts
+            if (!$isPOBased) {
+                $updateData['supplier_id'] = $request->supplier_id;
+                $updateData['delivery_note_number'] = $request->delivery_note_number;
+                $updateData['invoice_number'] = $request->invoice_number;
+                $updateData['external_reference'] = $request->external_reference;
+            }
+
+            $goodsReceived->update($updateData);
+
+            // ================================================================
+            // STEP 6: Update GR details (UPDATED - conditional PO detail updates)
+            // ================================================================
             foreach ($request->items as $grDetailId => $itemData) {
                 $grDetail = GoodsReceivedDetail::find($grDetailId);
 
                 if ($grDetail) {
+                    // Store old quantity for PO update calculation
+                    $oldQuantity = $grDetail->quantity_received;
+
+                    // Update GR detail
                     $grDetail->update([
                         'quantity_received' => $itemData['quantity_received'],
                         'quantity_to_stock' => $itemData['quantity_to_stock'],
                         'quantity_to_ready' => $itemData['quantity_to_ready'],
                         'unit_price' => $itemData['unit_price'],
+                        'total_price' => $itemData['quantity_received'] * $itemData['unit_price'], // NEW: calculated
                         'batch_number' => $itemData['batch_number'],
                         'expiry_date' => $itemData['expiry_date'],
                         'notes' => $itemData['notes'],
                     ]);
 
-                    // Update PO detail
-                    $grDetail->updatePODetail();
+                    // ================================================================
+                    // STEP 7: Update PO detail (UPDATED - only for PO-based)
+                    // ================================================================
+                    if ($isPOBased && $grDetail->po_detail_id) {
+                        $poDetail = PoDetail::find($grDetail->po_detail_id);
+                        if ($poDetail) {
+                            // Calculate quantity difference and update PO detail
+                            $quantityDiff = $itemData['quantity_received'] - $oldQuantity;
+                            $poDetail->increment('quantity_received', $quantityDiff);
+                        }
+                    }
                 }
             }
 
-            // Re-process stock updates (this might need adjustment based on business logic)
+            // ================================================================
+            // STEP 8: Re-process stock updates (UNCHANGED - existing logic)
+            // ================================================================
             // For now, we assume stock was already processed and won't double-process
+            // This might need adjustment based on business logic
 
-            // Update PO status
-            $goodsReceived->updatePOStatus();
+            // ================================================================
+            // STEP 9: Update status (UPDATED - conditional logic)
+            // ================================================================
+            if ($isPOBased) {
+                // PO-based: update PO status and check completion
+                $goodsReceived->updatePOStatus();
 
-            // Update GR status
-            if ($goodsReceived->isCompleteReceive()) {
-                $goodsReceived->update(['status' => 'complete']);
+                // Update GR status based on PO completion
+                if ($goodsReceived->isCompleteReceive()) {
+                    $goodsReceived->update(['status' => 'complete']);
+                }
+            } else {
+                // Direct receipts: keep as complete (they're always complete when created)
+                // No additional status logic needed
             }
 
-            // Log activity
-            ActivityLog::logActivity('goods_receiveds', $goodsReceived->gr_id, 'update', $oldData, $goodsReceived->fresh()->toArray());
+            // ================================================================
+            // STEP 10: Log activity (UPDATED - include receipt type info)
+            // ================================================================
+            ActivityLog::logActivity('goods_receiveds', $goodsReceived->gr_id, 'update', $oldData, array_merge($goodsReceived->fresh()->toArray(), [
+                'receipt_type' => $goodsReceived->receipt_type,
+                'is_po_based' => $isPOBased
+            ]));
 
             DB::commit();
 
+            // ================================================================
+            // STEP 11: Success response (UPDATED - receipt type aware message)
+            // ================================================================
+            $receiptTypeText = $isPOBased ? 'berdasarkan PO' : 'langsung';
             return redirect()->route('goods-received.show', $goodsReceived)
-                ->with('success', 'Penerimaan barang berhasil diupdate!');
+                ->with('success', "Penerimaan barang {$receiptTypeText} berhasil diupdate!");
         } catch (\Exception $e) {
             DB::rollback();
             return back()
@@ -1664,6 +1835,7 @@ public function testF1Generation(Request $request)
                 ->with('error', 'Gagal mengupdate penerimaan: ' . $e->getMessage());
         }
     }
+
 
     // API endpoint untuk get PO details yang belum fully received
     public function getPODetails(Request $request, $poId)
@@ -1716,33 +1888,627 @@ public function testF1Generation(Request $request)
 
 
 
+    /**
+     * Generate serial numbers dengan format flexible (F1 atau custom)
+     */
+    // public function getSerialNumberTemplate(Request $request)
+    // {
+    //     try {
+    //         $itemId = $request->get('item_id');
+    //         $quantity = (int) $request->get('quantity', 1);
+    //         $format = $request->get('format', 'f1'); // f1, custom, or auto
+    //         $customPrefix = $request->get('prefix', ''); // Custom prefix jika ada
+
+    //         // Validation
+    //         if (!$itemId || $quantity <= 0) {
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => 'Item ID dan quantity wajib diisi'
+    //             ], 400);
+    //         }
+
+    //         if ($quantity > 1000) {
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => 'Maksimal 100 serial numbers per request'
+    //             ], 400);
+    //         }
+
+    //         // Validate item exists
+    //         $item = Item::find($itemId);
+    //         if (!$item) {
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => 'Item tidak ditemukan'
+    //             ], 404);
+    //         }
+
+    //         // Generate serial numbers based on format
+    //         $serialNumbers = [];
+    //         $formatInfo = [];
+
+    //         switch ($format) {
+    //             case 'f1':
+    //                 $serialNumbers = $this->generateF1SerialNumbers($quantity);
+    //                 $formatInfo = [
+    //                     'type' => 'F1 Generated',
+    //                     'pattern' => 'F1XXXXXX',
+    //                     'description' => 'F1 + 6 random alphanumeric'
+    //                 ];
+    //                 break;
+
+    //             case 'custom':
+    //                 $serialNumbers = $this->generateCustomSerialNumbers($quantity, $customPrefix, $item);
+    //                 $formatInfo = [
+    //                     'type' => 'Custom Generated',
+    //                     'pattern' => $customPrefix ? "{$customPrefix}XXXX" : 'Auto pattern',
+    //                     'description' => 'Custom format based on item'
+    //                 ];
+    //                 break;
+
+    //             case 'auto':
+    //             default:
+    //                 // Auto-detect best format based on item type
+    //                 $autoFormat = $this->detectBestSerialFormat($item);
+    //                 $serialNumbers = $this->generateAutoSerialNumbers($quantity, $autoFormat, $item);
+    //                 $formatInfo = [
+    //                     'type' => 'Auto Generated',
+    //                     'pattern' => $autoFormat['pattern'],
+    //                     'description' => $autoFormat['description']
+    //                 ];
+    //                 break;
+    //         }
+
+    //         // Validate all generated serial numbers are unique
+    //         $validation = $this->validateGeneratedSerialNumbers($serialNumbers);
+
+    //         if (!$validation['all_valid']) {
+    //             Log::warning('Serial number conflicts detected, regenerating', [
+    //                 'conflicts' => $validation['conflicts'],
+    //                 'item_id' => $itemId
+    //             ]);
+
+    //             // Try regenerate with conflicts excluded
+    //             if ($format === 'f1') {
+    //                 $serialNumbers = $this->generateF1SerialNumbers($quantity, $validation['conflicts']);
+    //             } else {
+    //                 // For custom/auto, try different pattern
+    //                 $serialNumbers = $this->generateCustomSerialNumbers($quantity, $customPrefix . '_', $item);
+    //             }
+    //         }
+
+    //         Log::info('Serial numbers generated successfully', [
+    //             'item_id' => $itemId,
+    //             'item_code' => $item->item_code,
+    //             'quantity_requested' => $quantity,
+    //             'quantity_generated' => count($serialNumbers),
+    //             'format' => $format,
+    //             'generated_serials' => $serialNumbers
+    //         ]);
+
+    //         return response()->json([
+    //             'success' => true,
+    //             'data' => [
+    //                 'serial_numbers' => $serialNumbers,
+    //                 'format_info' => $formatInfo,
+    //                 'total_generated' => count($serialNumbers),
+    //                 'item_info' => [
+    //                     'item_id' => $item->item_id,
+    //                     'item_code' => $item->item_code,
+    //                     'item_name' => $item->item_name
+    //                 ],
+    //                 'validation' => $validation
+    //             ],
+    //             'message' => "Generated {$quantity} unique serial numbers"
+    //         ]);
+    //     } catch (\Exception $e) {
+    //         Log::error('Failed to generate serial numbers', [
+    //             'error' => $e->getMessage(),
+    //             'trace' => $e->getTraceAsString(),
+    //             'item_id' => $request->get('item_id'),
+    //             'quantity' => $request->get('quantity'),
+    //             'format' => $request->get('format')
+    //         ]);
+
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Gagal generate serial numbers: ' . $e->getMessage()
+    //         ], 500);
+    //     }
+    // }
+
+    /**
+     * Generate custom serial numbers based on item
+     */
+    private function generateCustomSerialNumbers(int $quantity, string $customPrefix = '', Item $item): array
+    {
+        $serialNumbers = [];
+        $maxAttempts = $quantity * 20;
+        $attempts = 0;
+
+        // Determine prefix
+        if (empty($customPrefix)) {
+            $prefix = $this->generatePrefixFromItem($item);
+        } else {
+            $prefix = strtoupper($customPrefix);
+        }
+
+        // Get existing serials with this prefix
+        $existingSerials = ItemDetail::where('serial_number', 'LIKE', $prefix . '%')
+            ->pluck('serial_number')
+            ->toArray();
+
+        Log::debug('Starting custom serial generation', [
+            'prefix' => $prefix,
+            'quantity_needed' => $quantity,
+            'existing_with_prefix' => count($existingSerials)
+        ]);
+
+        while (count($serialNumbers) < $quantity && $attempts < $maxAttempts) {
+            $attempts++;
+
+            // Generate suffix (6-8 random chars)
+            $suffixLength = strlen($prefix) <= 4 ? 8 : 6;
+            $suffix = $this->generateRandomAlphanumeric($suffixLength);
+            $serialNumber = $prefix . $suffix;
+
+            // Check uniqueness
+            if (
+                !in_array($serialNumber, $serialNumbers) &&
+                !in_array($serialNumber, $existingSerials)
+            ) {
+                $serialNumbers[] = $serialNumber;
+            }
+        }
+
+        return $serialNumbers;
+    }
+
+    /**
+     * Generate prefix from item information
+     */
+    private function generatePrefixFromItem(Item $item): string
+    {
+        // Try to create meaningful prefix from item
+        $itemCode = strtoupper($item->item_code);
+        $categoryCode = strtoupper($item->category->category_code ?? 'ITM');
+
+        // Different strategies based on item type
+        if (str_contains(strtolower($item->item_name), 'modem')) {
+            return 'MDM';
+        } elseif (str_contains(strtolower($item->item_name), 'router')) {
+            return 'RTR';
+        } elseif (str_contains(strtolower($item->item_name), 'switch')) {
+            return 'SWT';
+        } elseif (str_contains(strtolower($item->item_name), 'cable')) {
+            return 'CBL';
+        } elseif (strlen($itemCode) >= 3) {
+            return substr($itemCode, 0, 3);
+        } else {
+            return substr($categoryCode, 0, 3);
+        }
+    }
+
+    /**
+     * Auto-detect best serial format for item
+     */
+    private function detectBestSerialFormat(Item $item): array
+    {
+        $itemName = strtolower($item->item_name);
+        $categoryName = strtolower($item->category->category_name ?? '');
+
+        // For network equipment, use specific patterns
+        if (str_contains($itemName, 'modem') || str_contains($categoryName, 'modem')) {
+            return [
+                'pattern' => 'MDMXXXXXX',
+                'prefix' => 'MDM',
+                'description' => 'Modem serial format'
+            ];
+        }
+
+        if (str_contains($itemName, 'router') || str_contains($categoryName, 'router')) {
+            return [
+                'pattern' => 'RTRXXXXXX',
+                'prefix' => 'RTR',
+                'description' => 'Router serial format'
+            ];
+        }
+
+        if (str_contains($itemName, 'switch') || str_contains($categoryName, 'switch')) {
+            return [
+                'pattern' => 'SWTXXXXXX',
+                'prefix' => 'SWT',
+                'description' => 'Switch serial format'
+            ];
+        }
+
+        // Default to F1 format
+        return [
+            'pattern' => 'F1XXXXXX',
+            'prefix' => 'F1',
+            'description' => 'Standard F1 format'
+        ];
+    }
+
+    /**
+     * Generate auto serial numbers
+     */
+    private function generateAutoSerialNumbers(int $quantity, array $formatInfo, Item $item): array
+    {
+        if ($formatInfo['prefix'] === 'F1') {
+            return $this->generateF1SerialNumbers($quantity);
+        } else {
+            return $this->generateCustomSerialNumbers($quantity, $formatInfo['prefix'], $item);
+        }
+    }
+
+    /**
+     * FLEXIBLE: Validate serial number - support ANY format
+     */
+    public function validateSerialNumber(Request $request)
+    {
+        try {
+            $serialNumber = trim($request->get('serial_number'));
+
+            // Basic validation
+            if (empty($serialNumber)) {
+                return response()->json([
+                    'valid' => false,
+                    'message' => 'Serial number tidak boleh kosong',
+                    'error_type' => 'empty'
+                ]);
+            }
+
+            // Enhanced format validation - support multiple formats
+            $formatValidation = $this->validateAnySerialFormat($serialNumber);
+            if (!$formatValidation['valid']) {
+                return response()->json([
+                    'valid' => false,
+                    'message' => $formatValidation['message'],
+                    'error_type' => 'format',
+                    'format_detected' => $formatValidation['format_detected'] ?? 'unknown',
+                    'suggestions' => $formatValidation['suggestions'] ?? []
+                ]);
+            }
+
+            // Database duplicate check
+            $existingItem = ItemDetail::where('serial_number', $serialNumber)
+                ->with('item')
+                ->first();
+
+            if ($existingItem) {
+                return response()->json([
+                    'valid' => false,
+                    'message' => 'Serial number sudah digunakan',
+                    'error_type' => 'duplicate',
+                    'existing_info' => [
+                        'item_code' => $existingItem->item->item_code ?? 'N/A',
+                        'item_name' => $existingItem->item->item_name ?? 'N/A',
+                        'status' => $existingItem->status ?? 'N/A',
+                        'location' => $existingItem->location ?? 'N/A',
+                        'created_at' => $existingItem->created_at?->format('d/m/Y H:i')
+                    ]
+                ]);
+            }
+
+            return response()->json([
+                'valid' => true,
+                'message' => 'Serial number tersedia dan format valid',
+                'format_info' => [
+                    'detected_format' => $formatValidation['format_detected'],
+                    'is_generated' => $formatValidation['is_generated'],
+                    'is_original' => $formatValidation['is_original'],
+                    'length' => strlen($serialNumber),
+                    'pattern_match' => true
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Serial number validation error', [
+                'serial_number' => $request->get('serial_number'),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'valid' => false,
+                'message' => 'Error validasi: ' . $e->getMessage(),
+                'error_type' => 'system_error'
+            ], 500);
+        }
+    }
+
+    /**
+     * Validate any serial number format (flexible)
+     */
+    private function validateAnySerialFormat(string $serialNumber): array
+    {
+        $sn = strtoupper(trim($serialNumber));
+
+        // Must have minimum length
+        if (strlen($sn) < 4) {
+            return [
+                'valid' => false,
+                'message' => 'Serial number minimal 4 karakter'
+            ];
+        }
+
+        // Must have maximum length
+        if (strlen($sn) > 30) {
+            return [
+                'valid' => false,
+                'message' => 'Serial number maksimal 30 karakter'
+            ];
+        }
+
+        // Must contain only allowed characters
+        if (!preg_match('/^[A-Z0-9\-_]+$/', $sn)) {
+            return [
+                'valid' => false,
+                'message' => 'Serial number hanya boleh huruf, angka, dash (-), underscore (_)',
+                'suggestions' => [
+                    'Hapus karakter spesial selain dash (-) dan underscore (_)',
+                    'Gunakan huruf besar',
+                    'Tidak boleh ada spasi'
+                ]
+            ];
+        }
+
+        // Detect format type
+        $formatDetected = $this->detectSerialNumberFormat($sn);
+
+        return [
+            'valid' => true,
+            'message' => 'Format serial number valid',
+            'format_detected' => $formatDetected['type'],
+            'is_generated' => $formatDetected['is_generated'],
+            'is_original' => $formatDetected['is_original']
+        ];
+    }
+
+    /**
+     * Detect serial number format type
+     */
+    private function detectSerialNumberFormat(string $serialNumber): array
+    {
+        $sn = strtoupper($serialNumber);
+
+        // F1 format
+        if (str_starts_with($sn, 'F1') && strlen($sn) === 8) {
+            return [
+                'type' => 'F1 Generated',
+                'is_generated' => true,
+                'is_original' => false
+            ];
+        }
+
+        // Custom generated formats
+        $generatedPrefixes = ['MDM', 'RTR', 'SWT', 'CBL'];
+        foreach ($generatedPrefixes as $prefix) {
+            if (str_starts_with($sn, $prefix)) {
+                return [
+                    'type' => $prefix . ' Generated',
+                    'is_generated' => true,
+                    'is_original' => false
+                ];
+            }
+        }
+
+        // Original manufacturer patterns
+        if (preg_match('/^ZTE|^HW|^TP|^DL|^ZX/', $sn)) {
+            return [
+                'type' => 'Manufacturer Original',
+                'is_generated' => false,
+                'is_original' => true
+            ];
+        }
+
+        // Generic serial number
+        return [
+            'type' => 'Custom/Original',
+            'is_generated' => false,
+            'is_original' => true
+        ];
+    }
+
+    /**
+     * Enhanced generate F1 serial numbers (keeping existing method)
+     */
+    private function generateF1SerialNumbers(int $quantity, array $excludeList = []): array
+    {
+        // Keep existing F1 generation logic...
+        $serialNumbers = [];
+        $maxAttempts = $quantity * 20;
+        $attempts = 0;
+
+        $existingF1Serials = ItemDetail::where('serial_number', 'LIKE', 'F1%')
+            ->pluck('serial_number')
+            ->toArray();
+
+        $allExcludes = array_merge($excludeList, $existingF1Serials);
+
+        while (count($serialNumbers) < $quantity && $attempts < $maxAttempts) {
+            $attempts++;
+
+            $randomPart = $this->generateRandomAlphanumeric(6);
+            $serialNumber = 'F1' . $randomPart;
+
+            if (
+                !in_array($serialNumber, $serialNumbers) &&
+                !in_array($serialNumber, $allExcludes)
+            ) {
+                $serialNumbers[] = $serialNumber;
+            }
+        }
+
+        return $serialNumbers;
+    }
+
+    /**
+     * Enhanced random alphanumeric generation
+     */
+    private function generateRandomAlphanumeric(int $length): string
+    {
+        // Exclude confusing characters
+        $characters = 'ACDEFHJKLMNPQRTUVWXYZ23479';
+        $result = '';
+
+        for ($i = 0; $i < $length; $i++) {
+            $result .= $characters[random_int(0, strlen($characters) - 1)];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get suppliers untuk direct receipts
+     */
+    // public function getSuppliers(Request $request)
+    // {
+    //     $suppliers = Supplier::active()
+    //         ->when($request->filled('search'), function ($query) use ($request) {
+    //             $query->where('supplier_name', 'like', '%' . $request->search . '%');
+    //         })
+    //         ->orderBy('supplier_name')
+    //         ->get(['supplier_id', 'supplier_name', 'supplier_code']);
+
+    //     return response()->json([
+    //         'success' => true,
+    //         'data' => $suppliers
+    //     ]);
+    // }
+
+    /**
+     * Get items untuk direct receipts
+     */
+    // public function getItems(Request $request)
+    // {
+    //     $items = Item::with('category')
+    //         ->active()
+    //         ->when($request->filled('search'), function ($query) use ($request) {
+    //             $search = $request->search;
+    //             $query->where(function ($q) use ($search) {
+    //                 $q->where('item_name', 'like', '%' . $search . '%')
+    //                     ->orWhere('item_code', 'like', '%' . $search . '%');
+    //             });
+    //         })
+    //         ->orderBy('item_name')
+    //         ->get(['item_id', 'item_code', 'item_name', 'unit'])
+    //         ->map(function ($item) {
+    //             return [
+    //                 'item_id' => $item->item_id,
+    //                 'item_code' => $item->item_code,
+    //                 'item_name' => $item->item_name,
+    //                 'unit' => $item->unit,
+    //                 'category_name' => $item->category->category_name ?? 'N/A'
+    //             ];
+    //         });
+
+    //     return response()->json([
+    //         'success' => true,
+    //         'data' => $items
+    //     ]);
+    // }
+
+    /**
+     * Generate receive number berdasarkan receipt type
+     */
+    // public function generateReceiveNumber(Request $request)
+    // {
+    //     $receiptType = $request->get('receipt_type', 'po_based');
+    //     $receiveNumber = GoodsReceived::generateReceiveNumber($receiptType);
+
+    //     return response()->json([
+    //         'success' => true,
+    //         'data' => [
+    //             'receive_number' => $receiveNumber,
+    //             'receipt_type' => $receiptType
+    //         ]
+    //     ]);
+    // }
+
+    /**
+ * Generate receive number berdasarkan receipt type
+ */
+public function generateReceiveNumber(Request $request)
+{
+    $receiptType = $request->get('receipt_type', 'po_based');
+    $receiveNumber = GoodsReceived::generateReceiveNumber($receiptType);
+
+    return response()->json([
+        'success' => true,
+        'data' => [
+            'receive_number' => $receiveNumber,
+            'receipt_type' => $receiptType
+        ]
+    ]);
+}
+
 /**
- * Generate serial numbers dengan format flexible (F1 atau custom)
+ * Get suppliers untuk direct receipts
+ */
+public function getSuppliers(Request $request)
+{
+    $suppliers = Supplier::active()
+        ->when($request->filled('search'), function ($query) use ($request) {
+            $query->where('supplier_name', 'like', '%' . $request->search . '%');
+        })
+        ->orderBy('supplier_name')
+        ->get(['supplier_id', 'supplier_name', 'supplier_code']);
+
+    return response()->json([
+        'success' => true,
+        'data' => $suppliers
+    ]);
+}
+
+/**
+ * Get items untuk direct receipts
+ */
+public function getItems(Request $request)
+{
+    $items = Item::with('category')
+        ->active()
+        ->when($request->filled('search'), function ($query) use ($request) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('item_name', 'like', '%' . $search . '%')
+                    ->orWhere('item_code', 'like', '%' . $search . '%');
+            });
+        })
+        ->orderBy('item_name')
+        ->get(['item_id', 'item_code', 'item_name', 'unit'])
+        ->map(function ($item) {
+            return [
+                'item_id' => $item->item_id,
+                'item_code' => $item->item_code,
+                'item_name' => $item->item_name,
+                'unit' => $item->unit,
+                'category_name' => $item->category->category_name ?? 'N/A'
+            ];
+        });
+
+    return response()->json([
+        'success' => true,
+        'data' => $items
+    ]);
+}
+
+/**
+ * Simple serial number template generation
  */
 public function getSerialNumberTemplate(Request $request)
 {
     try {
         $itemId = $request->get('item_id');
         $quantity = (int) $request->get('quantity', 1);
-        $format = $request->get('format', 'f1'); // f1, custom, or auto
-        $customPrefix = $request->get('prefix', ''); // Custom prefix jika ada
 
-        // Validation
-        if (!$itemId || $quantity <= 0) {
+        if (!$itemId || $quantity <= 0 || $quantity > 100) {
             return response()->json([
                 'success' => false,
-                'message' => 'Item ID dan quantity wajib diisi'
+                'message' => 'Item ID dan quantity (1-100) wajib diisi'
             ], 400);
         }
 
-        if ($quantity > 1000) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Maksimal 100 serial numbers per request'
-            ], 400);
-        }
-
-        // Validate item exists
         $item = Item::find($itemId);
         if (!$item) {
             return response()->json([
@@ -1751,94 +2517,22 @@ public function getSerialNumberTemplate(Request $request)
             ], 404);
         }
 
-        // Generate serial numbers based on format
-        $serialNumbers = [];
-        $formatInfo = [];
-
-        switch ($format) {
-            case 'f1':
-                $serialNumbers = $this->generateF1SerialNumbers($quantity);
-                $formatInfo = [
-                    'type' => 'F1 Generated',
-                    'pattern' => 'F1XXXXXX',
-                    'description' => 'F1 + 6 random alphanumeric'
-                ];
-                break;
-
-            case 'custom':
-                $serialNumbers = $this->generateCustomSerialNumbers($quantity, $customPrefix, $item);
-                $formatInfo = [
-                    'type' => 'Custom Generated',
-                    'pattern' => $customPrefix ? "{$customPrefix}XXXX" : 'Auto pattern',
-                    'description' => 'Custom format based on item'
-                ];
-                break;
-
-            case 'auto':
-            default:
-                // Auto-detect best format based on item type
-                $autoFormat = $this->detectBestSerialFormat($item);
-                $serialNumbers = $this->generateAutoSerialNumbers($quantity, $autoFormat, $item);
-                $formatInfo = [
-                    'type' => 'Auto Generated',
-                    'pattern' => $autoFormat['pattern'],
-                    'description' => $autoFormat['description']
-                ];
-                break;
-        }
-
-        // Validate all generated serial numbers are unique
-        $validation = $this->validateGeneratedSerialNumbers($serialNumbers);
-
-        if (!$validation['all_valid']) {
-            Log::warning('Serial number conflicts detected, regenerating', [
-                'conflicts' => $validation['conflicts'],
-                'item_id' => $itemId
-            ]);
-
-            // Try regenerate with conflicts excluded
-            if ($format === 'f1') {
-                $serialNumbers = $this->generateF1SerialNumbers($quantity, $validation['conflicts']);
-            } else {
-                // For custom/auto, try different pattern
-                $serialNumbers = $this->generateCustomSerialNumbers($quantity, $customPrefix . '_', $item);
-            }
-        }
-
-        Log::info('Serial numbers generated successfully', [
-            'item_id' => $itemId,
-            'item_code' => $item->item_code,
-            'quantity_requested' => $quantity,
-            'quantity_generated' => count($serialNumbers),
-            'format' => $format,
-            'generated_serials' => $serialNumbers
-        ]);
+        // Simple F1 generation
+        $serialNumbers = $this->generateSimpleF1SerialNumbers($quantity);
 
         return response()->json([
             'success' => true,
             'data' => [
                 'serial_numbers' => $serialNumbers,
-                'format_info' => $formatInfo,
-                'total_generated' => count($serialNumbers),
                 'item_info' => [
                     'item_id' => $item->item_id,
                     'item_code' => $item->item_code,
                     'item_name' => $item->item_name
-                ],
-                'validation' => $validation
+                ]
             ],
-            'message' => "Generated {$quantity} unique serial numbers"
+            'message' => "Generated {$quantity} serial numbers"
         ]);
-
     } catch (\Exception $e) {
-        Log::error('Failed to generate serial numbers', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
-            'item_id' => $request->get('item_id'),
-            'quantity' => $request->get('quantity'),
-            'format' => $request->get('format')
-        ]);
-
         return response()->json([
             'success' => false,
             'message' => 'Gagal generate serial numbers: ' . $e->getMessage()
@@ -1847,43 +2541,29 @@ public function getSerialNumberTemplate(Request $request)
 }
 
 /**
- * Generate custom serial numbers based on item
+ * Simple F1 serial number generation
  */
-private function generateCustomSerialNumbers(int $quantity, string $customPrefix = '', Item $item): array
+private function generateSimpleF1SerialNumbers(int $quantity): array
 {
     $serialNumbers = [];
-    $maxAttempts = $quantity * 20;
-    $attempts = 0;
+    $characters = 'ACDEFHJKLMNPQRTUVWXYZ23479'; // Exclude confusing chars
 
-    // Determine prefix
-    if (empty($customPrefix)) {
-        $prefix = $this->generatePrefixFromItem($item);
-    } else {
-        $prefix = strtoupper($customPrefix);
-    }
+    for ($i = 0; $i < $quantity; $i++) {
+        $attempts = 0;
+        do {
+            $randomPart = '';
+            for ($j = 0; $j < 6; $j++) {
+                $randomPart .= $characters[random_int(0, strlen($characters) - 1)];
+            }
+            $serialNumber = 'F1' . $randomPart;
+            $attempts++;
+        } while (
+            in_array($serialNumber, $serialNumbers) ||
+            ItemDetail::where('serial_number', $serialNumber)->exists() &&
+            $attempts < 50
+        );
 
-    // Get existing serials with this prefix
-    $existingSerials = ItemDetail::where('serial_number', 'LIKE', $prefix . '%')
-        ->pluck('serial_number')
-        ->toArray();
-
-    Log::debug('Starting custom serial generation', [
-        'prefix' => $prefix,
-        'quantity_needed' => $quantity,
-        'existing_with_prefix' => count($existingSerials)
-    ]);
-
-    while (count($serialNumbers) < $quantity && $attempts < $maxAttempts) {
-        $attempts++;
-
-        // Generate suffix (6-8 random chars)
-        $suffixLength = strlen($prefix) <= 4 ? 8 : 6;
-        $suffix = $this->generateRandomAlphanumeric($suffixLength);
-        $serialNumber = $prefix . $suffix;
-
-        // Check uniqueness
-        if (!in_array($serialNumber, $serialNumbers) &&
-            !in_array($serialNumber, $existingSerials)) {
+        if ($attempts < 50) {
             $serialNumbers[] = $serialNumber;
         }
     }
@@ -1891,297 +2571,36 @@ private function generateCustomSerialNumbers(int $quantity, string $customPrefix
     return $serialNumbers;
 }
 
-/**
- * Generate prefix from item information
- */
-private function generatePrefixFromItem(Item $item): string
-{
-    // Try to create meaningful prefix from item
-    $itemCode = strtoupper($item->item_code);
-    $categoryCode = strtoupper($item->category->category_code ?? 'ITM');
+// /**
+//  * Simple serial number validation
+//  */
+// public function validateSerialNumber(Request $request)
+// {
+//     $serialNumber = trim(string: $request->get('serial_number'));
 
-    // Different strategies based on item type
-    if (str_contains(strtolower($item->item_name), 'modem')) {
-        return 'MDM';
-    } elseif (str_contains(strtolower($item->item_name), 'router')) {
-        return 'RTR';
-    } elseif (str_contains(strtolower($item->item_name), 'switch')) {
-        return 'SWT';
-    } elseif (str_contains(strtolower($item->item_name), 'cable')) {
-        return 'CBL';
-    } elseif (strlen($itemCode) >= 3) {
-        return substr($itemCode, 0, 3);
-    } else {
-        return substr($categoryCode, 0, 3);
-    }
-}
+//     if (empty($serialNumber)) {
+//         return response()->json([
+//             'valid' => false,
+//             'message' => 'Serial number tidak boleh kosong'
+//         ]);
+//     }
 
-/**
- * Auto-detect best serial format for item
- */
-private function detectBestSerialFormat(Item $item): array
-{
-    $itemName = strtolower($item->item_name);
-    $categoryName = strtolower($item->category->category_name ?? '');
+//     $exists = ItemDetail::where('serial_number', $serialNumber)->exists();
 
-    // For network equipment, use specific patterns
-    if (str_contains($itemName, 'modem') || str_contains($categoryName, 'modem')) {
-        return [
-            'pattern' => 'MDMXXXXXX',
-            'prefix' => 'MDM',
-            'description' => 'Modem serial format'
-        ];
-    }
+//     return response()->json([
+//         'valid' => !$exists,
+//         'message' => $exists ? 'Serial number sudah digunakan' : 'Serial number tersedia'
+//     ]);
+// }
 
-    if (str_contains($itemName, 'router') || str_contains($categoryName, 'router')) {
-        return [
-            'pattern' => 'RTRXXXXXX',
-            'prefix' => 'RTR',
-            'description' => 'Router serial format'
-        ];
-    }
-
-    if (str_contains($itemName, 'switch') || str_contains($categoryName, 'switch')) {
-        return [
-            'pattern' => 'SWTXXXXXX',
-            'prefix' => 'SWT',
-            'description' => 'Switch serial format'
-        ];
-    }
-
-    // Default to F1 format
-    return [
-        'pattern' => 'F1XXXXXX',
-        'prefix' => 'F1',
-        'description' => 'Standard F1 format'
-    ];
-}
-
-/**
- * Generate auto serial numbers
- */
-private function generateAutoSerialNumbers(int $quantity, array $formatInfo, Item $item): array
-{
-    if ($formatInfo['prefix'] === 'F1') {
-        return $this->generateF1SerialNumbers($quantity);
-    } else {
-        return $this->generateCustomSerialNumbers($quantity, $formatInfo['prefix'], $item);
-    }
-}
-
-/**
- * FLEXIBLE: Validate serial number - support ANY format
- */
-public function validateSerialNumber(Request $request)
-{
-    try {
-        $serialNumber = trim($request->get('serial_number'));
-
-        // Basic validation
-        if (empty($serialNumber)) {
-            return response()->json([
-                'valid' => false,
-                'message' => 'Serial number tidak boleh kosong',
-                'error_type' => 'empty'
-            ]);
-        }
-
-        // Enhanced format validation - support multiple formats
-        $formatValidation = $this->validateAnySerialFormat($serialNumber);
-        if (!$formatValidation['valid']) {
-            return response()->json([
-                'valid' => false,
-                'message' => $formatValidation['message'],
-                'error_type' => 'format',
-                'format_detected' => $formatValidation['format_detected'] ?? 'unknown',
-                'suggestions' => $formatValidation['suggestions'] ?? []
-            ]);
-        }
-
-        // Database duplicate check
-        $existingItem = ItemDetail::where('serial_number', $serialNumber)
-            ->with('item')
-            ->first();
-
-        if ($existingItem) {
-            return response()->json([
-                'valid' => false,
-                'message' => 'Serial number sudah digunakan',
-                'error_type' => 'duplicate',
-                'existing_info' => [
-                    'item_code' => $existingItem->item->item_code ?? 'N/A',
-                    'item_name' => $existingItem->item->item_name ?? 'N/A',
-                    'status' => $existingItem->status ?? 'N/A',
-                    'location' => $existingItem->location ?? 'N/A',
-                    'created_at' => $existingItem->created_at?->format('d/m/Y H:i')
-                ]
-            ]);
-        }
-
-        return response()->json([
-            'valid' => true,
-            'message' => 'Serial number tersedia dan format valid',
-            'format_info' => [
-                'detected_format' => $formatValidation['format_detected'],
-                'is_generated' => $formatValidation['is_generated'],
-                'is_original' => $formatValidation['is_original'],
-                'length' => strlen($serialNumber),
-                'pattern_match' => true
-            ]
-        ]);
-
-    } catch (\Exception $e) {
-        Log::error('Serial number validation error', [
-            'serial_number' => $request->get('serial_number'),
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ]);
-
-        return response()->json([
-            'valid' => false,
-            'message' => 'Error validasi: ' . $e->getMessage(),
-            'error_type' => 'system_error'
-        ], 500);
-    }
-}
-
-/**
- * Validate any serial number format (flexible)
- */
-private function validateAnySerialFormat(string $serialNumber): array
-{
-    $sn = strtoupper(trim($serialNumber));
-
-    // Must have minimum length
-    if (strlen($sn) < 4) {
-        return [
-            'valid' => false,
-            'message' => 'Serial number minimal 4 karakter'
-        ];
-    }
-
-    // Must have maximum length
-    if (strlen($sn) > 30) {
-        return [
-            'valid' => false,
-            'message' => 'Serial number maksimal 30 karakter'
-        ];
-    }
-
-    // Must contain only allowed characters
-    if (!preg_match('/^[A-Z0-9\-_]+$/', $sn)) {
-        return [
-            'valid' => false,
-            'message' => 'Serial number hanya boleh huruf, angka, dash (-), underscore (_)',
-            'suggestions' => [
-                'Hapus karakter spesial selain dash (-) dan underscore (_)',
-                'Gunakan huruf besar',
-                'Tidak boleh ada spasi'
-            ]
-        ];
-    }
-
-    // Detect format type
-    $formatDetected = $this->detectSerialNumberFormat($sn);
-
-    return [
-        'valid' => true,
-        'message' => 'Format serial number valid',
-        'format_detected' => $formatDetected['type'],
-        'is_generated' => $formatDetected['is_generated'],
-        'is_original' => $formatDetected['is_original']
-    ];
-}
-
-/**
- * Detect serial number format type
- */
-private function detectSerialNumberFormat(string $serialNumber): array
-{
-    $sn = strtoupper($serialNumber);
-
-    // F1 format
-    if (str_starts_with($sn, 'F1') && strlen($sn) === 8) {
-        return [
-            'type' => 'F1 Generated',
-            'is_generated' => true,
-            'is_original' => false
-        ];
-    }
-
-    // Custom generated formats
-    $generatedPrefixes = ['MDM', 'RTR', 'SWT', 'CBL'];
-    foreach ($generatedPrefixes as $prefix) {
-        if (str_starts_with($sn, $prefix)) {
-            return [
-                'type' => $prefix . ' Generated',
-                'is_generated' => true,
-                'is_original' => false
-            ];
-        }
-    }
-
-    // Original manufacturer patterns
-    if (preg_match('/^ZTE|^HW|^TP|^DL|^ZX/', $sn)) {
-        return [
-            'type' => 'Manufacturer Original',
-            'is_generated' => false,
-            'is_original' => true
-        ];
-    }
-
-    // Generic serial number
-    return [
-        'type' => 'Custom/Original',
-        'is_generated' => false,
-        'is_original' => true
-    ];
-}
-
-/**
- * Enhanced generate F1 serial numbers (keeping existing method)
- */
-private function generateF1SerialNumbers(int $quantity, array $excludeList = []): array
-{
-    // Keep existing F1 generation logic...
-    $serialNumbers = [];
-    $maxAttempts = $quantity * 20;
-    $attempts = 0;
-
-    $existingF1Serials = ItemDetail::where('serial_number', 'LIKE', 'F1%')
-        ->pluck('serial_number')
-        ->toArray();
-
-    $allExcludes = array_merge($excludeList, $existingF1Serials);
-
-    while (count($serialNumbers) < $quantity && $attempts < $maxAttempts) {
-        $attempts++;
-
-        $randomPart = $this->generateRandomAlphanumeric(6);
-        $serialNumber = 'F1' . $randomPart;
-
-        if (!in_array($serialNumber, $serialNumbers) &&
-            !in_array($serialNumber, $allExcludes)) {
-            $serialNumbers[] = $serialNumber;
-        }
-    }
-
-    return $serialNumbers;
-}
-
-/**
- * Enhanced random alphanumeric generation
- */
-private function generateRandomAlphanumeric(int $length): string
-{
-    // Exclude confusing characters
-    $characters = 'ACDEFHJKLMNPQRTUVWXYZ23479';
-    $result = '';
-
-    for ($i = 0; $i < $length; $i++) {
-        $result .= $characters[random_int(0, strlen($characters) - 1)];
-    }
-
-    return $result;
-}
+// /**
+//  * Generate GR ID
+//  */
+// private function generateGRId(): string
+// {
+//     $lastGR = GoodsReceived::orderBy('gr_id', 'desc')->first();
+//     $lastNumber = $lastGR ? (int) substr($lastGR->gr_id, 2) : 0;
+//     $newNumber = $lastNumber + 1;
+//     return 'GR' . str_pad($newNumber, 6, '0', STR_PAD_LEFT);
+// }
 }

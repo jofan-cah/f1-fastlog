@@ -8,6 +8,7 @@ use App\Models\Supplier;
 use App\Models\Item;
 use App\Models\ActivityLog;
 use App\Constants\PurchaseOrderConstants;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
@@ -921,6 +922,53 @@ class PurchaseOrderController extends Controller
 
         // Nanti bisa diintegrasikan dengan library PDF seperti TCPDF atau DomPDF
         return view('purchase-orders.print', compact('purchaseOrder'));
+    }
+
+
+     public function downloadPDF(PurchaseOrder $purchaseOrder)
+    {
+        $purchaseOrder->load([
+            'supplier',
+            'createdBy',
+            'poDetails.item.category'
+        ]);
+
+        // Buat PDF
+        $pdf = PDF::loadView('purchase-orders.pdf', compact('purchaseOrder'));
+
+        // Set paper size dan orientasi
+        $pdf->setPaper('A4', 'portrait');
+
+        // Set options untuk kualitas PDF
+        $pdf->setOptions([
+            'isHtml5ParserEnabled' => true,
+            'isRemoteEnabled' => true,
+            'defaultFont' => 'Arial'
+        ]);
+
+        // Generate filename
+        $filename = 'PO_' . $purchaseOrder->po_number . '_' . now()->format('Y-m-d') . '.pdf';
+
+        // Download file
+        return $pdf->download($filename);
+    }
+
+    /**
+     * View PDF di browser (tanpa download)
+     */
+    public function viewPDF(PurchaseOrder $purchaseOrder)
+    {
+        $purchaseOrder->load([
+            'supplier',
+            'createdBy',
+            'poDetails.item.category'
+        ]);
+
+        $pdf = Pdf::loadView('purchase-orders.pdf', compact('purchaseOrder'));
+        $pdf->setPaper('A4', 'portrait');
+
+        // Stream ke browser
+        return $pdf->stream('PO_' . $purchaseOrder->po_number . '.pdf');
     }
 
     // KEPT: API endpoint untuk duplicate PO (unchanged untuk backward compatibility)

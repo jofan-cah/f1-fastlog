@@ -77,12 +77,15 @@
         </button>
     @endif
 
-    {{-- General Actions --}}
-    <a href="{{ route('purchase-orders.print', $purchaseOrder) }}" target="_blank"
-        class="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all duration-200 flex items-center space-x-2">
-        <i class="fas fa-print"></i>
-        <span>Print</span>
-    </a>
+
+
+<a href="{{ route('purchase-orders.view-pdf', $purchaseOrder->po_id) }}" target="_blank"
+   class="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 flex items-center space-x-2">
+    <i class="fas fa-file-pdf"></i>
+    <span>View PDF</span>
+</a>
+
+
 
     <button @click="showDuplicateModal = true"
         class="px-4 py-2 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-xl hover:from-teal-700 hover:to-teal-800 transition-all duration-200 flex items-center space-x-2">
