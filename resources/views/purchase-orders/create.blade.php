@@ -231,8 +231,7 @@
                                     <tr>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Harga</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+
                                         <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Aksi</th>
                                     </tr>
                                 </thead>
@@ -261,18 +260,7 @@
                                                     <span class="text-sm text-gray-500" x-text="item.unit"></span>
                                                 </div>
                                             </td>
-                                            <td class="px-6 py-4">
-                                                <div class="relative">
-                                                    <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">Rp</span>
-                                                    <input type="number" :name="`items[${index}][unit_price]`"
-                                                        x-model="item.unit_price" @input="updateItemTotal(index)"
-                                                        step="1" min="0" placeholder="0" required
-                                                        class="w-32 py-2 pl-8 pr-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                                </div>
-                                            </td>
-                                            <td class="px-6 py-4">
-                                                <div class="text-sm font-medium text-gray-900" x-text="formatCurrency(item.total)"></div>
-                                            </td>
+
                                             <td class="px-6 py-4 text-center">
                                                 <button type="button" @click="removeItem(index)"
                                                     class="text-red-600 hover:text-red-800 p-1 rounded">
@@ -284,7 +272,7 @@
 
                                     <!-- Empty State -->
                                     <tr x-show="selectedItems.length === 0">
-                                        <td colspan="5" class="px-6 py-8 text-center">
+                                        <td colspan="4" class="px-6 py-8 text-center">
                                             <div class="flex flex-col items-center justify-center">
                                                 <i class="fas fa-boxes text-4xl text-gray-300 mb-4"></i>
                                                 <h3 class="text-lg font-medium text-gray-900 mb-2">Belum ada item</h3>
@@ -299,15 +287,7 @@
                                 </tbody>
 
                                 <!-- Total Footer -->
-                                <tfoot class="bg-gray-50 border-t" x-show="selectedItems.length > 0">
-                                    <tr>
-                                        <td colspan="3" class="px-6 py-4 text-right text-sm font-medium text-gray-900">
-                                            Total Amount:
-                                        </td>
-                                        <td class="px-6 py-4 text-sm font-bold text-gray-900" x-text="formatCurrency(totalAmount)"></td>
-                                        <td class="px-6 py-4"></td>
-                                    </tr>
-                                </tfoot>
+
                             </table>
                         </div>
                     </div>
@@ -353,10 +333,7 @@
                                     <span class="font-semibold" x-text="totalQuantity"></span>
                                 </div>
                                 <hr>
-                                <div class="flex justify-between text-lg">
-                                    <span class="text-gray-900 font-semibold">Total Amount:</span>
-                                    <span class="font-bold text-green-600" x-text="formatCurrency(totalAmount)"></span>
-                                </div>
+
                             </div>
                         </div>
                     </div>
@@ -460,16 +437,7 @@
                     </div>
 
                     <!-- Tips -->
-                    <div class="bg-green-50 rounded-2xl border border-green-200 p-6">
-                        <h4 class="text-sm font-semibold text-green-900 mb-3">💡 Tips</h4>
-                        <ul class="text-sm text-green-800 space-y-2">
-                            <li>• Item dan quantity wajib diisi dengan benar</li>
-                            <li>• Harga dapat diisi perkiraan atau kosong dulu</li>
-                            <li>• Gunakan tanggal diharapkan untuk tracking</li>
-                            <li>• Tambahkan catatan jika ada instruksi khusus</li>
-                            <li>• Supplier dapat dipilih nanti jika belum yakin</li>
-                        </ul>
-                    </div>
+
                 </div>
             </div>
         </form>
@@ -608,9 +576,7 @@
                 availableItems: availableItems,
                 suppliers: suppliers,
 
-                get totalAmount() {
-                    return this.selectedItems.reduce((total, item) => total + (item.total || 0), 0);
-                },
+
 
                 get totalQuantity() {
                     return this.selectedItems.reduce((total, item) => total + (parseInt(item.quantity) || 0), 0);
@@ -699,8 +665,7 @@
                             category_name: categoryName,
                             unit: unit,
                             quantity: 1,
-                            unit_price: 0,
-                            total: 0
+                            notes: ''
                         });
                         this.showToast('Item berhasil ditambahkan', 'success');
                     }
@@ -712,21 +677,7 @@
                     this.showToast(`${item.item_name} dihapus dari PO`, 'info');
                 },
 
-                updateItemTotal(index) {
-                    const item = this.selectedItems[index];
-                    const quantity = parseFloat(item.quantity) || 0;
-                    const unitPrice = parseFloat(item.unit_price) || 0;
-                    item.total = quantity * unitPrice;
-                },
 
-                formatCurrency(amount) {
-                    return new Intl.NumberFormat('id-ID', {
-                        style: 'currency',
-                        currency: 'IDR',
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: 0
-                    }).format(amount || 0);
-                },
 
                 showToast(message, type = 'info') {
                     const toast = document.createElement('div');
@@ -757,18 +708,7 @@
                         return false;
                     }
 
-                    // Validate each item
-                    for (let i = 0; i < this.selectedItems.length; i++) {
-                        const item = this.selectedItems[i];
-                        if (!item.quantity || item.quantity <= 0) {
-                            this.showToast(`Quantity ${item.item_name} harus lebih dari 0`, 'error');
-                            return false;
-                        }
-                        if (item.unit_price < 0) {
-                            this.showToast(`Harga ${item.item_name} tidak boleh negatif`, 'error');
-                            return false;
-                        }
-                    }
+
 
                     return true;
                 }

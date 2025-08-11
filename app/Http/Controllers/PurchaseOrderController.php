@@ -410,7 +410,7 @@ class PurchaseOrderController extends Controller
     //     }
     // }
 
-    // Store PO baru - Modified untuk workflow + Auto-approval untuk SUP001
+  // Store PO baru - Modified: Hide price from frontend, default to 0
     public function store(Request $request)
     {
         if (!$this->canUserAccess('create')) {
@@ -419,14 +419,14 @@ class PurchaseOrderController extends Controller
 
         $validator = Validator::make($request->all(), [
             'po_number' => 'required|string|max:50|unique:purchase_orders,po_number',
-            'supplier_id' => 'nullable|string|exists:suppliers,supplier_id', // Optional di create
+            'supplier_id' => 'nullable|string|exists:suppliers,supplier_id',
             'po_date' => 'required|date',
             'expected_date' => 'nullable|date|after_or_equal:po_date',
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.item_id' => 'required|string|exists:items,item_id',
             'items.*.quantity' => 'required|integer|min:1',
-            'items.*.unit_price' => 'required|numeric|min:0',
+            // ✅ REMOVED: unit_price validation (tidak ada di form)
             'items.*.notes' => 'nullable|string',
         ], [
             'po_number.required' => 'Nomor PO wajib diisi.',
@@ -448,130 +448,275 @@ class PurchaseOrderController extends Controller
             // Generate PO ID
             $poId = $this->generatePOId();
 
-            // ✅ LOGIC: Check if auto-approval supplier
+            // ✅ CHECK: Auto-approval untuk SUP001
             $supplierId = $request->supplier_id;
-            $isAutoApprovalSupplier = ($supplierId === 'SUP001');
+            $isAutoApproval = ($supplierId === 'SUP001');
 
-            // Set initial workflow status based on supplier
-            $initialWorkflowStatus = $isAutoApprovalSupplier
+            // Set workflow status berdasarkan supplier
+            $workflowStatus = $isAutoApproval
                 ? PurchaseOrderConstants::WORKFLOW_STATUS_APPROVED
                 : PurchaseOrderConstants::WORKFLOW_STATUS_DRAFT_LOGISTIC;
 
-            // Set backward compatibility status
-            $initialStatus = $isAutoApprovalSupplier ? 'sent' : 'draft';
+            $status = $isAutoApproval ? 'sent' : 'draft';
 
-            // Create Purchase Order dengan conditional workflow status
-            $po = PurchaseOrder::create([
+            // Create Purchase Order
+            $createData = [
                 'po_id' => $poId,
                 'po_number' => $request->po_number,
-                'supplier_id' => $request->supplier_id, // Optional
+                'supplier_id' => $request->supplier_id,
                 'po_date' => $request->po_date,
                 'expected_date' => $request->expected_date,
-                'status' => $initialStatus, // Backward compatibility
-                'workflow_status' => $initialWorkflowStatus,
-                'total_amount' => 0,
+                'status' => $status,
+                'workflow_status' => $workflowStatus,
+                'total_amount' => 0, // ✅ DEFAULT: Always 0 since no price from frontend
                 'notes' => $request->notes,
                 'created_by' => Auth::user()->user_id,
+            ];
 
-                // ✅ ENHANCEMENT: Auto-fill workflow data for SUP001
-                'logistic_user_id' => Auth::user()->user_id,
-                'logistic_processed_at' => now(),
-                'finance_f1_user_id' => $isAutoApprovalSupplier ? Auth::user()->user_id : null,
-                'finance_f1_processed_at' => $isAutoApprovalSupplier ? now() : null,
-                'finance_f1_notes' => $isAutoApprovalSupplier ? 'Auto-approved: Trusted supplier SUP001' : null,
-                'finance_f2_user_id' => $isAutoApprovalSupplier ? Auth::user()->user_id : null,
-                'finance_f2_processed_at' => $isAutoApprovalSupplier ? now() : null,
-                'finance_f2_notes' => $isAutoApprovalSupplier ? 'Auto-approved: Fast-track for SUP001' : null,
+            // ✅ CONDITIONAL: Add workflow & payment data ONLY untuk SUP001
+            if ($isAutoApproval) {
+                $createData = array_merge($createData, [
+                    // Auto-fill workflow data untuk SUP001
+                    'logistic_user_id' => Auth::user()->user_id,
+                    'logistic_approved_at' => now(),
+                    'finance_f1_user_id' => Auth::user()->user_id,
+                    'finance_f1_approved_at' => now(),
+                    'finance_f1_notes' => 'Auto-approved: Trusted supplier SUP001',
+                    'finance_f2_user_id' => Auth::user()->user_id,
+                    'finance_f2_approved_at' => now(),
+                    'finance_f2_notes' => 'Auto-approved: Fast-track for SUP001',
 
-                // ✅ ENHANCEMENT: Auto-setup payment for SUP001 (default values)
-                'payment_method' => $isAutoApprovalSupplier ? 'bank_transfer' : null,
-                'payment_amount' => $isAutoApprovalSupplier ? 0 : null, // Will be updated below
-                'bank_name' => $isAutoApprovalSupplier ? 'Bank Default SUP001' : null,
-                'account_number' => $isAutoApprovalSupplier ? '1234567890' : null,
-                'account_holder' => $isAutoApprovalSupplier ? 'SUP001 Corporation' : null,
-                'payment_due_date' => $isAutoApprovalSupplier ? now()->addDays(30) : null,
-            ]);
+                    // Auto-setup payment untuk SUP001 (amount tetap 0)
+                    'payment_method' => 'bank_transfer',
+                    'payment_amount' => 0,
+                    'bank_name' => 'Bank Mandiri',
+                    'account_number' => '1234567890123',
+                    'account_holder' => 'SUP001 Corporation',
+                    'payment_due_date' => now()->addDays(30),
+                    'payment_status' => PurchaseOrderConstants::PAYMENT_STATUS_PENDING,
+                ]);
+            }
+            // ✅ IMPORTANT: For NON-SUP001 suppliers, payment fields akan NULL/default (normal draft flow)
 
-            // Create PO Details
-            $totalAmount = 0;
+            $po = PurchaseOrder::create($createData);
+
+            // Create PO Details - ✅ PRICE ALWAYS 0
             foreach ($request->items as $itemData) {
                 $detailId = PoDetail::generateDetailId();
-                $totalPrice = $itemData['quantity'] * $itemData['unit_price'];
 
                 PoDetail::create([
                     'po_detail_id' => $detailId,
                     'po_id' => $po->po_id,
                     'item_id' => $itemData['item_id'],
                     'quantity_ordered' => $itemData['quantity'],
-                    'unit_price' => $itemData['unit_price'],
-                    'total_price' => $totalPrice,
+                    'unit_price' => 0, // ✅ DEFAULT: Always 0 (no price from frontend)
+                    'total_price' => 0, // ✅ DEFAULT: Always 0 (quantity * 0)
                     'quantity_received' => 0,
                     'notes' => $itemData['notes'] ?? null,
                 ]);
-
-                $totalAmount += $totalPrice;
             }
 
-            // Update total amount and payment amount for auto-approval
-            $updateData = ['total_amount' => $totalAmount];
-            if ($isAutoApprovalSupplier) {
-                $updateData['payment_amount'] = $totalAmount;
-            }
-            $po->update($updateData);
+            // ✅ NO NEED TO UPDATE: total_amount tetap 0
 
-            // ✅ ENHANCED ACTIVITY LOGGING
-            if ($isAutoApprovalSupplier) {
-                // Log the auto-approval process
-                ActivityLog::logActivity('purchase_orders', $po->po_id, 'create_auto_approved', null, array_merge($po->toArray(), [
-                    'auto_approval_reason' => 'Trusted supplier SUP001 - automatic fast-track approval',
-                    'skipped_workflows' => ['pending_finance_f1', 'pending_finance_f2'],
-                    'auto_approval_timestamp' => now()->toISOString()
-                ]));
-
-                // Log individual workflow steps for audit trail
-                ActivityLog::logActivity(
-                    'purchase_orders',
-                    $po->po_id,
-                    'auto_submit_to_f1',
-                    ['old_status' => 'would_be_draft_logistic'],
-                    ['new_status' => 'auto_processed_f1', 'reason' => 'SUP001 fast-track']
-                );
-
-                ActivityLog::logActivity(
-                    'purchase_orders',
-                    $po->po_id,
-                    'auto_process_f1',
-                    ['old_status' => 'auto_processed_f1'],
-                    ['new_status' => 'auto_processed_f2', 'reason' => 'SUP001 fast-track']
-                );
-
-                ActivityLog::logActivity(
-                    'purchase_orders',
-                    $po->po_id,
-                    'auto_approve_f2',
-                    ['old_status' => 'auto_processed_f2'],
-                    ['new_status' => 'approved', 'reason' => 'SUP001 fast-track']
-                );
+            // ✅ ACTIVITY LOGGING
+            if ($isAutoApproval) {
+                ActivityLog::logActivity('purchase_orders', $po->po_id, 'create_auto_approved', null, [
+                    'supplier_id' => $supplierId,
+                    'auto_approval_reason' => 'Trusted supplier SUP001 - automatic approval',
+                    'workflow_status' => 'approved',
+                    'total_amount' => 0, // No price tracking
+                    'note' => 'PO created without pricing - quantities only'
+                ]);
             } else {
-                // Standard create log
-                ActivityLog::logActivity('purchase_orders', $po->po_id, 'create', null, $po->toArray());
+                ActivityLog::logActivity('purchase_orders', $po->po_id, 'create', null, array_merge($po->toArray(), [
+                    'note' => 'PO created without pricing - quantities only'
+                ]));
             }
 
             DB::commit();
 
-            // ✅ CONDITIONAL SUCCESS MESSAGE
-            if ($isAutoApprovalSupplier) {
+            // ✅ SUCCESS MESSAGE
+            if ($isAutoApproval) {
                 return redirect()->route('purchase-orders.show', $po)
-                    ->with('success', 'Purchase Order berhasil dibuat! 🚀 PO untuk SUP001 telah otomatis disetujui dan siap dikirim ke supplier!');
+                    ->with('success', 'Purchase Order berhasil dibuat! 🚀 PO untuk SUP001 telah otomatis disetujui dan siap dikirim!');
             } else {
                 return redirect()->route('purchase-orders.show', $po)
-                    ->with('success', 'Purchase Order berhasil dibuat! Status: Draft Logistik');
+                    ->with('success', 'Purchase Order berhasil dibuat! Status: Draft Logistic');
             }
+
         } catch (\Exception $e) {
             DB::rollback();
             return back()
                 ->withInput()
                 ->with('error', 'Gagal membuat PO: ' . $e->getMessage());
+        }
+    }
+
+    // Update PO - Modified: Hide price from frontend, default to 0
+    public function update(Request $request, PurchaseOrder $purchaseOrder)
+    {
+        if (!$this->canUserAccess('edit_logistic', $purchaseOrder)) {
+            return back()->with('error', 'Anda tidak dapat mengedit PO ini. PO harus dalam status Draft Logistic.');
+        }
+
+        $validator = Validator::make($request->all(), [
+            'supplier_id' => 'nullable|string|exists:suppliers,supplier_id',
+            'po_date' => 'required|date',
+            'expected_date' => 'nullable|date|after_or_equal:po_date',
+            'notes' => 'nullable|string',
+            'items' => 'required|array|min:1',
+            'items.*.item_id' => 'required|string|exists:items,item_id',
+            'items.*.quantity' => 'required|integer|min:1',
+            // ✅ REMOVED: unit_price validation
+            'items.*.notes' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return back()
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $oldData = $purchaseOrder->toArray();
+            $oldSupplierId = $purchaseOrder->supplier_id;
+            $newSupplierId = $request->supplier_id;
+
+            // ✅ AUTO-APPROVAL LOGIC (same as store)
+            $wasAutoApproval = ($oldSupplierId === 'SUP001');
+            $isAutoApproval = ($newSupplierId === 'SUP001');
+
+            $newWorkflowStatus = $purchaseOrder->workflow_status;
+            $newStatus = $purchaseOrder->status;
+
+            if (!$wasAutoApproval && $isAutoApproval) {
+                $newWorkflowStatus = PurchaseOrderConstants::WORKFLOW_STATUS_APPROVED;
+                $newStatus = 'sent';
+            } elseif ($wasAutoApproval && !$isAutoApproval) {
+                $newWorkflowStatus = PurchaseOrderConstants::WORKFLOW_STATUS_DRAFT_LOGISTIC;
+                $newStatus = 'draft';
+            }
+
+            // Update PO header
+            $updateData = [
+                'supplier_id' => $request->supplier_id,
+                'po_date' => $request->po_date,
+                'expected_date' => $request->expected_date,
+                'notes' => $request->notes,
+                'workflow_status' => $newWorkflowStatus,
+                'status' => $newStatus,
+                'total_amount' => 0, // ✅ ALWAYS 0: No pricing
+            ];
+
+            // ✅ Handle auto-approval workflow data (same logic but amount = 0)
+            if (!$wasAutoApproval && $isAutoApproval) {
+                $updateData = array_merge($updateData, [
+                    'logistic_user_id' => Auth::user()->user_id,
+                    'logistic_approved_at' => now(),
+                    'finance_f1_user_id' => Auth::user()->user_id,
+                    'finance_f1_approved_at' => now(),
+                    'finance_f1_notes' => 'Auto-approved: Changed to trusted supplier SUP001',
+                    'finance_f2_user_id' => Auth::user()->user_id,
+                    'finance_f2_approved_at' => now(),
+                    'finance_f2_notes' => 'Auto-approved: Fast-track for SUP001',
+                    'payment_method' => 'bank_transfer',
+                    'payment_amount' => 0, // ✅ ALWAYS 0
+                    'bank_name' => 'Bank Mandiri',
+                    'account_number' => '1234567890123',
+                    'account_holder' => 'SUP001 Corporation',
+                    'payment_due_date' => now()->addDays(30),
+                    'payment_status' => PurchaseOrderConstants::PAYMENT_STATUS_PENDING,
+                ]);
+            } elseif ($wasAutoApproval && !$isAutoApproval) {
+                $updateData = array_merge($updateData, [
+                    'logistic_user_id' => null,
+                    'logistic_approved_at' => null,
+                    'finance_f1_user_id' => null,
+                    'finance_f1_approved_at' => null,
+                    'finance_f1_notes' => null,
+                    'finance_f2_user_id' => null,
+                    'finance_f2_approved_at' => null,
+                    'finance_f2_notes' => null,
+                    'payment_method' => null,
+                    'payment_amount' => 0, // ✅ RESET TO 0
+                    'bank_name' => null,
+                    'account_number' => null,
+                    'account_holder' => null,
+                    'payment_due_date' => null,
+                    'payment_status' => null,
+                ]);
+            }
+
+            $purchaseOrder->update($updateData);
+
+            // Delete existing details
+            $purchaseOrder->poDetails()->delete();
+
+            // Create new details - ✅ PRICE ALWAYS 0
+            foreach ($request->items as $itemData) {
+                $detailId = PoDetail::generateDetailId();
+
+                PoDetail::create([
+                    'po_detail_id' => $detailId,
+                    'po_id' => $purchaseOrder->po_id,
+                    'item_id' => $itemData['item_id'],
+                    'quantity_ordered' => $itemData['quantity'],
+                    'unit_price' => 0, // ✅ DEFAULT: Always 0
+                    'total_price' => 0, // ✅ DEFAULT: Always 0
+                    'quantity_received' => 0,
+                    'notes' => $itemData['notes'] ?? null,
+                ]);
+            }
+
+            // ✅ ENHANCED ACTIVITY LOGGING
+            $activityData = [
+                'old_supplier' => $oldSupplierId,
+                'new_supplier' => $newSupplierId,
+                'old_workflow_status' => $oldData['workflow_status'],
+                'new_workflow_status' => $newWorkflowStatus,
+                'total_amount' => 0, // No pricing
+                'note' => 'PO updated without pricing - quantities only'
+            ];
+
+            if (!$wasAutoApproval && $isAutoApproval) {
+                ActivityLog::logActivity('purchase_orders', $purchaseOrder->po_id, 'update_with_auto_approval', $oldData,
+                    array_merge($activityData, [
+                        'auto_approval_reason' => 'Supplier changed to SUP001 - automatic approval triggered',
+                        'action' => 'supplier_change_to_trusted'
+                    ])
+                );
+            } elseif ($wasAutoApproval && !$isAutoApproval) {
+                ActivityLog::logActivity('purchase_orders', $purchaseOrder->po_id, 'update_remove_auto_approval', $oldData,
+                    array_merge($activityData, [
+                        'auto_approval_removed_reason' => 'Supplier changed from SUP001 - reverted to manual workflow',
+                        'action' => 'supplier_change_from_trusted'
+                    ])
+                );
+            } else {
+                ActivityLog::logActivity('purchase_orders', $purchaseOrder->po_id, 'update', $oldData, $activityData);
+            }
+
+            DB::commit();
+
+            // ✅ CONDITIONAL SUCCESS MESSAGE
+            if (!$wasAutoApproval && $isAutoApproval) {
+                return redirect()->route('purchase-orders.show', $purchaseOrder)
+                    ->with('success', 'PO berhasil diupdate! 🚀 Supplier diubah ke SUP001 - PO otomatis disetujui!');
+            } elseif ($wasAutoApproval && !$isAutoApproval) {
+                return redirect()->route('purchase-orders.show', $purchaseOrder)
+                    ->with('success', 'PO berhasil diupdate! Supplier diubah dari SUP001 - PO kembali ke status Draft Logistic.');
+            } else {
+                return redirect()->route('purchase-orders.show', $purchaseOrder)
+                    ->with('success', 'Purchase Order berhasil diupdate!');
+            }
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            return back()
+                ->withInput()
+                ->with('error', 'Gagal mengupdate PO: ' . $e->getMessage());
         }
     }
 
@@ -671,270 +816,7 @@ class PurchaseOrderController extends Controller
         return view('purchase-orders.edit', compact('purchaseOrder', 'suppliers', 'items'));
     }
 
-    // Update PO - Updated untuk workflow
-    // public function update(Request $request, PurchaseOrder $purchaseOrder)
-    // {
-    //     if (!$this->canUserAccess('edit_logistic', $purchaseOrder)) {
-    //         return back()->with('error', 'Anda tidak dapat mengedit PO ini. PO harus dalam status Draft Logistik.');
-    //     }
 
-    //     $validator = Validator::make($request->all(), [
-    //         'supplier_id' => 'nullable|string|exists:suppliers,supplier_id', // Optional
-    //         'po_date' => 'required|date',
-    //         'expected_date' => 'nullable|date|after_or_equal:po_date',
-    //         'notes' => 'nullable|string',
-    //         'items' => 'required|array|min:1',
-    //         'items.*.item_id' => 'required|string|exists:items,item_id',
-    //         'items.*.quantity' => 'required|integer|min:1',
-    //         'items.*.unit_price' => 'required|numeric|min:0',
-    //         'items.*.notes' => 'nullable|string',
-    //     ]);
-
-    //     if ($validator->fails()) {
-    //         return back()
-    //             ->withErrors($validator)
-    //             ->withInput();
-    //     }
-
-    //     try {
-    //         DB::beginTransaction();
-
-    //         $oldData = $purchaseOrder->toArray();
-
-    //         // Update PO header
-    //         $purchaseOrder->update([
-    //             'supplier_id' => $request->supplier_id,
-    //             'po_date' => $request->po_date,
-    //             'expected_date' => $request->expected_date,
-    //             'notes' => $request->notes,
-    //         ]);
-
-    //         // Delete existing details
-    //         $purchaseOrder->poDetails()->delete();
-
-    //         // Create new details
-    //         $totalAmount = 0;
-    //         foreach ($request->items as $itemData) {
-    //             $detailId = PoDetail::generateDetailId();
-    //             $totalPrice = $itemData['quantity'] * $itemData['unit_price'];
-
-    //             PoDetail::create([
-    //                 'po_detail_id' => $detailId,
-    //                 'po_id' => $purchaseOrder->po_id,
-    //                 'item_id' => $itemData['item_id'],
-    //                 'quantity_ordered' => $itemData['quantity'],
-    //                 'unit_price' => $itemData['unit_price'],
-    //                 'total_price' => $totalPrice,
-    //                 'quantity_received' => 0,
-    //                 'notes' => $itemData['notes'] ?? null,
-    //             ]);
-
-    //             $totalAmount += $itemData['quantity'] * $itemData['unit_price'];
-    //         }
-
-    //         // Update total amount
-    //         $purchaseOrder->update(['total_amount' => $totalAmount]);
-
-    //         // Log activity
-    //         ActivityLog::logActivity('purchase_orders', $purchaseOrder->po_id, 'update', $oldData, $purchaseOrder->fresh()->toArray());
-
-    //         DB::commit();
-
-    //         return redirect()->route('purchase-orders.show', $purchaseOrder)
-    //             ->with('success', 'Purchase Order berhasil diupdate!');
-    //     } catch (\Exception $e) {
-    //         DB::rollback();
-    //         return back()
-    //             ->withInput()
-    //             ->with('error', 'Gagal mengupdate PO: ' . $e->getMessage());
-    //     }
-    // }
-
-    // Update PO - Modified untuk workflow + Auto-approval untuk SUP001
-    public function update(Request $request, PurchaseOrder $purchaseOrder)
-    {
-        if (!$this->canUserAccess('edit_logistic', $purchaseOrder)) {
-            return back()->with('error', 'Anda tidak dapat mengedit PO ini. PO harus dalam status Draft Logistic.');
-        }
-
-        $validator = Validator::make($request->all(), [
-            'supplier_id' => 'nullable|string|exists:suppliers,supplier_id',
-            'po_date' => 'required|date',
-            'expected_date' => 'nullable|date|after_or_equal:po_date',
-            'notes' => 'nullable|string',
-            'items' => 'required|array|min:1',
-            'items.*.item_id' => 'required|string|exists:items,item_id',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.unit_price' => 'required|numeric|min:0',
-            'items.*.notes' => 'nullable|string',
-        ]);
-
-        if ($validator->fails()) {
-            return back()
-                ->withErrors($validator)
-                ->withInput();
-        }
-
-        try {
-            DB::beginTransaction();
-
-            $oldData = $purchaseOrder->toArray();
-            $oldSupplierId = $purchaseOrder->supplier_id;
-            $newSupplierId = $request->supplier_id;
-
-            // ✅ CHECK: Auto-approval logic untuk supplier change
-            $wasAutoApproval = ($oldSupplierId === 'SUP001');
-            $isAutoApproval = ($newSupplierId === 'SUP001');
-
-            // Determine new workflow status
-            $newWorkflowStatus = $purchaseOrder->workflow_status; // Keep current by default
-            $newStatus = $purchaseOrder->status; // Keep current by default
-
-            // Handle supplier change scenarios
-            if (!$wasAutoApproval && $isAutoApproval) {
-                // Changed TO SUP001 → Auto-approve
-                $newWorkflowStatus = PurchaseOrderConstants::WORKFLOW_STATUS_APPROVED;
-                $newStatus = 'sent';
-            } elseif ($wasAutoApproval && !$isAutoApproval) {
-                // Changed FROM SUP001 → Back to draft
-                $newWorkflowStatus = PurchaseOrderConstants::WORKFLOW_STATUS_DRAFT_LOGISTIC;
-                $newStatus = 'draft';
-            }
-            // If both are non-SUP001 or both are SUP001, keep current status
-
-            // Update PO header
-            $updateData = [
-                'supplier_id' => $request->supplier_id,
-                'po_date' => $request->po_date,
-                'expected_date' => $request->expected_date,
-                'notes' => $request->notes,
-                'workflow_status' => $newWorkflowStatus,
-                'status' => $newStatus,
-            ];
-
-            // ✅ Handle auto-approval workflow data
-            if (!$wasAutoApproval && $isAutoApproval) {
-                // NEW auto-approval: Fill workflow data
-                $updateData = array_merge($updateData, [
-                    'logistic_user_id' => Auth::user()->user_id,
-                    'logistic_approved_at' => now(),
-                    'finance_f1_user_id' => Auth::user()->user_id,
-                    'finance_f1_approved_at' => now(),
-                    'finance_f1_notes' => 'Auto-approved: Changed to trusted supplier SUP001',
-                    'finance_f2_user_id' => Auth::user()->user_id,
-                    'finance_f2_approved_at' => now(),
-                    'finance_f2_notes' => 'Auto-approved: Fast-track for SUP001',
-                    'payment_method' => 'bank_transfer',
-                    'bank_name' => 'Bank Mandiri',
-                    'account_number' => '1234567890123',
-                    'account_holder' => 'SUP001 Corporation',
-                    'payment_due_date' => now()->addDays(30),
-                    'payment_status' => PurchaseOrderConstants::PAYMENT_STATUS_PENDING,
-                ]);
-            } elseif ($wasAutoApproval && !$isAutoApproval) {
-                // REMOVE auto-approval: Clear workflow data
-                $updateData = array_merge($updateData, [
-                    'logistic_user_id' => null,
-                    'logistic_approved_at' => null,
-                    'finance_f1_user_id' => null,
-                    'finance_f1_approved_at' => null,
-                    'finance_f1_notes' => null,
-                    'finance_f2_user_id' => null,
-                    'finance_f2_approved_at' => null,
-                    'finance_f2_notes' => null,
-                    'payment_method' => null,
-                    'payment_amount' => null,
-                    'bank_name' => null,
-                    'account_number' => null,
-                    'account_holder' => null,
-                    'payment_due_date' => null,
-                    'payment_status' => null,
-                ]);
-            }
-
-            $purchaseOrder->update($updateData);
-
-            // Delete existing details
-            $purchaseOrder->poDetails()->delete();
-
-            // Create new details
-            $totalAmount = 0;
-            foreach ($request->items as $itemData) {
-                $detailId = PoDetail::generateDetailId();
-                $totalPrice = $itemData['quantity'] * $itemData['unit_price'];
-
-                PoDetail::create([
-                    'po_detail_id' => $detailId,
-                    'po_id' => $purchaseOrder->po_id,
-                    'item_id' => $itemData['item_id'],
-                    'quantity_ordered' => $itemData['quantity'],
-                    'unit_price' => $itemData['unit_price'],
-                    'total_price' => $totalPrice,
-                    'quantity_received' => 0,
-                    'notes' => $itemData['notes'] ?? null,
-                ]);
-
-                $totalAmount += $totalPrice;
-            }
-
-            // Update total amount and payment amount
-            $finalUpdateData = ['total_amount' => $totalAmount];
-            if ($isAutoApproval) {
-                $finalUpdateData['payment_amount'] = $totalAmount;
-            }
-            $purchaseOrder->update($finalUpdateData);
-
-            // ✅ ENHANCED ACTIVITY LOGGING
-            $activityData = [
-                'old_supplier' => $oldSupplierId,
-                'new_supplier' => $newSupplierId,
-                'old_workflow_status' => $oldData['workflow_status'],
-                'new_workflow_status' => $newWorkflowStatus,
-                'total_amount' => $totalAmount
-            ];
-
-            if (!$wasAutoApproval && $isAutoApproval) {
-                // Log supplier change WITH auto-approval
-                ActivityLog::logActivity('purchase_orders', $purchaseOrder->po_id, 'update_with_auto_approval', $oldData,
-                    array_merge($activityData, [
-                        'auto_approval_reason' => 'Supplier changed to SUP001 - automatic approval triggered',
-                        'action' => 'supplier_change_to_trusted'
-                    ])
-                );
-            } elseif ($wasAutoApproval && !$isAutoApproval) {
-                // Log supplier change WITH auto-approval removal
-                ActivityLog::logActivity('purchase_orders', $purchaseOrder->po_id, 'update_remove_auto_approval', $oldData,
-                    array_merge($activityData, [
-                        'auto_approval_removed_reason' => 'Supplier changed from SUP001 - reverted to manual workflow',
-                        'action' => 'supplier_change_from_trusted'
-                    ])
-                );
-            } else {
-                // Standard update log
-                ActivityLog::logActivity('purchase_orders', $purchaseOrder->po_id, 'update', $oldData, $activityData);
-            }
-
-            DB::commit();
-
-            // ✅ CONDITIONAL SUCCESS MESSAGE
-            if (!$wasAutoApproval && $isAutoApproval) {
-                return redirect()->route('purchase-orders.show', $purchaseOrder)
-                    ->with('success', 'PO berhasil diupdate! 🚀 Supplier diubah ke SUP001 - PO otomatis disetujui!');
-            } elseif ($wasAutoApproval && !$isAutoApproval) {
-                return redirect()->route('purchase-orders.show', $purchaseOrder)
-                    ->with('success', 'PO berhasil diupdate! Supplier diubah dari SUP001 - PO kembali ke status Draft Logistic.');
-            } else {
-                return redirect()->route('purchase-orders.show', $purchaseOrder)
-                    ->with('success', 'Purchase Order berhasil diupdate!');
-            }
-
-        } catch (\Exception $e) {
-            DB::rollback();
-            return back()
-                ->withInput()
-                ->with('error', 'Gagal mengupdate PO: ' . $e->getMessage());
-        }
-    }
 
     // NEW: Submit to Finance F1 (Logistik action)
     public function submitToFinanceF1(Request $request, PurchaseOrder $purchaseOrder)
