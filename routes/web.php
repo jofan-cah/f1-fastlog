@@ -11,6 +11,7 @@ use App\Http\Controllers\ItemDetailController;
 use App\Http\Controllers\PoDetailController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SupplierController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
@@ -277,6 +278,21 @@ Route::middleware('auth')->group(function () {
         // Profile routes - cuma edit & update
         Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
         Route::put('/profile/update', [ProfileController::class, 'update'])->name('profile.update');
+    });
+
+
+    // Tambahkan ke routes/web.php
+    Route::middleware('permission:reports,read')->group(function () {
+        Route::get('/reports/dashboard', [ReportController::class, 'dashboard'])->name('reports.dashboard');
+        Route::get('/reports/api/chart-data', [ReportController::class, 'getApiData'])->name('reports.api.chart-data');
+        Route::get('/reports/api/damage-analysis', [ReportController::class, 'getDamageAnalysis'])->name('reports.api.damage-analysis');
+        Route::get('/reports/api/real-time-stats', [ReportController::class, 'getRealTimeStats'])->name('reports.api.real-time-stats');
+           Route::post('/reports/export/excel', [ReportController::class, 'exportExcel'])->name('reports.export.excel');
+        Route::post('/reports/export/pdf', [ReportController::class, 'exportPdf'])->name('reports.export.pdf');
+    });
+
+    Route::middleware('permission:reports,export')->group(function () {
+
     });
 
     // UPDATE - Basic updates (Logistik untuk draft, Admin untuk override)
