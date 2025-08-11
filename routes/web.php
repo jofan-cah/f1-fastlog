@@ -9,6 +9,7 @@ use App\Http\Controllers\GoodsReceivedController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\ItemDetailController;
 use App\Http\Controllers\PoDetailController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\SupplierController;
 use Illuminate\Support\Facades\Route;
@@ -262,17 +263,20 @@ Route::middleware('auth')->group(function () {
 
     // READ - All levels can view (filtered by controller based on user level)
     Route::middleware('permission:purchase_orders,read')->group(function () {
-            Route::get('{purchaseOrder}/download-pdf', [PurchaseOrderController::class, 'downloadPDF'])
-        ->name('purchase-orders.download-pdf');
+        Route::get('{purchaseOrder}/download-pdf', [PurchaseOrderController::class, 'downloadPDF'])
+            ->name('purchase-orders.download-pdf');
 
-    Route::get('{purchaseOrder}/view-pdf', [PurchaseOrderController::class, 'viewPDF'])
-        ->name('purchase-orders.view-pdf');
+        Route::get('{purchaseOrder}/view-pdf', [PurchaseOrderController::class, 'viewPDF'])
+            ->name('purchase-orders.view-pdf');
         Route::get('/purchase-orders', [PurchaseOrderController::class, 'index'])->name('purchase-orders.index');
         Route::get('/purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'show'])->name('purchase-orders.show');
         Route::get('/purchase-orders/{purchaseOrder}/print', [PurchaseOrderController::class, 'print'])->name('purchase-orders.print');
+    });
 
-
-
+    Route::middleware('auth')->group(function () {
+        // Profile routes - cuma edit & update
+        Route::get('/profile/edit', [ProfileController::class, 'edit'])->name('profile.edit');
+        Route::put('/profile/update', [ProfileController::class, 'update'])->name('profile.update');
     });
 
     // UPDATE - Basic updates (Logistik untuk draft, Admin untuk override)
