@@ -16,11 +16,7 @@
             </div>
             <div class="flex flex-col sm:flex-row gap-3">
                 @if(Auth::user()->user_level_id === 'LVL002' || Auth::user()->user_level_id === 'LVL001')
-                    <a href="{{ route('purchase-orders.create', ['low_stock' => true]) }}"
-                        class="px-4 py-2 bg-gradient-to-r from-yellow-600 to-yellow-700 text-white rounded-xl hover:from-yellow-700 hover:to-yellow-800 transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <span>PO Stok Rendah</span>
-                    </a>
+
                     <a href="{{ route('purchase-orders.create') }}"
                         class="px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl hover:from-red-700 hover:to-red-800 transition-all duration-200 flex items-center space-x-2 shadow-lg hover:shadow-xl">
                         <i class="fas fa-plus"></i>
