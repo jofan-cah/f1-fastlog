@@ -388,10 +388,10 @@
                                         </span>
                                     @else
                                         <span
-                                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                            <span class="w-1.5 h-1.5 bg-red-400 rounded-full mr-1.5"></span>
+                                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                            <span class="w-1.5 h-1.5 bg-yellow-400 rounded-full mr-1.5"></span>
                                             <i class="fas fa-times-circle mr-1"></i>
-                                            No Good
+                                            Observasi
                                         </span>
                                     @endif
                                 </td>

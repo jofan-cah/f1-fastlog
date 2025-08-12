@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Models\Transaction;
+use App\Models\TransactionDetail;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
@@ -30,19 +31,28 @@ class TransactionReportExport implements FromCollection, WithHeadings, WithMappi
         $this->format = $format;
     }
 
+    /**
+     * ✅ FIXED: Export per TransactionDetail, bukan per Transaction
+     * Jadi setiap item detail dapat row sendiri
+     */
     public function collection()
     {
-        $query = Transaction::with(['item', 'createdBy', 'approvedBy', 'transactionDetails.itemDetail'])
-            ->whereBetween('transaction_date', [
+        $query = TransactionDetail::with([
+            'transaction.createdBy',
+            'transaction.approvedBy',
+            'itemDetail.item'
+        ])->whereHas('transaction', function($q) {
+            $q->whereBetween('transaction_date', [
                 $this->dateFrom . ' 00:00:00',
                 $this->dateTo . ' 23:59:59'
             ]);
 
-        if ($this->transactionType) {
-            $query->where('transaction_type', $this->transactionType);
-        }
+            if ($this->transactionType) {
+                $q->where('transaction_type', $this->transactionType);
+            }
+        });
 
-        return $query->orderBy('transaction_date', 'desc')->get();
+        return $query->orderBy('created_at', 'desc')->get();
     }
 
     public function headings(): array
@@ -50,11 +60,13 @@ class TransactionReportExport implements FromCollection, WithHeadings, WithMappi
         $baseHeadings = [
             'No',
             'Transaction Number',
-            'Type',
+            'Transaction Type',
             'Status',
-            'Item Name',
-            'Item Code',
-            'Quantity',
+            'Item Name',        // ✅ Sekarang per item detail
+            'Item Code',        // ✅ Sekarang per item detail
+            'Serial Number',    // ✅ Individual serial number
+            'Status Before',    // ✅ Status item sebelum transaksi
+            'Status After',     // ✅ Status item setelah transaksi
             'Created By',
             'Approved By',
             'Transaction Date',
@@ -64,9 +76,9 @@ class TransactionReportExport implements FromCollection, WithHeadings, WithMappi
 
         if ($this->format === 'detailed') {
             $baseHeadings = array_merge($baseHeadings, [
-                'Serial Numbers',
                 'From Location',
-                'To Location'
+                'To Location',
+                'Item Notes'  // Notes specific untuk item ini
             ]);
         }
 
@@ -81,10 +93,17 @@ class TransactionReportExport implements FromCollection, WithHeadings, WithMappi
         return $baseHeadings;
     }
 
-    public function map($transaction): array
+    /**
+     * ✅ FIXED: Map per TransactionDetail
+     */
+    public function map($transactionDetail): array
     {
         static $no = 0;
         $no++;
+
+        $transaction = $transactionDetail->transaction;
+        $itemDetail = $transactionDetail->itemDetail;
+        $item = $itemDetail->item ?? null;
 
         $typeInfo = $transaction->getTypeInfo();
         $statusInfo = $transaction->getStatusInfo();
@@ -94,9 +113,11 @@ class TransactionReportExport implements FromCollection, WithHeadings, WithMappi
             $transaction->transaction_number,
             $typeInfo['text'],
             $statusInfo['text'],
-            $transaction->item->item_name ?? 'N/A',
-            $transaction->item->item_code ?? 'N/A',
-            $transaction->quantity,
+            $item->item_name ?? 'Unknown Item',           // ✅ Nama item spesifik
+            $item->item_code ?? 'N/A',                    // ✅ Code item spesifik
+            $itemDetail->serial_number ?? 'N/A',         // ✅ Serial number spesifik
+            $transactionDetail->status_before ?? '-',     // ✅ Status before per item
+            $transactionDetail->status_after ?? '-',      // ✅ Status after per item
             $transaction->createdBy->full_name ?? 'N/A',
             $transaction->approvedBy->full_name ?? '-',
             $transaction->transaction_date->format('Y-m-d H:i:s'),
@@ -105,15 +126,10 @@ class TransactionReportExport implements FromCollection, WithHeadings, WithMappi
         ];
 
         if ($this->format === 'detailed') {
-            $serialNumbers = $transaction->transactionDetails
-                ->pluck('itemDetail.serial_number')
-                ->filter()
-                ->join(', ');
-
             $baseData = array_merge($baseData, [
-                $serialNumbers ?: '-',
                 $transaction->from_location ?? '-',
-                $transaction->to_location ?? '-'
+                $transaction->to_location ?? '-',
+                $transactionDetail->notes ?? '-'  // ✅ Notes per item detail
             ]);
         }
 
@@ -138,7 +154,7 @@ class TransactionReportExport implements FromCollection, WithHeadings, WithMappi
             1 => [
                 'font' => [
                     'bold' => true,
-                    'color' => ['rgb' => 'FFFFFF'],
+                    'color' => ['rgb' => '000'],
                 ],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
@@ -176,12 +192,11 @@ class TransactionReportExport implements FromCollection, WithHeadings, WithMappi
 
                 // Center align certain columns
                 $sheet->getStyle('A:A')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER); // No
-                $sheet->getStyle('G:G')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER); // Quantity
 
                 // Add title above headers
                 $sheet->insertNewRowBefore(1, 3);
 
-                $sheet->setCellValue('A1', 'TRANSACTION REPORT');
+                $sheet->setCellValue('A1', 'TRANSACTION REPORT - DETAILED ITEMS');
                 $sheet->mergeCells('A1:' . $lastColumn . '1');
                 $sheet->getStyle('A1')->applyFromArray([
                     'font' => [
@@ -213,7 +228,7 @@ class TransactionReportExport implements FromCollection, WithHeadings, WithMappi
                     ],
                 ]);
 
-                $sheet->setCellValue('A3', 'Generated on: ' . now()->format('Y-m-d H:i:s'));
+                $sheet->setCellValue('A3', 'Generated on: ' . now()->format('Y-m-d H:i:s') . ' | Each row = 1 item detail');
                 $sheet->mergeCells('A3:' . $lastColumn . '3');
                 $sheet->getStyle('A3')->applyFromArray([
                     'font' => [
@@ -232,7 +247,53 @@ class TransactionReportExport implements FromCollection, WithHeadings, WithMappi
                 $sheet->getRowDimension('2')->setRowHeight(20);
                 $sheet->getRowDimension('3')->setRowHeight(15);
                 $sheet->getRowDimension('4')->setRowHeight(25); // Header row
+
+                // ✅ BONUS: Group rows by transaction number for readability
+                $this->addTransactionGrouping($sheet);
             },
         ];
+    }
+
+    /**
+     * ✅ BONUS: Add visual grouping untuk transaction yang sama
+     */
+    private function addTransactionGrouping($sheet)
+    {
+        $lastRow = $sheet->getHighestRow();
+        $currentTransactionNumber = '';
+        $groupStartRow = 4; // After headers
+
+        for ($row = 4; $row <= $lastRow; $row++) {
+            $transactionNumber = $sheet->getCell('B' . $row)->getValue();
+
+            if ($transactionNumber !== $currentTransactionNumber) {
+                // New transaction group
+                if ($row > 4) {
+                    // Add subtle background untuk previous group
+                    $groupEndRow = $row - 1;
+                    if (($groupStartRow - 4) % 2 == 0) {
+                        $sheet->getStyle('A' . $groupStartRow . ':' . $sheet->getHighestColumn() . $groupEndRow)
+                            ->getFill()
+                            ->setFillType(Fill::FILL_SOLID)
+                            ->getStartColor()
+                            ->setRGB('F8F9FA');
+                    }
+                }
+
+                $currentTransactionNumber = $transactionNumber;
+                $groupStartRow = $row;
+            }
+        }
+
+        // Handle last group
+        if ($groupStartRow <= $lastRow) {
+            if (($groupStartRow - 4) % 2 == 0) {
+                $sheet->getStyle('A' . $groupStartRow . ':' . $sheet->getHighestColumn() . $lastRow)
+                    ->getFill()
+                    ->setFillType(Fill::FILL_SOLID)
+                    ->getStartColor()
+                    ->setRGB('F8F9FA');
+            }
+        }
     }
 }
