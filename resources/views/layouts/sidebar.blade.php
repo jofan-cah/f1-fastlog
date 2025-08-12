@@ -332,7 +332,7 @@
                     @endunless
 
                     {{-- ✅ Pengembalian - Hide untuk Teknisi --}}
-                   
+
 
                     {{-- ✅ Approval - Hide untuk Teknisi (sudah ada @canAccess) --}}
                     @canAccess('transactions', 'approve')
@@ -377,6 +377,18 @@
                         @endcanAccess
                     </div>
                 </div>
+                @canAccess('reports', 'read')
+                <div class="space-y-1">
+                    <a href="{{ route('reports.dashboard') }}"
+                        class="sidebar-item w-full flex items-center p-3 rounded-xl transition-all duration-200 group
+              {{ request()->routeIs('reports.*') ? 'bg-red-600/20 text-red-400 border border-red-500/30' : 'text-gray-300 hover:text-white hover:bg-white/10' }}">
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-chart-bar group-hover:scale-110 transition-transform"></i>
+                            <span class="font-medium">Reports</span>
+                        </div>
+                    </a>
+                </div>
+                @endcanAccess
             </div>
         @endif
 

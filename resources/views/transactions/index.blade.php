@@ -95,7 +95,7 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-sm font-medium text-gray-600">Success Rate</p>
-                        <p class="text-2xl font-bold text-purple-600" x-text="stats.success_rate + '%'">
+                        <p class="text-2xl font-bold text-purple-600">
                             {{ $stats['success_rate'] ?? 0 }}%</p>
                     </div>
                     <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">

@@ -463,9 +463,22 @@
 
                 <!-- To Location -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Lokasi Tujuan</label>
-                    <input type="text" x-model="form.to_location" placeholder="Lokasi tujuan barang"
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Lokasi Tujuan
+                        <span x-show="form.transaction_type === 'REPAIR'" class="text-blue-600 text-xs">
+                            (Tempat repair/bengkel)
+                        </span>
+                    </label>
+
+                    <input type="text" x-model="form.to_location"
+                        :placeholder="form.transaction_type === 'REPAIR' ? 'Contoh: Bengkel Elektronik Jaya, Workshop IT Lt.2' :
+                            'Lokasi tujuan barang'"
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500">
+
+                    <!-- Helper text khusus REPAIR -->
+                    <div x-show="form.transaction_type === 'REPAIR'" class="mt-1 text-xs text-blue-600">
+                        💡 Tuliskan nama bengkel/workshop tempat barang akan diperbaiki
+                    </div>
                 </div>
 
                 <!-- Kondisi (show only for certain transaction types) -->

@@ -58,7 +58,9 @@ class UserLevelController extends Controller
             'reports' => ['read', 'export'],
             'activity_logs' => ['read'],
             'qr_scanner' => ['read', 'scan'],
-            'settings' => ['read', 'update']
+            'settings' => ['read', 'update'],
+            'reports' => ['read'],
+
         ];
 
         return view('user-levels.create', compact('defaultPermissions'));
@@ -128,7 +130,8 @@ class UserLevelController extends Controller
             'reports' => ['read', 'export'],
             'activity_logs' => ['read'],
             'qr_scanner' => ['read', 'scan'],
-            'settings' => ['read', 'update']
+            'settings' => ['read', 'update'],
+                 'reports' => ['read'],
         ];
 
         return view('user-levels.edit', compact('userLevel', 'defaultPermissions'));

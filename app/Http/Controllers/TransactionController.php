@@ -306,6 +306,7 @@ class TransactionController extends Controller
 
         $request->validate($rules);
 
+        // dd($request->all());
         try {
             DB::beginTransaction();
 
@@ -381,6 +382,11 @@ class TransactionController extends Controller
                     'kondisi_before' => $itemInfo['detail']->kondisi ?? 'good',
                     'kondisi_after' => null,  // Will be set when approved
                     'notes' => $itemInfo['notes'],
+                ]);
+
+                // ✅ TAMBAH INI: Update kondisi di item_details langsung
+                $itemInfo['detail']->update([
+                    'kondisi' => $itemInfo['kondisi']
                 ]);
             }
 
