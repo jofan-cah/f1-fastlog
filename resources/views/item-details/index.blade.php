@@ -367,13 +367,14 @@
 
                                         <span
                                             class="w-1.5 h-1.5 rounded-full mr-1.5
-    {{ $itemDetail->status == 'available'
-        ? 'bg-green-400'
-        : ($itemDetail->status == 'damaged'
-            ? 'bg-red-400'
-            : ($itemDetail->status == 'maintenance'
-                ? 'bg-yellow-400'
-                : 'bg-blue-400')) }}"></span>
+                                            {{ $itemDetail->status == 'available'
+                                                ? 'bg-green-400'
+                                                : ($itemDetail->status == 'damaged'
+                                                    ? 'bg-red-400'
+                                                    : ($itemDetail->status == 'maintenance'
+                                                        ? 'bg-yellow-400'
+                                                        : 'bg-blue-400')) }}">
+                                        </span>
                                         {{ $labels[$itemDetail->status] ?? ucfirst($itemDetail->status) }}
 
                                 </td>
