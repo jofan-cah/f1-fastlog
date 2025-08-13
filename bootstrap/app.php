@@ -12,10 +12,19 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         //
+
+        $middleware->web(remove: [
+            \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class
+        ]);
+
+        // Atau exclude specific patterns
+        $middleware->validateCsrfTokens(except: [
+            'api/*',
+        ]);
         $middleware->alias([
             'user.active' => \App\Http\Middleware\CheckUserActive::class,
             'admin' => \App\Http\Middleware\AdminOnly::class,
-             'befast.auth' => \App\Http\Middleware\BefastAuth::class,
+            'befast.auth' => \App\Http\Middleware\BefastAuth::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
