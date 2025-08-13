@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'user.active' => \App\Http\Middleware\CheckUserActive::class,
             'admin' => \App\Http\Middleware\AdminOnly::class,
+             'befast.auth' => \App\Http\Middleware\BefastAuth::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

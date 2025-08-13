@@ -5,6 +5,7 @@
 // ================================================================
 
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\Api\BefastApiController;
 use App\Http\Controllers\GoodsReceivedController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\ItemDetailController;
@@ -35,6 +36,27 @@ Route::get('/', function () {
     return auth()->check() ? redirect()->route('dashboard') : redirect()->route('login');
 });
 
+
+Route::prefix('api/befast')
+    ->middleware(['befast.auth']) // ✅ Pakai middleware kita
+    ->group(function () {
+
+        // Test endpoint
+        Route::get('/ping', function () {
+            return response()->json([
+                'success' => true,
+                'message' => 'Befast API is working!',
+                'timestamp' => now()->toISOString(),
+                'server' => 'fastlog.fiberone.net.id'
+            ]);
+        });
+
+        // Main APIs
+        Route::get('/categories', [BefastApiController::class, 'getCategories']);
+        Route::get('/serials/{category_id}', [BefastApiController::class, 'getSerials']);
+        Route::post('/book-serial', [BefastApiController::class, 'bookSerial']);
+        Route::post('/cancel-booking', [BefastApiController::class, 'cancelBooking']);
+    });
 // Authentication Routes (hanya untuk guest)
 Route::middleware('guest')->group(function () {
     // Login Routes
