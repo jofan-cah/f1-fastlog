@@ -410,7 +410,7 @@ class PurchaseOrderController extends Controller
     //     }
     // }
 
-  // Store PO baru - Modified: Hide price from frontend, default to 0
+    // Store PO baru - Modified: Hide price from frontend, default to 0
     public function store(Request $request)
     {
         if (!$this->canUserAccess('create')) {
@@ -543,7 +543,6 @@ class PurchaseOrderController extends Controller
                 return redirect()->route('purchase-orders.show', $po)
                     ->with('success', 'Purchase Order berhasil dibuat! Status: Draft Logistic');
             }
-
         } catch (\Exception $e) {
             DB::rollback();
             return back()
@@ -681,14 +680,22 @@ class PurchaseOrderController extends Controller
             ];
 
             if (!$wasAutoApproval && $isAutoApproval) {
-                ActivityLog::logActivity('purchase_orders', $purchaseOrder->po_id, 'update_with_auto_approval', $oldData,
+                ActivityLog::logActivity(
+                    'purchase_orders',
+                    $purchaseOrder->po_id,
+                    'update_with_auto_approval',
+                    $oldData,
                     array_merge($activityData, [
                         'auto_approval_reason' => 'Supplier changed to SUP001 - automatic approval triggered',
                         'action' => 'supplier_change_to_trusted'
                     ])
                 );
             } elseif ($wasAutoApproval && !$isAutoApproval) {
-                ActivityLog::logActivity('purchase_orders', $purchaseOrder->po_id, 'update_remove_auto_approval', $oldData,
+                ActivityLog::logActivity(
+                    'purchase_orders',
+                    $purchaseOrder->po_id,
+                    'update_remove_auto_approval',
+                    $oldData,
                     array_merge($activityData, [
                         'auto_approval_removed_reason' => 'Supplier changed from SUP001 - reverted to manual workflow',
                         'action' => 'supplier_change_from_trusted'
@@ -711,7 +718,6 @@ class PurchaseOrderController extends Controller
                 return redirect()->route('purchase-orders.show', $purchaseOrder)
                     ->with('success', 'Purchase Order berhasil diupdate!');
             }
-
         } catch (\Exception $e) {
             DB::rollback();
             return back()
@@ -1226,13 +1232,23 @@ class PurchaseOrderController extends Controller
         $purchaseOrder->load([
             'supplier',
             'createdBy',
-            'poDetails.item.category'
+            'poDetails.item.category',
+            'poDetails.item.itemDetails' // Load untuk hitung stock
         ]);
+
+        // Calculate stock info untuk setiap item
+        foreach ($purchaseOrder->poDetails as $detail) {
+            $item = $detail->item;
+            $itemDetails = $item->itemDetails;
+
+            // Simple calculation sesuai header
+            $item->qty_stock = $itemDetails->where('status', 'stock')->count();        // Qty Stock (di gudang)
+            $item->qty_ready = $itemDetails->where('status', 'available')->count();    // Qty Siap Pakai
+        }
 
         $pdf = Pdf::loadView('purchase-orders.pdf', compact('purchaseOrder'));
         $pdf->setPaper('A4', 'portrait');
 
-        // Stream ke browser
         return $pdf->stream('PO_' . $purchaseOrder->po_number . '.pdf');
     }
 

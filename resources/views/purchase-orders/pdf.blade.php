@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -70,7 +71,8 @@
             margin-top: 12px;
         }
 
-        table.items th, table.items td {
+        table.items th,
+        table.items td {
             border: 1px solid #ccc;
             padding: 8px;
         }
@@ -194,6 +196,7 @@
         }
     </style>
 </head>
+
 <body>
     <header>
         <table class="header-table">
@@ -213,7 +216,7 @@
                     <strong>PURCHASE ORDER</strong><br>
                     No: {{ $purchaseOrder->po_number }}<br>
                     Tanggal: {{ $purchaseOrder->po_date->format('d M Y') }}<br>
-                    @if($purchaseOrder->expected_date)
+                    @if ($purchaseOrder->expected_date)
                         Jatuh Tempo: {{ $purchaseOrder->expected_date->format('d M Y') }}<br>
                     @endif
                     Created by: {{ $purchaseOrder->createdBy->full_name }}
@@ -227,10 +230,10 @@
         <div class="box">
             <strong>Supplier:</strong><br>
             {{ $purchaseOrder->supplier->supplier_name }}<br>
-            @if($purchaseOrder->supplier->address)
+            @if ($purchaseOrder->supplier->address)
                 {!! nl2br($purchaseOrder->supplier->address) !!}<br>
             @endif
-            @if($purchaseOrder->supplier->phone || $purchaseOrder->supplier->email)
+            @if ($purchaseOrder->supplier->phone || $purchaseOrder->supplier->email)
                 Tel: {{ $purchaseOrder->supplier->phone ?? '-' }} • Email: {{ $purchaseOrder->supplier->email ?? '-' }}
             @endif
         </div>
@@ -240,22 +243,30 @@
             <thead>
                 <tr>
                     <th style="width: 5%">No</th>
-                    <th style="width: 60%">Deskripsi Item</th>
-                    <th class="text-center" style="width: 15%">Qty</th>
-                    <th class="text-center" style="width: 20%">Unit</th>
+                    <th style="width: 40%">Nama Item</th>
+                    <th class="text-center" >Qty Stock</th>
+                    <th class="text-center" >Qty Tersedia</th>
+                    <th class="text-center" >Qty Order</th>
+                    <th class="text-center" >Unit</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach($purchaseOrder->poDetails as $index => $detail)
-                <tr>
-                    <td class="text-center">{{ $index + 1 }}</td>
-                    <td>
-                        <div class="item-name">{{ $detail->item->item_name }}</div>
-                       
-                    </td>
-                    <td class="text-center">{{ number_format($detail->quantity_ordered, 0) }}</td>
-                    <td class="text-center">{{ $detail->item->unit }}</td>
-                </tr>
+                @foreach ($purchaseOrder->poDetails as $index => $detail)
+                    <tr>
+                        <td class="text-center">{{ $index + 1 }}</td>
+                        <td>
+                            <div class="item-name">{{ $detail->item->item_name }}</div>
+                            <div class="item-code">Code: {{ $detail->item->item_code }}</div>
+                            @if ($detail->item->category)
+                                <div class="item-code">Category: {{ $detail->item->category->category_name }}</div>
+                            @endif
+                        </td>
+                        <td class="text-center">{{ $detail->item->qty_stock ?? 0 }}</td> <!-- Qty Stock -->
+                        <td class="text-center">{{ $detail->item->qty_ready ?? 0 }}</td> <!-- Qty Siap Pakai -->
+                        <td class="text-center">{{ number_format($detail->quantity_ordered, 0) }}</td>
+                        <!-- Qty Order -->
+                        <td class="text-center">{{ $detail->item->unit }}</td> <!-- Unit -->
+                    </tr>
                 @endforeach
             </tbody>
         </table>
@@ -277,12 +288,12 @@
         <br>
         <br>
 
-        @if($purchaseOrder->notes)
-        <!-- Notes -->
-        <div class="notes-section">
-            <div class="notes-title">Catatan:</div>
-            <div>{{ $purchaseOrder->notes }}</div>
-        </div>
+        @if ($purchaseOrder->notes)
+            <!-- Notes -->
+            <div class="notes-section">
+                <div class="notes-title">Catatan:</div>
+                <div>{{ $purchaseOrder->notes }}</div>
+            </div>
         @endif
 
         <!-- Signatures -->
@@ -292,7 +303,8 @@
                     <div class="signature-title">Dibuat Oleh</div>
                     <div class="signature-space"></div>
                     <div class="signature-line">{{ $purchaseOrder->createdBy->full_name }}</div>
-                    <div style="font-size: 10px; margin-top: 5px;">{{ $purchaseOrder->created_at->format('d/m/Y') }}</div>
+                    <div style="font-size: 10px; margin-top: 5px;">{{ $purchaseOrder->created_at->format('d/m/Y') }}
+                    </div>
                 </td>
                 <td>
                     <div class="signature-title">Disetujui Oleh</div>
@@ -315,4 +327,5 @@
         <div>Generated: {{ now()->format('d/m/Y H:i:s') }}</div>
     </footer>
 </body>
+
 </html>
