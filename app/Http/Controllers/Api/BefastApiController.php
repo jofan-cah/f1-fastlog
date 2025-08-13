@@ -251,9 +251,7 @@ class BefastApiController extends Controller
     {
         $request->validate([
             'serial_number' => 'required|string',
-            'booked_by' => 'required|string|max:255',
-            'booking_notes' => 'nullable|string|max:500',
-            'customer_info' => 'nullable|string|max:255'
+
         ]);
 
         try {
