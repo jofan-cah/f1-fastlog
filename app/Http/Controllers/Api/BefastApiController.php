@@ -1,7 +1,7 @@
 <?php
 
 // ================================================================
-// UPDATE BefastApiController - Modem Focused
+// FIXED BefastApiController - Sesuai Model Item
 // ================================================================
 
 namespace App\Http\Controllers\Api;
@@ -17,25 +17,38 @@ use Illuminate\Support\Facades\Log;
 class BefastApiController extends Controller
 {
     /**
-     * API 1: Get Modem Items (Skip categories, default Modem)
+     * API 1: Get Modem Items (Fixed - sesuai model Item)
      *
      * GET /api/befast/items
      */
     public function getItems(Request $request)
     {
         try {
-            // Hardcode filter untuk modem categories
-            $modemKeywords = ['modem', 'adsl', 'vdsl', 'router', 'olt', 'onu', 'ont'];
-
-            $items = Item::with('category')
-                ->whereHas('category', function($q) use ($modemKeywords) {
-                    $q->where('is_active', true);
-                    foreach ($modemKeywords as $keyword) {
-                        $q->orWhere('category_name', 'like', "%{$keyword}%");
-                    }
+            // ✅ FIXED: Filter categories yang mengandung kata "modem"
+            $modemCategories = Category::where('is_active', true)
+                ->where(function($q) {
+                    $q->where('category_name', 'like', '%modem%')
+                      ->orWhere('category_name', 'like', '%adsl%')
+                      ->orWhere('category_name', 'like', '%vdsl%')
+                      ->orWhere('category_name', 'like', '%router%')
+                      ->orWhere('category_name', 'like', '%olt%')
+                      ->orWhere('category_name', 'like', '%onu%')
+                      ->orWhere('category_name', 'like', '%ont%');
                 })
+                ->pluck('category_id')
+                ->toArray();
+
+            Log::info('Modem categories found', [
+                'category_ids' => $modemCategories,
+                'total_categories' => count($modemCategories)
+            ]);
+
+            // ✅ FIXED: Query items yang ada di modem categories dan punya stock available
+            $items = Item::with(['category', 'stock'])
+                ->whereIn('category_id', $modemCategories)
+                ->where('is_active', true)
                 ->whereHas('itemDetails', function($q) {
-                    $q->where('status', 'available'); // Only items yang punya available stock
+                    $q->where('status', 'available');
                 })
                 ->get()
                 ->map(function($item) {
@@ -46,14 +59,16 @@ class BefastApiController extends Controller
 
                     return [
                         'item_id' => $item->item_id,
-                        'item_name' => $item->item_name,
                         'item_code' => $item->item_code,
-                        'brand' => $item->brand ?? 'Unknown',
-                        'model' => $item->model ?? 'Unknown',
-                        'category_name' => $item->category->category_name,
-                        'available_count' => $availableCount,
+                        'item_name' => $item->item_name,
+                        'category_id' => $item->category_id,
+                        'category_name' => $item->category->category_name ?? 'Unknown',
                         'unit' => $item->unit,
-                        'description' => $item->description
+                        'description' => $item->description,
+                        'available_count' => $availableCount,
+                        'min_stock' => $item->min_stock,
+                        'stock_info' => $item->getStockInfo(), // Method dari model
+                        'qr_code' => $item->qr_code
                     ];
                 })
                 ->filter(function($item) {
@@ -67,12 +82,13 @@ class BefastApiController extends Controller
                 $items = $items->filter(function($item) use ($search) {
                     return str_contains(strtolower($item['item_name']), $search) ||
                            str_contains(strtolower($item['item_code']), $search) ||
-                           str_contains(strtolower($item['brand']), $search);
+                           str_contains(strtolower($item['description'] ?? ''), $search);
                 })->values();
             }
 
             Log::info('Befast API - Items requested', [
-                'total_items' => $items->count(),
+                'total_modem_categories' => count($modemCategories),
+                'total_items_found' => $items->count(),
                 'search' => $request->search,
                 'ip' => $request->ip()
             ]);
@@ -83,7 +99,8 @@ class BefastApiController extends Controller
                 'data' => [
                     'items' => $items,
                     'total_count' => $items->count(),
-                    'total_available_stock' => $items->sum('available_count')
+                    'total_available_stock' => $items->sum('available_count'),
+                    'modem_categories_included' => $modemCategories
                 ],
                 'meta' => [
                     'category_filter' => 'modem_only',
@@ -104,14 +121,14 @@ class BefastApiController extends Controller
     }
 
     /**
-     * API 2: Get Serial Numbers by Item ID
+     * API 2: Get Serial Numbers by Item ID (Fixed)
      *
      * GET /api/befast/serials/{item_id}
      */
     public function getSerials(Request $request, $itemId)
     {
         try {
-            $item = Item::with('category')->find($itemId);
+            $item = Item::with(['category', 'stock'])->find($itemId);
 
             if (!$item) {
                 return response()->json([
@@ -121,14 +138,16 @@ class BefastApiController extends Controller
                 ], 404);
             }
 
-            // Verify it's a modem item
+            // ✅ FIXED: Verify it's a modem item berdasarkan category
             $modemKeywords = ['modem', 'adsl', 'vdsl', 'router', 'olt', 'onu', 'ont'];
             $isModemItem = false;
 
-            foreach ($modemKeywords as $keyword) {
-                if (stripos($item->category->category_name, $keyword) !== false) {
-                    $isModemItem = true;
-                    break;
+            if ($item->category) {
+                foreach ($modemKeywords as $keyword) {
+                    if (stripos($item->category->category_name, $keyword) !== false) {
+                        $isModemItem = true;
+                        break;
+                    }
                 }
             }
 
@@ -136,7 +155,8 @@ class BefastApiController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'Item is not a modem type',
-                    'error_code' => 'NOT_MODEM_ITEM'
+                    'error_code' => 'NOT_MODEM_ITEM',
+                    'item_category' => $item->category->category_name ?? 'Unknown'
                 ], 400);
             }
 
@@ -162,15 +182,19 @@ class BefastApiController extends Controller
                                    'serial_number' => $itemDetail->serial_number,
                                    'location' => $itemDetail->location,
                                    'status' => $itemDetail->status,
+                                   'kondisi' => $itemDetail->kondisi ?? 'good',
                                    'notes' => $itemDetail->notes,
                                    'custom_attributes' => $itemDetail->custom_attributes,
-                                   'created_at' => $itemDetail->created_at->format('Y-m-d H:i:s')
+                                   'qr_code' => $itemDetail->qr_code,
+                                   'created_at' => $itemDetail->created_at->format('Y-m-d H:i:s'),
+                                   'status_info' => $itemDetail->getStatusInfo() // Method dari model
                                ];
                            });
 
             Log::info('Befast API - Serials requested', [
                 'item_id' => $itemId,
                 'item_name' => $item->item_name,
+                'item_category' => $item->category->category_name ?? 'Unknown',
                 'total_serials' => $serials->count(),
                 'search' => $request->search,
                 'location' => $request->location,
@@ -183,11 +207,13 @@ class BefastApiController extends Controller
                 'data' => [
                     'item' => [
                         'item_id' => $item->item_id,
-                        'item_name' => $item->item_name,
                         'item_code' => $item->item_code,
-                        'brand' => $item->brand ?? 'Unknown',
-                        'model' => $item->model ?? 'Unknown',
-                        'category_name' => $item->category->category_name
+                        'item_name' => $item->item_name,
+                        'category_id' => $item->category_id,
+                        'category_name' => $item->category->category_name ?? 'Unknown',
+                        'unit' => $item->unit,
+                        'description' => $item->description,
+                        'stock_info' => $item->getStockInfo()
                     ],
                     'serials' => $serials,
                     'total_count' => $serials->count()
@@ -203,7 +229,10 @@ class BefastApiController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Befast API - Get serials failed: ' . $e->getMessage());
+            Log::error('Befast API - Get serials failed', [
+                'item_id' => $itemId,
+                'error' => $e->getMessage()
+            ]);
 
             return response()->json([
                 'success' => false,
@@ -214,7 +243,7 @@ class BefastApiController extends Controller
     }
 
     /**
-     * API 3: Book Serial Number (sama seperti sebelumnya)
+     * API 3: Book Serial Number (Fixed - enhanced logging)
      *
      * POST /api/befast/book-serial
      */
@@ -241,14 +270,16 @@ class BefastApiController extends Controller
                 ], 404);
             }
 
-            // Verify it's a modem
+            // ✅ FIXED: Verify it's a modem berdasarkan category
             $modemKeywords = ['modem', 'adsl', 'vdsl', 'router', 'olt', 'onu', 'ont'];
             $isModem = false;
 
-            foreach ($modemKeywords as $keyword) {
-                if (stripos($modem->item->category->category_name, $keyword) !== false) {
-                    $isModem = true;
-                    break;
+            if ($modem->item && $modem->item->category) {
+                foreach ($modemKeywords as $keyword) {
+                    if (stripos($modem->item->category->category_name, $keyword) !== false) {
+                        $isModem = true;
+                        break;
+                    }
                 }
             }
 
@@ -256,7 +287,8 @@ class BefastApiController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'Serial number is not a modem',
-                    'error_code' => 'NOT_MODEM_SERIAL'
+                    'error_code' => 'NOT_MODEM_SERIAL',
+                    'item_category' => $modem->item->category->category_name ?? 'Unknown'
                 ], 400);
             }
 
@@ -289,7 +321,8 @@ class BefastApiController extends Controller
                 'booking_date' => now()->toDateString(),
                 'booking_time' => now()->toTimeString(),
                 'customer_info' => $request->customer_info,
-                'booking_notes' => $request->booking_notes
+                'booking_notes' => $request->booking_notes,
+                'api_source' => 'befast'
             ];
 
             // Update modem
@@ -299,7 +332,7 @@ class BefastApiController extends Controller
                 'custom_attributes' => $attributes
             ]);
 
-            // Log activity
+            // Enhanced ActivityLog
             ActivityLog::logActivity(
                 'item_details',
                 $modem->item_detail_id,
@@ -312,9 +345,10 @@ class BefastApiController extends Controller
                     'booking_notes' => $request->booking_notes,
                     'api_source' => 'befast',
                     'item_info' => [
-                        'item_name' => $modem->item->item_name,
+                        'item_id' => $modem->item->item_id,
                         'item_code' => $modem->item->item_code,
-                        'category' => $modem->item->category->category_name
+                        'item_name' => $modem->item->item_name,
+                        'category' => $modem->item->category->category_name ?? 'Unknown'
                     ],
                     'booking_timestamp' => now()->toISOString()
                 ]
@@ -323,11 +357,21 @@ class BefastApiController extends Controller
             Log::info('Befast API - Modem booked successfully', [
                 'serial_number' => $request->serial_number,
                 'item_detail_id' => $modem->item_detail_id,
-                'item_name' => $modem->item->item_name,
-                'booked_by' => $request->booked_by,
-                'customer_info' => $request->customer_info,
-                'old_status' => $oldStatus,
-                'new_status' => 'reserved',
+                'item_info' => [
+                    'item_id' => $modem->item->item_id,
+                    'item_code' => $modem->item->item_code,
+                    'item_name' => $modem->item->item_name,
+                    'category' => $modem->item->category->category_name ?? 'Unknown'
+                ],
+                'booking_info' => [
+                    'booked_by' => $request->booked_by,
+                    'customer_info' => $request->customer_info,
+                    'booking_notes' => $request->booking_notes
+                ],
+                'status_change' => [
+                    'from' => $oldStatus,
+                    'to' => 'reserved'
+                ],
                 'ip' => $request->ip()
             ]);
 
@@ -339,10 +383,12 @@ class BefastApiController extends Controller
                     'serial_number' => $modem->serial_number,
                     'item_info' => [
                         'item_id' => $modem->item->item_id,
-                        'item_name' => $modem->item->item_name,
                         'item_code' => $modem->item->item_code,
-                        'brand' => $modem->item->brand ?? 'Unknown',
-                        'category' => $modem->item->category->category_name
+                        'item_name' => $modem->item->item_name,
+                        'category_id' => $modem->item->category_id,
+                        'category_name' => $modem->item->category->category_name ?? 'Unknown',
+                        'unit' => $modem->item->unit,
+                        'description' => $modem->item->description
                     ],
                     'status_change' => [
                         'old_status' => $oldStatus,
@@ -366,6 +412,7 @@ class BefastApiController extends Controller
             Log::error('Befast API - Book serial failed', [
                 'serial_number' => $request->serial_number,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'ip' => $request->ip()
             ]);
 
