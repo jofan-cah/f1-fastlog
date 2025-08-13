@@ -37,25 +37,24 @@ Route::get('/', function () {
 });
 
 
+// routes/api.php - ganti yang lama
 Route::prefix('api/befast')
-    ->middleware(['befast.auth']) // ✅ Pakai middleware kita
+    ->middleware(['befast.auth'])
     ->group(function () {
 
-        // Test endpoint
         Route::get('/ping', function () {
             return response()->json([
                 'success' => true,
                 'message' => 'Befast API is working!',
-                'timestamp' => now()->toISOString(),
-                'server' => 'fastlog.fiberone.net.id'
+                'focus' => 'Modem items only',
+                'timestamp' => now()->toISOString()
             ]);
         });
 
-        // Main APIs
-        Route::get('/categories', [BefastApiController::class, 'getCategories']);
-        Route::get('/serials/{category_id}', [BefastApiController::class, 'getSerials']);
+        // ✅ API baru - Modem focused
+        Route::get('/items', [BefastApiController::class, 'getItems']);
+        Route::get('/serials/{item_id}', [BefastApiController::class, 'getSerials']);
         Route::post('/book-serial', [BefastApiController::class, 'bookSerial']);
-        Route::post('/cancel-booking', [BefastApiController::class, 'cancelBooking']);
     });
 // Authentication Routes (hanya untuk guest)
 Route::middleware('guest')->group(function () {
