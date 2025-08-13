@@ -153,7 +153,7 @@
 
 
                 <!-- Custom Attributes -->
-                @if ($formattedAttributes && count($formattedAttributes) > 0)
+                {{-- @if ($formattedAttributes && count($formattedAttributes) > 0)
                     <div class="mt-6 pt-6 border-t border-gray-200">
                         <h3 class="text-lg font-semibold text-gray-900 mb-4">Atribut Khusus</h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -165,7 +165,7 @@
                             @endforeach
                         </div>
                     </div>
-                @endif
+                @endif --}}
             </div>
 
             <!-- Right Sidebar -->
