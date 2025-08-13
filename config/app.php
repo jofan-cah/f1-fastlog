@@ -15,6 +15,7 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    'befast_secret_key' => env('BEFAST_SECRET_KEY', 'ADMIN123321'),
     /*
     |--------------------------------------------------------------------------
     | Application Environment
