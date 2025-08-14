@@ -340,15 +340,6 @@
         <br>
         <br>
 
-        @if ($purchaseOrder->notes)
-            <!-- Notes -->
-            <div class="notes-section">
-                <div class="notes-title">Catatan Purchase Order:</div>
-                <div>{{ $purchaseOrder->notes }}</div>
-            </div>
-        @endif
-
-
 
         <!-- Signatures -->
         <table class="signatures">
