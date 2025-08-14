@@ -231,7 +231,7 @@
                         <img src="{{ public_path('f1.png') }}" alt="PT FIBERONE Logo" onerror="this.style.display='none'">
                     </div>
                     <div class="company-info">
-                        <h2>PT FIBERONE</h2>
+                        <h2>PT Jaringan Fiberone Indonesia</h2>
                         <p>Griya Permata Hijau, Jl. Mpu Sedah No.01 Blok A, Gatak, Sumberejo</p>
                         <p>Kec. Klaten Sel., Kabupaten Klaten, Jawa Tengah 57422</p>
                         <p>Tel: 0815-6464-2022 • Email: info@fiberone.co.id</p>
