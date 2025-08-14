@@ -231,7 +231,7 @@
                         <img src="{{ public_path('f1.png') }}" alt="PT FIBERONE Logo" onerror="this.style.display='none'">
                     </div>
                     <div class="company-info">
-                        <h2>PT Jaringan Fiberone Indonesia</h2>
+                        <h2>PT FIBERONE</h2>
                         <p>Griya Permata Hijau, Jl. Mpu Sedah No.01 Blok A, Gatak, Sumberejo</p>
                         <p>Kec. Klaten Sel., Kabupaten Klaten, Jawa Tengah 57422</p>
                         <p>Tel: 0815-6464-2022 • Email: info@fiberone.co.id</p>
@@ -268,16 +268,22 @@
             <thead>
                 <tr>
                     <th style="width: 5%">No</th>
-                    <th style="width: 35%">Nama Item</th>
-                    <th class="text-center" style="width: 10%">Stock Gudang</th>
-                    <th class="text-center" style="width: 10%">Stock Distribusi</th>
-                    <th class="text-center" style="width: 10%">Jumlah Order</th>
+                    <th style="width: 30%">Nama Item</th>
+                    <th class="text-center" style="width: 8%">Stock Gudang</th>
+                    <th class="text-center" style="width: 8%">Stock Distribusi</th>
+                    <th class="text-center" style="width: 8%">Stock Total</th>
+                    <th class="text-center" style="width: 8%">Jumlah Order</th>
                     <th class="text-center" style="width: 8%">Satuan</th>
-                    <th class="text-center" style="width: 22%">Reason</th>
+                    <th class="text-center" style="width: 25%">Reason</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach ($purchaseOrder->poDetails as $index => $detail)
+                    @php
+                        $stockGudang = $detail->item->qty_stock ?? 0;
+                        $stockDistribusi = $detail->item->qty_ready ?? 0;
+                        $stockTotal = $stockGudang + $stockDistribusi;
+                    @endphp
                     <tr>
                         <td class="text-center">{{ $index + 1 }}</td>
                         <td>
@@ -287,8 +293,11 @@
                                 <div class="item-code">Category: {{ $detail->item->category->category_name }}</div>
                             @endif
                         </td>
-                        <td class="text-center">{{ $detail->item->qty_stock ?? 0 }}</td>
-                        <td class="text-center">{{ $detail->item->qty_ready ?? 0 }}</td>
+                        <td class="text-center">{{ number_format($stockGudang, 0) }}</td>
+                        <td class="text-center">{{ number_format($stockDistribusi, 0) }}</td>
+                        <td class="text-center" style="font-weight: bold; background-color: #f0f9ff; ">
+                            {{ number_format($stockTotal, 0) }}
+                        </td>
                         <td class="text-center">{{ number_format($detail->quantity_ordered, 0) }}</td>
                         <td class="text-center">{{ $detail->item->unit }}</td>
                         <td class="text-center">
