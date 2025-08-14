@@ -434,7 +434,7 @@
                                             <i class="fas fa-eye"></i>
                                         </a>
 
-                                        @if ($po->canBeEditedByLogistic() && Auth::user()->user_level_id === 'LVL002')
+                                        @if (Auth::user()->user_level_id === 'LVL001' || Auth::user()->user_level_id === 'LVL002' )
                                             <a href="{{ route('purchase-orders.edit', $po->po_id) }}"
                                                 class="text-yellow-600 hover:text-yellow-900 p-2 hover:bg-yellow-50 rounded-lg transition-all duration-200"
                                                 title="Edit PO">
