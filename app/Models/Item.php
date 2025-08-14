@@ -255,6 +255,7 @@ class Item extends Model
             'sheet' => 'Sheet',
             'bottle' => 'Bottle',
             'pair' => 'Pair',
+            'rim' => 'Rim',
         ];
     }
 }
