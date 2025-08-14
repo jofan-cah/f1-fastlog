@@ -49,14 +49,12 @@
         <!-- Page Header -->
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div class="flex items-center space-x-4">
-                <div
-                    class="w-16 h-16 bg-gradient-to-br from-yellow-600 to-yellow-700 rounded-2xl flex items-center justify-center">
+                <div class="w-16 h-16 bg-gradient-to-br from-yellow-600 to-yellow-700 rounded-2xl flex items-center justify-center">
                     <i class="fas fa-edit text-white text-2xl"></i>
                 </div>
                 <div>
                     <h1 class="text-2xl font-bold text-gray-900">Edit Purchase Order</h1>
-                    <p class="text-gray-600 mt-1">{{ $purchaseOrder->po_number }} •
-                        {{ $purchaseOrder->supplier->supplier_name }}</p>
+                    <p class="text-gray-600 mt-1">{{ $purchaseOrder->po_number }} • {{ $purchaseOrder->supplier->supplier_name }}</p>
                 </div>
             </div>
             <div class="flex flex-col sm:flex-row gap-3">
@@ -69,7 +67,7 @@
         </div>
 
         <!-- Status Warning -->
-        @if ($purchaseOrder->status !== 'draft')
+        @if ($purchaseOrder->workflow_status !== 'draft_logistic')
             <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-6">
                 <div class="flex items-start">
                     <div class="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -78,8 +76,8 @@
                     <div class="ml-4">
                         <h3 class="text-lg font-semibold text-yellow-900 mb-2">Perhatian!</h3>
                         <p class="text-yellow-700 text-sm">
-                            PO ini memiliki status <strong>{{ $purchaseOrder->getStatusInfo()['text'] }}</strong>.
-                            Hanya PO dengan status Draft yang dapat diedit secara penuh.
+                            PO ini memiliki status <strong>{{ $purchaseOrder->getWorkflowStatusInfo()['text'] }}</strong>.
+                            Hanya PO dengan status Draft Logistic yang dapat diedit secara penuh.
                         </p>
                     </div>
                 </div>
@@ -120,9 +118,8 @@
                                         Status Saat Ini
                                     </label>
                                     <div class="p-3 bg-gray-50 rounded-lg border">
-                                        <span
-                                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $purchaseOrder->getStatusInfo()['class'] }}">
-                                            {{ $purchaseOrder->getStatusInfo()['text'] }}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $purchaseOrder->getWorkflowStatusInfo()['class'] }}">
+                                            {{ $purchaseOrder->getWorkflowStatusInfo()['text'] }}
                                         </span>
                                     </div>
                                 </div>
@@ -130,12 +127,12 @@
                                 <!-- Supplier -->
                                 <div>
                                     <label for="supplier_id" class="block text-sm font-medium text-gray-700 mb-2">
-                                        Supplier <span class="text-red-500">*</span>
+                                        Supplier <span class="text-gray-400">(Opsional)</span>
                                     </label>
                                     <select id="supplier_id" name="supplier_id" x-model="selectedSupplierId"
                                         @change="onSupplierChange()"
                                         class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all @error('supplier_id') border-red-500 @enderror">
-                                        <option value="">Pilih Supplier</option>
+                                        <option value="">Pilih supplier atau kosongkan untuk dipilih di Finance F1</option>
                                         @foreach ($suppliers as $supplier)
                                             <option value="{{ $supplier->supplier_id }}"
                                                 {{ old('supplier_id', $purchaseOrder->supplier_id) == $supplier->supplier_id ? 'selected' : '' }}>
@@ -180,10 +177,8 @@
                                         Dibuat Oleh
                                     </label>
                                     <div class="p-3 bg-gray-50 rounded-lg border">
-                                        <span
-                                            class="text-sm text-gray-900">{{ $purchaseOrder->createdBy->full_name }}</span>
-                                        <div class="text-xs text-gray-500 mt-1">
-                                            {{ $purchaseOrder->created_at->format('d/m/Y H:i') }}</div>
+                                        <span class="text-sm text-gray-900">{{ $purchaseOrder->createdBy->full_name }}</span>
+                                        <div class="text-xs text-gray-500 mt-1">{{ $purchaseOrder->created_at->format('d/m/Y H:i') }}</div>
                                     </div>
                                 </div>
                             </div>
@@ -225,8 +220,7 @@
                                     <tr>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Harga</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
                                         <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Aksi</th>
                                     </tr>
                                 </thead>
@@ -244,12 +238,6 @@
                                                         <div class="text-xs text-gray-400" x-text="item.category_name"></div>
                                                     </div>
                                                 </div>
-                                                <div class="mt-3 flex items-center justify-between">
-                                                    <span class="text-xs text-gray-500" x-text="`Unit: ${item.unit}`"></span>
-                                                    <div class="text-xs" :class="item.stock_status === 'low' ? 'text-red-600' : 'text-green-600'">
-                                                        <span x-text="`Stok: ${item.available_stock || 0}`"></span>
-                                                    </div>
-                                                </div>
                                                 <!-- Progress indicator untuk received items -->
                                                 <div x-show="item.quantity_received > 0" class="mt-2">
                                                     <div class="flex items-center space-x-2">
@@ -257,35 +245,54 @@
                                                         <span class="text-xs text-green-600" x-text="`Diterima: ${item.quantity_received}/${item.quantity}`"></span>
                                                     </div>
                                                 </div>
+                                                <input type="hidden" :name="`items[${index}][item_id]`" :value="item.item_id">
                                             </td>
                                             <td class="px-6 py-4">
-                                                <input type="number"
-                                                    :name="`items[${index}][quantity]`"
-                                                    x-model="item.quantity"
-                                                    @input="updateItemTotal(index)"
-                                                    :min="item.quantity_received || 0"
-                                                    :class="item.quantity_received > 0 ? 'cursor-not-allowed bg-gray-100' : ''"
-                                                    :readonly="item.quantity_received > 0"
-                                                    class="w-20 px-2 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                                <input type="hidden" :name="`items[${index}][item_id]`" x-model="item.item_id">
+                                                <div class="flex items-center space-x-2">
+                                                    <input type="number" :name="`items[${index}][quantity]`"
+                                                        x-model="item.quantity" @input="updateItemTotal(index)"
+                                                        :min="item.quantity_received || 0"
+                                                        :class="item.quantity_received > 0 ? 'cursor-not-allowed bg-gray-100' : ''"
+                                                        :readonly="item.quantity_received > 0"
+                                                        min="1" required
+                                                        class="w-20 py-2 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                                    <span class="text-sm text-gray-500" x-text="item.unit"></span>
+                                                </div>
                                             </td>
                                             <td class="px-6 py-4">
-                                                <input type="number"
-                                                    :name="`items[${index}][unit_price]`"
-                                                    x-model="item.unit_price"
-                                                    @input="updateItemTotal(index)"
-                                                    step="0.01"
-                                                    class="w-28 px-2 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                            </td>
-                                            <td class="px-6 py-4">
-                                                <span class="text-sm font-medium text-gray-900" x-text="formatCurrency(item.total)"></span>
+                                                <div class="space-y-2">
+                                                    <!-- Notes Type Selection -->
+                                                    <select :name="`items[${index}][notes_type]`" x-model="item.notes_type"
+                                                        @change="updateItemNotes(index)"
+                                                        class="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                                        <option value="">Pilih jenis catatan</option>
+                                                        <option value="stock_menipis">Stock menipis</option>
+                                                        <option value="manual">Input manual</option>
+                                                    </select>
+
+                                                    <!-- Manual Notes Input (shown when manual is selected) -->
+                                                    <div x-show="item.notes_type === 'manual'">
+                                                        <input type="text" :name="`items[${index}][notes]`"
+                                                            x-model="item.notes"
+                                                            placeholder="Masukkan catatan item..."
+                                                            class="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                                    </div>
+
+                                                    <!-- Hidden input for auto notes -->
+                                                    <input x-show="item.notes_type !== 'manual'" type="hidden"
+                                                        :name="`items[${index}][notes]`" :value="item.notes">
+
+                                                    <!-- Display auto notes -->
+                                                    <div x-show="item.notes_type === 'stock_menipis'" class="text-xs text-orange-600 italic">
+                                                        Stock menipis - perlu segera dipesan
+                                                    </div>
+                                                </div>
                                             </td>
                                             <td class="px-6 py-4 text-center">
-                                                <button type="button"
-                                                    @click="removeItem(index)"
+                                                <button type="button" @click="removeItem(index)"
                                                     :disabled="item.quantity_received > 0"
                                                     :class="item.quantity_received > 0 ? 'cursor-not-allowed opacity-50' : 'hover:bg-red-100'"
-                                                    class="p-2 text-red-600 rounded-lg transition-colors">
+                                                    class="text-red-600 hover:text-red-800 p-1 rounded">
                                                     <i class="fas fa-trash text-sm"></i>
                                                 </button>
                                             </td>
@@ -294,110 +301,113 @@
 
                                     <!-- Empty state -->
                                     <tr x-show="selectedItems.length === 0">
-                                        <td colspan="5" class="px-6 py-8 text-center text-gray-500">
-                                            <i class="fas fa-box-open text-4xl text-gray-300 mb-2"></i>
-                                            <p>Belum ada item yang dipilih</p>
+                                        <td colspan="4" class="px-6 py-8 text-center">
+                                            <div class="flex flex-col items-center justify-center">
+                                                <i class="fas fa-boxes text-4xl text-gray-300 mb-4"></i>
+                                                <h3 class="text-lg font-medium text-gray-900 mb-2">Belum ada item</h3>
+                                                <p class="text-gray-500 mb-4">Tambahkan item untuk purchase order ini</p>
+                                                <button type="button" @click="showAddItemModal()"
+                                                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                                    Tambah Item Pertama
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
+                    </div>
 
-                        <!-- Items Summary -->
-                        <div x-show="selectedItems.length > 0" class="px-6 py-4 border-t border-gray-200 bg-gray-50">
-                            <div class="flex justify-between items-center">
-                                <div class="text-sm text-gray-600">
-                                    Total Items: <span class="font-medium" x-text="selectedItems.length"></span>
-                                    | Total Qty: <span class="font-medium" x-text="totalQuantity"></span>
-                                </div>
-                                <div class="text-lg font-bold text-gray-900">
-                                    Total: <span x-text="formatCurrency(totalAmount)"></span>
-                                </div>
-                            </div>
+                    <!-- Action Buttons -->
+                    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <a href="{{ route('purchase-orders.show', $purchaseOrder->po_id) }}"
+                                class="flex-1 px-6 py-3 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-all duration-200 flex items-center justify-center space-x-2">
+                                <i class="fas fa-times"></i>
+                                <span>Batal</span>
+                            </a>
+                            <button type="submit" :disabled="selectedItems.length === 0"
+                                class="flex-1 px-6 py-3 bg-gradient-to-r from-yellow-600 to-yellow-700 text-white rounded-xl hover:from-yellow-700 hover:to-yellow-800 transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i class="fas fa-save"></i>
+                                <span>Update Purchase Order</span>
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- Right Column - Summary & Actions -->
+                <!-- Right Column - Summary & Info -->
                 <div class="space-y-6">
-                    <!-- Supplier Info Card -->
+                    <!-- Summary Card -->
                     <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
                         <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
                             <h3 class="text-lg font-semibold text-gray-900 flex items-center">
-                                <i class="fas fa-truck mr-2 text-green-600"></i>
-                                Supplier Info
+                                <i class="fas fa-calculator mr-2 text-green-600"></i>
+                                Ringkasan
                             </h3>
                         </div>
                         <div class="p-6">
-                            <div x-show="selectedSupplier" class="space-y-4">
-                                <div>
-                                    <label class="text-sm font-medium text-gray-700">Nama Supplier</label>
-                                    <p class="text-sm text-gray-900 mt-1" x-text="selectedSupplier?.supplier_name"></p>
+                            <div class="space-y-4">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Total Items:</span>
+                                    <span class="font-semibold" x-text="selectedItems.length"></span>
                                 </div>
-                                <div>
-                                    <label class="text-sm font-medium text-gray-700">Kode Supplier</label>
-                                    <p class="text-sm text-gray-900 mt-1" x-text="selectedSupplier?.supplier_code"></p>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Total Quantity:</span>
+                                    <span class="font-semibold" x-text="totalQuantity"></span>
                                 </div>
-                                <div x-show="selectedSupplier?.contact_person">
-                                    <label class="text-sm font-medium text-gray-700">Contact Person</label>
-                                    <p class="text-sm text-gray-900 mt-1" x-text="selectedSupplier?.contact_person"></p>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Total Received:</span>
+                                    <span class="font-semibold text-green-600" x-text="totalReceived"></span>
                                 </div>
-                                <div x-show="selectedSupplier?.phone">
-                                    <label class="text-sm font-medium text-gray-700">Telepon</label>
-                                    <p class="text-sm text-gray-900 mt-1" x-text="selectedSupplier?.phone"></p>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Items dengan Notes:</span>
+                                    <span class="font-semibold" x-text="itemsWithNotes"></span>
                                 </div>
-                            </div>
-                            <div x-show="!selectedSupplier" class="text-center py-4">
-                                <i class="fas fa-truck text-3xl text-gray-300 mb-2"></i>
-                                <p class="text-gray-500 text-sm">Pilih supplier terlebih dahulu</p>
+                                <hr>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Order Summary -->
-                    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+                    <!-- Supplier Info -->
+                    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden" x-show="selectedSupplier">
                         <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
                             <h3 class="text-lg font-semibold text-gray-900 flex items-center">
-                                <i class="fas fa-calculator mr-2 text-blue-600"></i>
-                                Order Summary
+                                <i class="fas fa-building mr-2 text-blue-600"></i>
+                                Info Supplier
                             </h3>
                         </div>
-                        <div class="p-6 space-y-4">
-                            <div class="flex justify-between items-center">
-                                <span class="text-sm text-gray-600">Total Items</span>
-                                <span class="text-sm font-medium" x-text="selectedItems.length"></span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-sm text-gray-600">Total Quantity</span>
-                                <span class="text-sm font-medium" x-text="totalQuantity"></span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-sm text-gray-600">Total Received</span>
-                                <span class="text-sm font-medium text-green-600" x-text="totalReceived"></span>
-                            </div>
-                            <div class="border-t pt-4">
-                                <div class="flex justify-between items-center">
-                                    <span class="text-lg font-semibold text-gray-900">Grand Total</span>
-                                    <span class="text-lg font-bold text-blue-600" x-text="formatCurrency(totalAmount)"></span>
+                        <div class="p-6" x-show="selectedSupplier">
+                            <div class="space-y-3 text-sm">
+                                <div>
+                                    <span class="font-medium text-gray-700">Nama:</span>
+                                    <div class="text-gray-900" x-text="selectedSupplier?.supplier_name"></div>
+                                </div>
+                                <div>
+                                    <span class="font-medium text-gray-700">Kode:</span>
+                                    <div class="text-gray-900 font-mono" x-text="selectedSupplier?.supplier_code"></div>
+                                </div>
+                                <div x-show="selectedSupplier?.contact_person">
+                                    <span class="font-medium text-gray-700">Contact:</span>
+                                    <div class="text-gray-900" x-text="selectedSupplier?.contact_person"></div>
+                                </div>
+                                <div x-show="selectedSupplier?.phone">
+                                    <span class="font-medium text-gray-700">Telepon:</span>
+                                    <div class="text-gray-900" x-text="selectedSupplier?.phone"></div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Actions -->
-                    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-                        <div class="p-6 space-y-4">
-                            <button type="submit"
-                                class="w-full px-4 py-3 bg-gradient-to-r from-yellow-600 to-yellow-700 text-white rounded-xl hover:from-yellow-700 hover:to-yellow-800 transition-all duration-200 flex items-center justify-center space-x-2">
-                                <i class="fas fa-save"></i>
-                                <span>Update Purchase Order</span>
-                            </button>
-
-                            <a href="{{ route('purchase-orders.show', $purchaseOrder->po_id) }}"
-                                class="w-full px-4 py-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-xl hover:from-gray-700 hover:to-gray-800 transition-all duration-200 flex items-center justify-center space-x-2">
-                                <i class="fas fa-times"></i>
-                                <span>Batal</span>
-                            </a>
+                    <!-- No Supplier Selected Info -->
+                    <div class="bg-yellow-50 rounded-2xl border border-yellow-200 p-6" x-show="!selectedSupplier">
+                        <div class="flex items-start space-x-3">
+                            <i class="fas fa-info-circle text-yellow-600 mt-1"></i>
+                            <div>
+                                <h4 class="text-sm font-semibold text-yellow-900 mb-2">Supplier Belum Dipilih</h4>
+                                <p class="text-sm text-yellow-800">
+                                    Tidak masalah! Supplier dapat dipilih nanti pada tahap Finance F1 berdasarkan analisis kebutuhan dan kebijakan perusahaan.
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -405,81 +415,74 @@
         </form>
 
         <!-- Add Item Modal -->
-        <div x-show="addItemModal.show"
-             x-transition:enter="transition ease-out duration-300"
-             x-transition:enter-start="opacity-0"
-             x-transition:enter-end="opacity-100"
-             x-transition:leave="transition ease-in duration-200"
-             x-transition:leave-start="opacity-100"
-             x-transition:leave-end="opacity-0"
-             class="fixed inset-0 z-50 overflow-y-auto"
-             style="display: none;">
-            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                <!-- Background overlay -->
-                <div class="fixed inset-0 transition-opacity" @click="hideAddItemModal()">
-                    <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        <div x-show="addItemModal.show" x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0" @click.self="hideAddItemModal()"
+            @keydown.escape.window="hideAddItemModal()"
+            class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" style="display: none;">
+            <div x-show="addItemModal.show" x-transition:enter="transition ease-out duration-300 transform"
+                x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-200 transform"
+                x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                        <i class="fas fa-plus mr-2 text-blue-600"></i>
+                        Tambah Item ke Purchase Order
+                    </h3>
                 </div>
 
-                <!-- Modal panel -->
-                <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
-                    <div class="bg-white px-6 py-4 border-b border-gray-200">
-                        <div class="flex items-center justify-between">
-                            <h3 class="text-lg font-semibold text-gray-900">Pilih Item</h3>
-                            <button @click="hideAddItemModal()" class="text-gray-400 hover:text-gray-600">
-                                <i class="fas fa-times text-xl"></i>
-                            </button>
+                <div class="p-6 max-h-[70vh] overflow-y-auto">
+                    <!-- Search -->
+                    <div class="mb-4">
+                        <div class="relative">
+                            <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                            <input type="text" x-model="itemSearch" @input="filterItems()"
+                                placeholder="Cari item berdasarkan nama atau kode..."
+                                class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                         </div>
                     </div>
 
-                    <div class="p-6">
-                        <!-- Search -->
-                        <div class="mb-6">
-                            <input type="text"
-                                x-model="itemSearch"
-                                @input="filterItems()"
-                                placeholder="Cari item berdasarkan nama, kode, atau kategori..."
-                                class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        </div>
-
-                        <!-- Items Grid -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
-                            <template x-for="item in filteredItems" :key="item.item_id">
-                                <div @click="selectItemForAdd(item)"
-                                     class="item-card border border-gray-200 rounded-xl p-4 cursor-pointer hover:border-blue-500 hover:shadow-md transition-all">
-                                    <div class="flex items-start space-x-3">
-                                        <div class="w-12 h-12 bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg flex items-center justify-center">
-                                            <i class="fas fa-box text-white"></i>
-                                        </div>
-                                        <div class="flex-1 min-w-0">
-                                            <h4 class="text-sm font-medium text-gray-900 truncate" x-text="item.item_name"></h4>
-                                            <p class="text-xs text-gray-500" x-text="item.item_code"></p>
-                                            <p class="text-xs text-gray-400" x-text="item.category_name"></p>
-                                            <div class="mt-2 flex items-center justify-between">
-                                                <span class="text-xs text-gray-600" x-text="`Unit: ${item.unit}`"></span>
-                                                <div class="text-xs" :class="item.stock_status === 'low' ? 'text-red-600' : 'text-green-600'">
-                                                    <span x-text="`Stok: ${item.available_stock || 0}`"></span>
-                                                </div>
-                                            </div>
-                                        </div>
+                    <!-- Items Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <template x-for="item in filteredItems" :key="item.item_id">
+                            <div class="border border-gray-200 rounded-xl p-4 hover:border-blue-300 transition-colors cursor-pointer"
+                                @click="selectItemForAdd(item)">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-12 h-12 bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg flex items-center justify-center">
+                                        <i class="fas fa-box text-white"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="text-sm font-medium text-gray-900" x-text="item.item_name"></div>
+                                        <div class="text-sm text-gray-500" x-text="item.item_code"></div>
+                                        <div class="text-xs text-gray-400" x-text="item.category_name"></div>
                                     </div>
                                 </div>
-                            </template>
-                        </div>
-
-                        <!-- No items found -->
-                        <div x-show="filteredItems.length === 0" class="text-center py-8">
-                            <i class="fas fa-search text-4xl text-gray-300 mb-4"></i>
-                            <p class="text-gray-500">Tidak ada item yang ditemukan</p>
-                        </div>
+                                <div class="mt-3 flex items-center justify-between">
+                                    <span class="text-xs text-gray-500" x-text="`Unit: ${item.unit}`"></span>
+                                    <div class="text-xs" :class="item.stock_status === 'low' ? 'text-red-600' : 'text-green-600'">
+                                        <span x-text="`Stok: ${item.available_stock}`"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
                     </div>
 
-                    <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
-                        <div class="flex justify-end">
-                            <button type="button" @click="hideAddItemModal()"
-                                class="px-4 py-2 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-colors">
-                                Tutup
-                            </button>
-                        </div>
+                    <!-- No items found -->
+                    <div x-show="filteredItems.length === 0" class="text-center py-8">
+                        <i class="fas fa-search text-4xl text-gray-300 mb-4"></i>
+                        <p class="text-gray-500">Tidak ada item yang ditemukan</p>
+                    </div>
+                </div>
+
+                <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                    <div class="flex justify-end">
+                        <button type="button" @click="hideAddItemModal()"
+                            class="px-4 py-2 bg-gray-500 text-white rounded-xl hover:bg-gray-600 transition-colors">
+                            Tutup
+                        </button>
                     </div>
                 </div>
             </div>
@@ -542,16 +545,16 @@
                 availableItems: [],
                 suppliers: [],
 
-                get totalAmount() {
-                    return this.selectedItems.reduce((total, item) => total + (item.total || 0), 0);
-                },
-
                 get totalQuantity() {
                     return this.selectedItems.reduce((total, item) => total + (parseInt(item.quantity) || 0), 0);
                 },
 
                 get totalReceived() {
                     return this.selectedItems.reduce((total, item) => total + (parseInt(item.quantity_received) || 0), 0);
+                },
+
+                get itemsWithNotes() {
+                    return this.selectedItems.filter(item => item.notes_type && item.notes_type !== '').length;
                 },
 
                 init() {
@@ -605,10 +608,20 @@
                 },
 
                 loadExistingItems() {
-                    // Load existing PO items
+                    // Load existing PO items with notes support
                     try {
                         this.selectedItems = {!! json_encode(
                             $purchaseOrder->poDetails->map(function ($detail) {
+                                // Detect notes type from existing notes
+                                $notesType = '';
+                                $notes = $detail->notes ?? '';
+
+                                if (str_contains(strtolower($notes), 'stock menipis')) {
+                                    $notesType = 'stock_menipis';
+                                } elseif (!empty($notes)) {
+                                    $notesType = 'manual';
+                                }
+
                                 return [
                                     'item_id' => $detail->item_id,
                                     'item_name' => $detail->item->item_name,
@@ -617,8 +630,8 @@
                                     'unit' => $detail->item->unit,
                                     'quantity' => $detail->quantity_ordered,
                                     'quantity_received' => $detail->quantity_received,
-                                    'unit_price' => floatval($detail->unit_price),
-                                    'total' => floatval($detail->total_price),
+                                    'notes_type' => $notesType,
+                                    'notes' => $notes,
                                 ];
                             }),
                         ) !!};
@@ -676,7 +689,11 @@
                     // Check if item already exists
                     const existingIndex = this.selectedItems.findIndex(item => item.item_id === itemId);
                     if (existingIndex !== -1) {
-                        // Increase quantity if already exists
+                        // Increase quantity if already exists and not received
+                        if (this.selectedItems[existingIndex].quantity_received > 0) {
+                            this.showToast('Item yang sudah diterima tidak dapat ditambah quantity-nya', 'error');
+                            return;
+                        }
                         this.selectedItems[existingIndex].quantity = parseInt(this.selectedItems[existingIndex].quantity) + 1;
                         this.updateItemTotal(existingIndex);
                         this.showToast('Quantity item ditambah', 'info');
@@ -690,8 +707,8 @@
                             unit: unit,
                             quantity: 1,
                             quantity_received: 0,
-                            unit_price: 0,
-                            total: 0
+                            notes_type: '',
+                            notes: ''
                         });
                         this.showToast('Item berhasil ditambahkan', 'success');
                     }
@@ -711,19 +728,19 @@
                 },
 
                 updateItemTotal(index) {
-                    const item = this.selectedItems[index];
-                    const quantity = parseFloat(item.quantity) || 0;
-                    const unitPrice = parseFloat(item.unit_price) || 0;
-                    item.total = quantity * unitPrice;
+                    // No price calculation needed since we're hiding pricing
+                    // This function is kept for compatibility but does nothing
                 },
 
-                formatCurrency(amount) {
-                    return new Intl.NumberFormat('id-ID', {
-                        style: 'currency',
-                        currency: 'IDR',
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: 0
-                    }).format(amount || 0);
+                updateItemNotes(index) {
+                    const item = this.selectedItems[index];
+                    if (item.notes_type === 'stock_menipis') {
+                        item.notes = 'Stock menipis - perlu segera dipesan';
+                    } else if (item.notes_type === 'manual') {
+                        item.notes = ''; // Reset untuk manual input
+                    } else {
+                        item.notes = '';
+                    }
                 },
 
                 showToast(message, type = 'info') {
@@ -750,11 +767,6 @@
 
                 // Validation before submit
                 validateForm() {
-                    if (!this.selectedSupplierId) {
-                        this.showToast('Supplier harus dipilih', 'error');
-                        return false;
-                    }
-
                     if (this.selectedItems.length === 0) {
                         this.showToast('Minimal harus ada 1 item', 'error');
                         return false;
@@ -771,10 +783,6 @@
                             this.showToast(
                                 `Quantity ${item.item_name} tidak boleh kurang dari yang sudah diterima (${item.quantity_received})`,
                                 'error');
-                            return false;
-                        }
-                        if (!item.unit_price || item.unit_price < 0) {
-                            this.showToast(`Harga ${item.item_name} harus diisi`, 'error');
                             return false;
                         }
                     }
@@ -803,7 +811,7 @@
             // Initialize Select2 for better UX
             if (typeof $ !== 'undefined' && $.fn.select2) {
                 $('#supplier_id').select2({
-                    placeholder: 'Pilih Supplier',
+                    placeholder: 'Pilih supplier atau kosongkan untuk dipilih di Finance F1',
                     allowClear: true,
                     width: '100%'
                 }).on('change', function() {
@@ -873,16 +881,6 @@
             cursor: not-allowed !important;
         }
 
-        /* Lock icon styling */
-        .fa-lock {
-            opacity: 0.7;
-        }
-
-        /* Progress indicator improvements */
-        .progress-indicator {
-            transition: all 0.3s ease;
-        }
-
         /* Responsive table improvements */
         @media (max-width: 768px) {
             .table-responsive {
@@ -896,90 +894,6 @@
             .table-responsive input {
                 min-width: 60px;
             }
-        }
-
-        /* Highlight changes */
-        .item-changed {
-            background-color: rgba(59, 130, 246, 0.05);
-            border-left: 3px solid #3b82f6;
-        }
-
-        /* Warning states */
-        .item-warning {
-            background-color: rgba(245, 158, 11, 0.05);
-            border-left: 3px solid #f59e0b;
-        }
-
-        /* Modal improvements */
-        .modal-backdrop {
-            backdrop-filter: blur(4px);
-        }
-
-        /* Toast improvements */
-        .toast-enter {
-            animation: toast-slide-in 0.3s ease-out;
-        }
-
-        @keyframes toast-slide-in {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-
-        /* Form field focus improvements */
-        .form-input:focus {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-
-        /* Button hover improvements */
-        .btn-primary:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        }
-
-        /* Table row hover improvements */
-        .table-row:hover {
-            background-color: rgba(59, 130, 246, 0.02);
-        }
-
-        /* Received items styling */
-        .item-received {
-            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%);
-            border-left: 4px solid #22c55e;
-        }
-
-        /* Price input focus */
-        input[type="number"]:focus {
-            background-color: #fff;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-
-        /* Status indicators */
-        .status-badge {
-            position: relative;
-            overflow: hidden;
-        }
-
-        .status-badge::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-            transition: left 0.5s;
-        }
-
-        .status-badge:hover::before {
-            left: 100%;
         }
     </style>
 @endpush

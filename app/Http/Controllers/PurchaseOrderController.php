@@ -602,7 +602,7 @@ class PurchaseOrderController extends Controller
         }
     }
 
-    // Update PO - Modified: Hide price from frontend, default to 0
+    // Update PO - Modified: Hide price from frontend, default to 0, support notes
     public function update(Request $request, PurchaseOrder $purchaseOrder)
     {
         if (!$this->canUserAccess('edit_logistic', $purchaseOrder)) {
@@ -617,8 +617,17 @@ class PurchaseOrderController extends Controller
             'items' => 'required|array|min:1',
             'items.*.item_id' => 'required|string|exists:items,item_id',
             'items.*.quantity' => 'required|integer|min:1',
-            // ✅ REMOVED: unit_price validation
-            'items.*.notes' => 'nullable|string',
+            // ✅ NEW: Notes validation
+            'items.*.notes_type' => 'nullable|string|in:stock_menipis,manual',
+            'items.*.notes' => 'nullable|string|max:255',
+        ], [
+            'supplier_id.exists' => 'Supplier yang dipilih tidak valid.',
+            'po_date.required' => 'Tanggal PO wajib diisi.',
+            'items.required' => 'Items wajib diisi.',
+            'items.min' => 'Minimal 1 item harus dipilih.',
+            'items.*.quantity.min' => 'Quantity harus minimal 1.',
+            'items.*.notes_type.in' => 'Jenis catatan harus stock_menipis atau manual.',
+            'items.*.notes.max' => 'Notes item maksimal 255 karakter.',
         ]);
 
         if ($validator->fails()) {
@@ -701,12 +710,38 @@ class PurchaseOrderController extends Controller
 
             $purchaseOrder->update($updateData);
 
+            // ✅ PRESERVE RECEIVED QUANTITIES: Get existing received quantities before deletion
+            $existingReceived = [];
+            foreach ($purchaseOrder->poDetails as $detail) {
+                $existingReceived[$detail->item_id] = $detail->quantity_received;
+            }
+
             // Delete existing details
             $purchaseOrder->poDetails()->delete();
 
-            // Create new details - ✅ PRICE ALWAYS 0
+            // ✅ Create new details with NOTES SUPPORT and preserve received quantities
             foreach ($request->items as $itemData) {
                 $detailId = PoDetail::generateDetailId();
+
+                // ✅ NEW: PROCESS NOTES berdasarkan type
+                $finalNotes = '';
+                if (isset($itemData['notes_type']) && !empty($itemData['notes_type'])) {
+                    if ($itemData['notes_type'] === 'stock_menipis') {
+                        $finalNotes = 'Stock menipis - perlu segera dipesan';
+                    } elseif ($itemData['notes_type'] === 'manual' && !empty($itemData['notes'])) {
+                        $finalNotes = trim($itemData['notes']);
+                    }
+                }
+
+                // ✅ PRESERVE: Keep existing received quantity if item exists
+                $quantityReceived = $existingReceived[$itemData['item_id']] ?? 0;
+
+                // ✅ VALIDATION: Ensure new quantity is not less than received
+                if ($itemData['quantity'] < $quantityReceived) {
+                    throw new \Exception(
+                        "Quantity untuk item {$itemData['item_id']} tidak boleh kurang dari yang sudah diterima ({$quantityReceived})"
+                    );
+                }
 
                 PoDetail::create([
                     'po_detail_id' => $detailId,
@@ -715,10 +750,22 @@ class PurchaseOrderController extends Controller
                     'quantity_ordered' => $itemData['quantity'],
                     'unit_price' => 0, // ✅ DEFAULT: Always 0
                     'total_price' => 0, // ✅ DEFAULT: Always 0
-                    'quantity_received' => 0,
-                    'notes' => $itemData['notes'] ?? null,
+                    'quantity_received' => $quantityReceived, // ✅ PRESERVE: Keep existing received
+                    'notes' => $finalNotes, // ✅ NEW: Support for item-specific notes
                 ]);
             }
+
+            // ✅ NEW: Calculate statistics untuk logging
+            $totalItems = count($request->items);
+            $itemsWithNotes = collect($request->items)->filter(function ($item) {
+                return !empty($item['notes_type']);
+            })->count();
+            $stockMenipisItems = collect($request->items)->filter(function ($item) {
+                return isset($item['notes_type']) && $item['notes_type'] === 'stock_menipis';
+            })->count();
+            $manualNotesItems = collect($request->items)->filter(function ($item) {
+                return isset($item['notes_type']) && $item['notes_type'] === 'manual';
+            })->count();
 
             // ✅ ENHANCED ACTIVITY LOGGING
             $activityData = [
@@ -727,7 +774,11 @@ class PurchaseOrderController extends Controller
                 'old_workflow_status' => $oldData['workflow_status'],
                 'new_workflow_status' => $newWorkflowStatus,
                 'total_amount' => 0, // No pricing
-                'note' => 'PO updated without pricing - quantities only'
+                'total_items' => $totalItems,
+                'items_with_notes' => $itemsWithNotes,
+                'stock_menipis_items' => $stockMenipisItems,
+                'manual_notes_items' => $manualNotesItems,
+                'note' => 'PO updated without pricing - quantities only with notes support'
             ];
 
             if (!$wasAutoApproval && $isAutoApproval) {
@@ -758,19 +809,35 @@ class PurchaseOrderController extends Controller
 
             DB::commit();
 
-            // ✅ CONDITIONAL SUCCESS MESSAGE
+            // ✅ ENHANCED CONDITIONAL SUCCESS MESSAGE with notes info
+            $successMessage = '';
             if (!$wasAutoApproval && $isAutoApproval) {
-                return redirect()->route('purchase-orders.show', $purchaseOrder)
-                    ->with('success', 'PO berhasil diupdate! 🚀 Supplier diubah ke SUP001 - PO otomatis disetujui!');
+                $successMessage = 'PO berhasil diupdate! 🚀 Supplier diubah ke SUP001 - PO otomatis disetujui!';
             } elseif ($wasAutoApproval && !$isAutoApproval) {
-                return redirect()->route('purchase-orders.show', $purchaseOrder)
-                    ->with('success', 'PO berhasil diupdate! Supplier diubah dari SUP001 - PO kembali ke status Draft Logistic.');
+                $successMessage = 'PO berhasil diupdate! Supplier diubah dari SUP001 - PO kembali ke status Draft Logistic.';
             } else {
-                return redirect()->route('purchase-orders.show', $purchaseOrder)
-                    ->with('success', 'Purchase Order berhasil diupdate!');
+                $successMessage = 'Purchase Order berhasil diupdate!';
             }
+
+            // Add notes info to success message
+            if ($itemsWithNotes > 0) {
+                $successMessage .= " (${itemsWithNotes} item dengan catatan)";
+            }
+
+            return redirect()->route('purchase-orders.show', $purchaseOrder)
+                ->with('success', $successMessage);
         } catch (\Exception $e) {
             DB::rollback();
+
+            // ✅ ENHANCED ERROR LOGGING
+            \Log::error('Failed to update Purchase Order', [
+                'po_id' => $purchaseOrder->po_id,
+                'user_id' => Auth::user()->user_id,
+                'error' => $e->getMessage(),
+                'request_data' => $request->except(['_token', '_method']),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return back()
                 ->withInput()
                 ->with('error', 'Gagal mengupdate PO: ' . $e->getMessage());
