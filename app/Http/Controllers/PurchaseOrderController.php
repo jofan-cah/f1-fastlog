@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class PurchaseOrderController extends Controller
 {
@@ -426,14 +427,18 @@ class PurchaseOrderController extends Controller
             'items' => 'required|array|min:1',
             'items.*.item_id' => 'required|string|exists:items,item_id',
             'items.*.quantity' => 'required|integer|min:1',
-            // ✅ REMOVED: unit_price validation (tidak ada di form)
-            'items.*.notes' => 'nullable|string',
+            // ✅ NEW: Validation untuk notes
+            'items.*.notes_type' => 'nullable|string|in:stock_menipis,manual',
+            'items.*.notes' => 'nullable|string|max:255',
         ], [
             'po_number.required' => 'Nomor PO wajib diisi.',
             'po_number.unique' => 'Nomor PO sudah digunakan.',
             'po_date.required' => 'Tanggal PO wajib diisi.',
             'items.required' => 'Items wajib diisi.',
             'items.min' => 'Minimal 1 item harus dipilih.',
+            // ✅ NEW: Error messages untuk notes
+            'items.*.notes_type.in' => 'Jenis catatan harus stock_menipis atau manual.',
+            'items.*.notes.max' => 'Notes item maksimal 255 karakter.',
         ]);
 
         if ($validator->fails()) {
@@ -500,9 +505,19 @@ class PurchaseOrderController extends Controller
 
             $po = PurchaseOrder::create($createData);
 
-            // Create PO Details - ✅ PRICE ALWAYS 0
+            // Create PO Details - ✅ PRICE ALWAYS 0 + NEW NOTES SUPPORT
             foreach ($request->items as $itemData) {
                 $detailId = PoDetail::generateDetailId();
+
+                // ✅ NEW: PROCESS NOTES berdasarkan type
+                $finalNotes = '';
+                if (isset($itemData['notes_type']) && !empty($itemData['notes_type'])) {
+                    if ($itemData['notes_type'] === 'stock_menipis') {
+                        $finalNotes = 'Stock menipis - perlu segera dipesan';
+                    } elseif ($itemData['notes_type'] === 'manual' && !empty($itemData['notes'])) {
+                        $finalNotes = trim($itemData['notes']);
+                    }
+                }
 
                 PoDetail::create([
                     'po_detail_id' => $detailId,
@@ -512,39 +527,75 @@ class PurchaseOrderController extends Controller
                     'unit_price' => 0, // ✅ DEFAULT: Always 0 (no price from frontend)
                     'total_price' => 0, // ✅ DEFAULT: Always 0 (quantity * 0)
                     'quantity_received' => 0,
-                    'notes' => $itemData['notes'] ?? null,
+                    'notes' => $finalNotes, // ✅ NEW: Support for item-specific notes
                 ]);
             }
 
             // ✅ NO NEED TO UPDATE: total_amount tetap 0
 
-            // ✅ ACTIVITY LOGGING
+            // ✅ NEW: Calculate statistics untuk logging
+            $totalItems = count($request->items);
+            $itemsWithNotes = collect($request->items)->filter(function ($item) {
+                return !empty($item['notes_type']);
+            })->count();
+            $stockMenipisItems = collect($request->items)->filter(function ($item) {
+                return isset($item['notes_type']) && $item['notes_type'] === 'stock_menipis';
+            })->count();
+            $manualNotesItems = collect($request->items)->filter(function ($item) {
+                return isset($item['notes_type']) && $item['notes_type'] === 'manual';
+            })->count();
+
+            // ✅ ENHANCED ACTIVITY LOGGING
             if ($isAutoApproval) {
                 ActivityLog::logActivity('purchase_orders', $po->po_id, 'create_auto_approved', null, [
                     'supplier_id' => $supplierId,
                     'auto_approval_reason' => 'Trusted supplier SUP001 - automatic approval',
                     'workflow_status' => 'approved',
                     'total_amount' => 0, // No price tracking
-                    'note' => 'PO created without pricing - quantities only'
+                    'total_items' => $totalItems,
+                    'items_with_notes' => $itemsWithNotes,
+                    'stock_menipis_items' => $stockMenipisItems,
+                    'manual_notes_items' => $manualNotesItems,
+                    'note' => 'PO created without pricing - quantities only with notes support'
                 ]);
             } else {
                 ActivityLog::logActivity('purchase_orders', $po->po_id, 'create', null, array_merge($po->toArray(), [
-                    'note' => 'PO created without pricing - quantities only'
+                    'total_items' => $totalItems,
+                    'items_with_notes' => $itemsWithNotes,
+                    'stock_menipis_items' => $stockMenipisItems,
+                    'manual_notes_items' => $manualNotesItems,
+                    'note' => 'PO created without pricing - quantities only with notes support'
                 ]));
             }
 
             DB::commit();
 
-            // ✅ SUCCESS MESSAGE
+            // ✅ ENHANCED SUCCESS MESSAGE with notes info
+            $successMessage = 'Purchase Order berhasil dibuat!';
             if ($isAutoApproval) {
-                return redirect()->route('purchase-orders.show', $po)
-                    ->with('success', 'Purchase Order berhasil dibuat! 🚀 PO untuk SUP001 telah otomatis disetujui dan siap dikirim!');
+                $successMessage .= ' 🚀 PO untuk SUP001 telah otomatis disetujui dan siap dikirim!';
             } else {
-                return redirect()->route('purchase-orders.show', $po)
-                    ->with('success', 'Purchase Order berhasil dibuat! Status: Draft Logistic');
+                $successMessage .= ' Status: Draft Logistic';
             }
+
+            // Add notes info to success message
+            if ($itemsWithNotes > 0) {
+                $successMessage .= " (${itemsWithNotes} item dengan catatan)";
+            }
+
+            return redirect()->route('purchase-orders.show', $po)
+                ->with('success', $successMessage);
         } catch (\Exception $e) {
             DB::rollback();
+
+            // ✅ ENHANCED ERROR LOGGING
+            Log::error('Failed to create Purchase Order', [
+                'user_id' => Auth::user()->user_id,
+                'error' => $e->getMessage(),
+                'request_data' => $request->except(['_token']),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return back()
                 ->withInput()
                 ->with('error', 'Gagal membuat PO: ' . $e->getMessage());

@@ -40,7 +40,8 @@
         <!-- Page Header -->
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div class="flex items-center space-x-4">
-                <div class="w-16 h-16 bg-gradient-to-br from-red-600 to-red-700 rounded-2xl flex items-center justify-center">
+                <div
+                    class="w-16 h-16 bg-gradient-to-br from-red-600 to-red-700 rounded-2xl flex items-center justify-center">
                     <i class="fas fa-plus text-white text-2xl"></i>
                 </div>
                 <div>
@@ -149,7 +150,8 @@
                                     <select id="supplier_id" name="supplier_id" x-model="selectedSupplierId"
                                         @change="onSupplierChange()"
                                         class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all @error('supplier_id') border-red-500 @enderror">
-                                        <option value="">Pilih supplier atau kosongkan untuk dipilih di Finance F1</option>
+                                        <option value="">Pilih supplier atau kosongkan untuk dipilih di Finance F1
+                                        </option>
                                         @foreach ($suppliers as $supplier)
                                             <option value="{{ $supplier->supplier_id }}"
                                                 {{ old('supplier_id', $selectedSupplier?->supplier_id) == $supplier->supplier_id ? 'selected' : '' }}>
@@ -184,8 +186,7 @@
                                         Tanggal Diharapkan
                                     </label>
                                     <input type="date" id="expected_date" name="expected_date"
-                                        value="{{ old('expected_date') }}"
-                                        min="{{ now()->addDay()->format('Y-m-d') }}"
+                                        value="{{ old('expected_date') }}" min="{{ now()->addDay()->format('Y-m-d') }}"
                                         class="w-full py-3 px-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all @error('expected_date') border-red-500 @enderror">
                                     @error('expected_date')
                                         <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
@@ -209,6 +210,8 @@
                     </div>
 
                     <!-- Items Card -->
+
+                    <!-- Items Card -->
                     <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
                         <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
                             <div class="flex items-center justify-between">
@@ -229,10 +232,14 @@
                             <table class="w-full">
                                 <thead class="bg-gray-50 border-b">
                                     <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
-
-                                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Aksi</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes
+                                        </th>
+                                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Aksi
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-200">
@@ -240,16 +247,20 @@
                                         <tr class="hover:bg-gray-50">
                                             <td class="px-6 py-4">
                                                 <div class="flex items-center space-x-3">
-                                                    <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg flex items-center justify-center">
+                                                    <div
+                                                        class="w-10 h-10 bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg flex items-center justify-center">
                                                         <i class="fas fa-box text-white text-sm"></i>
                                                     </div>
                                                     <div>
-                                                        <div class="text-sm font-medium text-gray-900" x-text="item.item_name"></div>
+                                                        <div class="text-sm font-medium text-gray-900"
+                                                            x-text="item.item_name"></div>
                                                         <div class="text-sm text-gray-500" x-text="item.item_code"></div>
-                                                        <div class="text-xs text-gray-400" x-text="item.category_name"></div>
+                                                        <div class="text-xs text-gray-400" x-text="item.category_name">
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <input type="hidden" :name="`items[${index}][item_id]`" :value="item.item_id">
+                                                <input type="hidden" :name="`items[${index}][item_id]`"
+                                                    :value="item.item_id">
                                             </td>
                                             <td class="px-6 py-4">
                                                 <div class="flex items-center space-x-2">
@@ -260,7 +271,35 @@
                                                     <span class="text-sm text-gray-500" x-text="item.unit"></span>
                                                 </div>
                                             </td>
+                                            <td class="px-6 py-4">
+                                                <div class="space-y-2">
+                                                    <!-- Notes Type Selection -->
+                                                    <select :name="`items[${index}][notes_type]`" x-model="item.notes_type"
+                                                        @change="updateItemNotes(index)"
+                                                        class="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                                        <option value="">Pilih jenis catatan</option>
+                                                        <option value="stock_menipis">Stock menipis</option>
+                                                        <option value="manual">Input manual</option>
+                                                    </select>
 
+                                                    <!-- Manual Notes Input (shown when manual is selected) -->
+                                                    <div x-show="item.notes_type === 'manual'">
+                                                        <input type="text" :name="`items[${index}][notes]`"
+                                                            x-model="item.notes" placeholder="Masukkan catatan item..."
+                                                            class="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                                    </div>
+
+                                                    <!-- Hidden input for auto notes -->
+                                                    <input x-show="item.notes_type !== 'manual'" type="hidden"
+                                                        :name="`items[${index}][notes]`" :value="item.notes">
+
+                                                    <!-- Display auto notes -->
+                                                    <div x-show="item.notes_type === 'stock_menipis'"
+                                                        class="text-xs text-orange-600 italic">
+                                                        Stock menipis - perlu segera dipesan
+                                                    </div>
+                                                </div>
+                                            </td>
                                             <td class="px-6 py-4 text-center">
                                                 <button type="button" @click="removeItem(index)"
                                                     class="text-red-600 hover:text-red-800 p-1 rounded">
@@ -285,9 +324,6 @@
                                         </td>
                                     </tr>
                                 </tbody>
-
-                                <!-- Total Footer -->
-
                             </table>
                         </div>
                     </div>
@@ -339,7 +375,8 @@
                     </div>
 
                     <!-- Supplier Info -->
-                    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden" x-show="selectedSupplier">
+                    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
+                        x-show="selectedSupplier">
                         <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
                             <h3 class="text-lg font-semibold text-gray-900 flex items-center">
                                 <i class="fas fa-building mr-2 text-blue-600"></i>
@@ -375,7 +412,8 @@
                             <div>
                                 <h4 class="text-sm font-semibold text-yellow-900 mb-2">Supplier Belum Dipilih</h4>
                                 <p class="text-sm text-yellow-800">
-                                    Tidak masalah! Supplier dapat dipilih nanti pada tahap Finance F1 berdasarkan analisis kebutuhan dan kebijakan perusahaan.
+                                    Tidak masalah! Supplier dapat dipilih nanti pada tahap Finance F1 berdasarkan analisis
+                                    kebutuhan dan kebijakan perusahaan.
                                 </p>
                             </div>
                         </div>
@@ -399,9 +437,11 @@
                                         @click="quickAddItem('{{ $item->item_id }}', '{{ addslashes($item->item_name) }}', '{{ $item->item_code }}', '{{ $item->category->category_name ?? 'No Category' }}', '{{ $item->unit }}')">
                                         <div class="flex items-center justify-between">
                                             <div class="flex-1">
-                                                <div class="text-sm font-medium text-gray-900">{{ $item->item_name }}</div>
+                                                <div class="text-sm font-medium text-gray-900">{{ $item->item_name }}
+                                                </div>
                                                 <div class="text-xs text-gray-500">{{ $item->item_code }}</div>
-                                                <div class="text-xs text-red-600">Stok: {{ $stockInfo['available'] }}/{{ $item->min_stock }}</div>
+                                                <div class="text-xs text-red-600">Stok:
+                                                    {{ $stockInfo['available'] }}/{{ $item->min_stock }}</div>
                                             </div>
                                             <button type="button" class="text-blue-600 hover:text-blue-800">
                                                 <i class="fas fa-plus"></i>
@@ -479,7 +519,8 @@
                             <div class="border border-gray-200 rounded-xl p-4 hover:border-blue-300 transition-colors cursor-pointer"
                                 @click="selectItemForAdd(item)">
                                 <div class="flex items-center space-x-3">
-                                    <div class="w-12 h-12 bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg flex items-center justify-center">
+                                    <div
+                                        class="w-12 h-12 bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg flex items-center justify-center">
                                         <i class="fas fa-box text-white"></i>
                                     </div>
                                     <div class="flex-1">
@@ -490,7 +531,8 @@
                                 </div>
                                 <div class="mt-3 flex items-center justify-between">
                                     <span class="text-xs text-gray-500" x-text="`Unit: ${item.unit}`"></span>
-                                    <div class="text-xs" :class="item.stock_status === 'low' ? 'text-red-600' : 'text-green-600'">
+                                    <div class="text-xs"
+                                        :class="item.stock_status === 'low' ? 'text-red-600' : 'text-green-600'">
                                         <span x-text="`Stok: ${item.available_stock}`"></span>
                                     </div>
                                 </div>
@@ -562,10 +604,21 @@
     <script>
         const availableItems = {!! json_encode($availableItems ?? []) !!};
         const suppliers = {!! json_encode($suppliersJson ?? []) !!};
+        // Tambahkan fungsi ini ke Alpine.js component
+        function updateItemNotes(index) {
+            const item = this.selectedItems[index];
+            if (item.notes_type === 'stock_menipis') {
+                item.notes = 'Stock menipis - perlu segera dipesan';
+            } else if (item.notes_type === 'manual') {
+                item.notes = ''; // Reset untuk manual input
+            } else {
+                item.notes = '';
+            }
+        }
 
         function purchaseOrderCreate() {
             return {
-                selectedSupplierId: '{{ old("supplier_id", $selectedSupplier?->supplier_id) }}',
+                selectedSupplierId: '{{ old('supplier_id', $selectedSupplier?->supplier_id) }}',
                 selectedSupplier: null,
                 selectedItems: [],
                 addItemModal: {
@@ -604,11 +657,14 @@
                     this.updateSelectedSupplier();
                 },
 
+
+
                 autoAddLowStockItems() {
                     // Auto-add first 5 low stock items for quick setup
                     const lowStockItems = this.availableItems.filter(item => item.stock_status === 'low').slice(0, 5);
                     lowStockItems.forEach(item => {
-                        this.quickAddItem(item.item_id, item.item_name, item.item_code, item.category_name, item.unit);
+                        this.quickAddItem(item.item_id, item.item_name, item.item_code, item.category_name, item
+                            .unit);
                     });
                 },
 
@@ -648,16 +704,19 @@
                     this.addItem(itemId, itemName, itemCode, categoryName, unit);
                 },
 
-                addItem(itemId, itemName, itemCode, categoryName, unit) {
-                    // Check if item already exists
+                // Update fungsi addItem untuk include notes properties
+                addItem(itemId, itemName, itemCode, categoryName, unit, isLowStock = false) {
                     const existingIndex = this.selectedItems.findIndex(item => item.item_id === itemId);
                     if (existingIndex !== -1) {
-                        // Increase quantity if already exists
-                        this.selectedItems[existingIndex].quantity = parseInt(this.selectedItems[existingIndex].quantity) + 1;
+                        this.selectedItems[existingIndex].quantity = parseInt(this.selectedItems[existingIndex].quantity) +
+                            1;
                         this.updateItemTotal(existingIndex);
                         this.showToast('Quantity item ditambah', 'info');
                     } else {
-                        // Add new item
+                        // Set default notes untuk low stock items
+                        const notesType = isLowStock ? 'stock_menipis' : '';
+                        const notes = isLowStock ? 'Stock menipis - perlu segera dipesan' : '';
+
                         this.selectedItems.push({
                             item_id: itemId,
                             item_name: itemName,
@@ -665,11 +724,18 @@
                             category_name: categoryName,
                             unit: unit,
                             quantity: 1,
-                            notes: ''
+                            notes_type: notesType,
+                            notes: notes
                         });
                         this.showToast('Item berhasil ditambahkan', 'success');
                     }
                 },
+
+                // Tambahkan computed property untuk summary
+                get itemsWithNotes() {
+                    return this.selectedItems.filter(item => item.notes_type && item.notes_type !== '').length;
+                },
+
 
                 removeItem(index) {
                     const item = this.selectedItems[index];
@@ -772,6 +838,7 @@
                 opacity: 0;
                 transform: translateY(20px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);

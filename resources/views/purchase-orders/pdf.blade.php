@@ -79,7 +79,7 @@
 
         table.items th {
             background: #f2f2f2;
-            text-align: left;
+            text-align: center;
             font-weight: bold;
         }
 
@@ -194,6 +194,31 @@
             font-weight: bold;
             margin-bottom: 5px;
         }
+
+        /* ✅ NEW: Style untuk notes dalam tabel */
+        .item-notes {
+            font-size: 10px;
+            color: #666;
+            font-style: italic;
+            padding: 2px 4px;
+            background-color: #f8f9fa;
+            border-radius: 3px;
+            display: inline-block;
+            max-width: 120px;
+            word-wrap: break-word;
+        }
+
+        .notes-stock-menipis {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .notes-manual {
+            background-color: #e7f3ff;
+            color: #004085;
+            border: 1px solid #bee5eb;
+        }
     </style>
 </head>
 
@@ -243,11 +268,12 @@
             <thead>
                 <tr>
                     <th style="width: 5%">No</th>
-                    <th style="width: 40%">Nama Item</th>
-                    <th class="text-center" >Qty Stock</th>
-                    <th class="text-center" >Qty Tersedia</th>
-                    <th class="text-center" >Qty Order</th>
-                    <th class="text-center" >Unit</th>
+                    <th style="width: 35%">Nama Item</th>
+                    <th class="text-center" style="width: 10%">Stock Gudang</th>
+                    <th class="text-center" style="width: 10%">Stock Distribusi</th>
+                    <th class="text-center" style="width: 10%">Jumlah Order</th>
+                    <th class="text-center" style="width: 8%">Satuan</th>
+                    <th class="text-center" style="width: 22%">Reason</th>
                 </tr>
             </thead>
             <tbody>
@@ -261,11 +287,24 @@
                                 <div class="item-code">Category: {{ $detail->item->category->category_name }}</div>
                             @endif
                         </td>
-                        <td class="text-center">{{ $detail->item->qty_stock ?? 0 }}</td> <!-- Qty Stock -->
-                        <td class="text-center">{{ $detail->item->qty_ready ?? 0 }}</td> <!-- Qty Siap Pakai -->
+                        <td class="text-center">{{ $detail->item->qty_stock ?? 0 }}</td>
+                        <td class="text-center">{{ $detail->item->qty_ready ?? 0 }}</td>
                         <td class="text-center">{{ number_format($detail->quantity_ordered, 0) }}</td>
-                        <!-- Qty Order -->
-                        <td class="text-center">{{ $detail->item->unit }}</td> <!-- Unit -->
+                        <td class="text-center">{{ $detail->item->unit }}</td>
+                        <td class="text-center">
+                            @if ($detail->notes)
+                                @php
+                                    // Detect jenis notes berdasarkan content
+                                    $isStockMenipis = str_contains(strtolower($detail->notes), 'stock menipis');
+                                    $cssClass = $isStockMenipis ? 'notes-stock-menipis' : 'notes-manual';
+                                @endphp
+                                <span class="item-notes {{ $cssClass }}">
+                                    {{ $detail->notes }}
+                                </span>
+                            @else
+                                <span class="text-center" style="color: #999;">-</span>
+                            @endif
+                        </td>
                     </tr>
                 @endforeach
             </tbody>
@@ -282,6 +321,10 @@
                     <td class="label">Total Quantity:</td>
                     <td class="value">{{ number_format($purchaseOrder->poDetails->sum('quantity_ordered'), 0) }}</td>
                 </tr>
+                <tr>
+                    <td class="label">Items with Notes:</td>
+                    <td class="value">{{ $purchaseOrder->poDetails->whereNotNull('notes')->where('notes', '!=', '')->count() }}</td>
+                </tr>
             </table>
         </div>
         <br>
@@ -291,10 +334,12 @@
         @if ($purchaseOrder->notes)
             <!-- Notes -->
             <div class="notes-section">
-                <div class="notes-title">Catatan:</div>
+                <div class="notes-title">Catatan Purchase Order:</div>
                 <div>{{ $purchaseOrder->notes }}</div>
             </div>
         @endif
+
+
 
         <!-- Signatures -->
         <table class="signatures">
