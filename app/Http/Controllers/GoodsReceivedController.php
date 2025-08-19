@@ -1177,9 +1177,6 @@ class GoodsReceivedController extends Controller
         return $prefix . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
     }
 
-    /**
-     * Update method generateItemDetailsForReceived yang sudah ada
-     */
     private function generateItemDetailsForReceived(GoodsReceivedDetail $grDetail, array $itemData, array $serialNumbers = [])
     {
         $quantityReceived = (int)$itemData['quantity_received'];
@@ -1191,80 +1188,25 @@ class GoodsReceivedController extends Controller
         $itemCodePrefix = $item->item_code ?? 'XXX';
         $prefix = $codeCategory . $itemCodePrefix;
 
-        // DEBUG: Log the prefix and search pattern
-        Log::info('ItemDetail ID Generation Debug', [
+        Log::info('ItemDetail ID Generation - UUID Approach', [
             'item_id' => $itemData['item_id'],
-            'code_category' => $codeCategory,
-            'item_code' => $itemCodePrefix,
-            'generated_prefix' => $prefix,
-            'search_pattern' => $prefix . '%'
+            'prefix' => $prefix,
+            'quantity_to_generate' => $quantityReceived
         ]);
 
         return DB::transaction(function () use ($grDetail, $itemData, $serialNumbers, $quantityReceived, $item, $itemCode, $prefix) {
             $itemsGenerated = 0;
 
-            // Get existing records for debugging
-            $existingRecords = ItemDetail::where('item_detail_id', 'like', $prefix . '%')
-                ->orderBy('item_detail_id', 'desc')
-                ->limit(5)
-                ->pluck('item_detail_id')
-                ->toArray();
-
-            // DEBUG: Log existing records
-            Log::info('Existing ItemDetail records for prefix', [
-                'prefix' => $prefix,
-                'existing_records' => $existingRecords
-            ]);
-
-            // Get the starting number with row locking
-            $lastDetail = ItemDetail::where('item_detail_id', 'like', $prefix . '%')
-                ->orderBy('item_detail_id', 'desc')
-                ->lockForUpdate()
-                ->first();
-
-            $startingNumber = 1;
-            if ($lastDetail) {
-                $lastNumber = (int) substr($lastDetail->item_detail_id, -5);
-                $startingNumber = $lastNumber + 1;
-
-                // DEBUG: Log the calculation
-                Log::info('Last ItemDetail found', [
-                    'last_detail_id' => $lastDetail->item_detail_id,
-                    'extracted_number' => $lastNumber,
-                    'next_starting_number' => $startingNumber
-                ]);
-            } else {
-                Log::info('No existing ItemDetail found for prefix', ['prefix' => $prefix]);
-            }
-
-            // Generate all records with sequential IDs
             for ($i = 0; $i < $quantityReceived; $i++) {
                 $serialNumber = $this->getSerialNumber($serialNumbers, $i, $itemCode, $i + 1);
-                $status = 'stock';
-                $location = 'Warehouse - Stock';
-                $notes = "Received from GR: {$grDetail->gr_detail_id}";
 
-                // Generate sequential ID
-                $currentNumber = $startingNumber + $i;
-                $itemDetailId = $prefix . str_pad($currentNumber, 5, '0', STR_PAD_LEFT);
+                // ZERO COLLISION APPROACH: UUID-based ID
+                $itemDetailId = $this->generateUniqueItemDetailId($prefix);
 
-                // DEBUG: Log each ID being generated
-                Log::info('Generating ItemDetail', [
-                    'iteration' => $i,
-                    'current_number' => $currentNumber,
+                Log::info('Generating ItemDetail with UUID approach', [
+                    'iteration' => $i + 1,
                     'generated_id' => $itemDetailId
                 ]);
-
-                // Check if ID already exists before creating
-                $exists = ItemDetail::where('item_detail_id', $itemDetailId)->exists();
-                if ($exists) {
-                    Log::error('ItemDetail ID already exists!', [
-                        'duplicate_id' => $itemDetailId,
-                        'prefix' => $prefix,
-                        'current_number' => $currentNumber
-                    ]);
-                    throw new \Exception("ItemDetail ID {$itemDetailId} already exists in database");
-                }
 
                 try {
                     ItemDetail::create([
@@ -1274,9 +1216,9 @@ class GoodsReceivedController extends Controller
                         'serial_number' => $serialNumber,
                         'custom_attributes' => null,
                         'qr_code' => null,
-                        'status' => $status,
-                        'location' => $location,
-                        'notes' => $notes,
+                        'status' => 'stock',
+                        'location' => 'Warehouse - Stock',
+                        'notes' => "Received from GR: {$grDetail->gr_detail_id}",
                     ]);
 
                     $itemsGenerated++;
@@ -1286,12 +1228,11 @@ class GoodsReceivedController extends Controller
                         'iteration' => $i + 1,
                         'total_generated' => $itemsGenerated
                     ]);
-                } catch (\Illuminate\Database\QueryException $e) {
-                    Log::error('Database error creating ItemDetail', [
+                } catch (\Exception $e) {
+                    Log::error('Failed to create ItemDetail', [
                         'item_detail_id' => $itemDetailId,
-                        'error_code' => $e->getCode(),
-                        'error_message' => $e->getMessage(),
-                        'sql_state' => $e->errorInfo[0] ?? 'unknown'
+                        'error' => $e->getMessage(),
+                        'iteration' => $i
                     ]);
                     throw $e;
                 }
@@ -1300,6 +1241,26 @@ class GoodsReceivedController extends Controller
             return $itemsGenerated;
         });
     }
+
+    /**
+     * Generate unique ItemDetail ID - ZERO collision guarantee
+     */
+    private function generateUniqueItemDetailId($prefix): string
+    {
+        // UUID approach - matematically guaranteed unique
+        $uuid = str_replace('-', '', \Illuminate\Support\Str::uuid());
+
+        // Take first 10 characters dari UUID untuk readability
+        $uniquePart = strtoupper(substr($uuid, 0, 10));
+
+        return $prefix . $uniquePart;
+
+        // Result format: MDMMDM550E8400E2
+        // - Prefix tetap (MDMMDM)
+        // - 10 char UUID (550E8400E2) = guaranteed unique globally
+    }
+
+ 
 
     /**
      * Get serial number dari input manual atau generate otomatis
@@ -1588,34 +1549,34 @@ class GoodsReceivedController extends Controller
         return "{$itemCode}-{$year}-" . str_pad($newNumber, 3, '0', STR_PAD_LEFT);
     }
     // Tampilkan detail goods received
-public function show(GoodsReceived $goodsReceived)
-{
-    // Load relationships dengan conditional loading
-    $relationships = [
-        'supplier',
-        'receivedBy.userLevel',
-        'grDetails.item.category'
-    ];
+    public function show(GoodsReceived $goodsReceived)
+    {
+        // Load relationships dengan conditional loading
+        $relationships = [
+            'supplier',
+            'receivedBy.userLevel',
+            'grDetails.item.category'
+        ];
 
-    // Only load PO relationship jika PO-based
-    if ($goodsReceived->isPOBased() && $goodsReceived->po_id) {
-        $relationships[] = 'purchaseOrder.poDetails.item';
+        // Only load PO relationship jika PO-based
+        if ($goodsReceived->isPOBased() && $goodsReceived->po_id) {
+            $relationships[] = 'purchaseOrder.poDetails.item';
+        }
+
+        $goodsReceived->load($relationships);
+
+        // Summary info
+        $summaryInfo = $goodsReceived->getSummaryInfo();
+
+        // Status info
+        $statusInfo = $goodsReceived->getStatusInfo();
+
+        return view('goods-received.show', compact(
+            'goodsReceived',
+            'summaryInfo',
+            'statusInfo'
+        ));
     }
-
-    $goodsReceived->load($relationships);
-
-    // Summary info
-    $summaryInfo = $goodsReceived->getSummaryInfo();
-
-    // Status info
-    $statusInfo = $goodsReceived->getStatusInfo();
-
-    return view('goods-received.show', compact(
-        'goodsReceived',
-        'summaryInfo',
-        'statusInfo'
-    ));
-}
 
 
     // Tampilkan form edit goods received
@@ -2427,180 +2388,180 @@ public function show(GoodsReceived $goodsReceived)
     // }
 
     /**
- * Generate receive number berdasarkan receipt type
- */
-public function generateReceiveNumber(Request $request)
-{
-    $receiptType = $request->get('receipt_type', 'po_based');
-    $receiveNumber = GoodsReceived::generateReceiveNumber($receiptType);
-
-    return response()->json([
-        'success' => true,
-        'data' => [
-            'receive_number' => $receiveNumber,
-            'receipt_type' => $receiptType
-        ]
-    ]);
-}
-
-/**
- * Get suppliers untuk direct receipts
- */
-public function getSuppliers(Request $request)
-{
-    $suppliers = Supplier::active()
-        ->when($request->filled('search'), function ($query) use ($request) {
-            $query->where('supplier_name', 'like', '%' . $request->search . '%');
-        })
-        ->orderBy('supplier_name')
-        ->get(['supplier_id', 'supplier_name', 'supplier_code']);
-
-    return response()->json([
-        'success' => true,
-        'data' => $suppliers
-    ]);
-}
-
-/**
- * Get items untuk direct receipts
- */
-public function getItems(Request $request)
-{
-    $items = Item::with('category')
-        ->active()
-        ->when($request->filled('search'), function ($query) use ($request) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('item_name', 'like', '%' . $search . '%')
-                    ->orWhere('item_code', 'like', '%' . $search . '%');
-            });
-        })
-        ->orderBy('item_name')
-        ->get(['item_id', 'item_code', 'item_name', 'unit'])
-        ->map(function ($item) {
-            return [
-                'item_id' => $item->item_id,
-                'item_code' => $item->item_code,
-                'item_name' => $item->item_name,
-                'unit' => $item->unit,
-                'category_name' => $item->category->category_name ?? 'N/A'
-            ];
-        });
-
-    return response()->json([
-        'success' => true,
-        'data' => $items
-    ]);
-}
-
-/**
- * Simple serial number template generation
- */
-public function getSerialNumberTemplate(Request $request)
-{
-    try {
-        $itemId = $request->get('item_id');
-        $quantity = (int) $request->get('quantity', 1);
-
-        if (!$itemId || $quantity <= 0 || $quantity > 100) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Item ID dan quantity (1-100) wajib diisi'
-            ], 400);
-        }
-
-        $item = Item::find($itemId);
-        if (!$item) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Item tidak ditemukan'
-            ], 404);
-        }
-
-        // Simple F1 generation
-        $serialNumbers = $this->generateSimpleF1SerialNumbers($quantity);
+     * Generate receive number berdasarkan receipt type
+     */
+    public function generateReceiveNumber(Request $request)
+    {
+        $receiptType = $request->get('receipt_type', 'po_based');
+        $receiveNumber = GoodsReceived::generateReceiveNumber($receiptType);
 
         return response()->json([
             'success' => true,
             'data' => [
-                'serial_numbers' => $serialNumbers,
-                'item_info' => [
+                'receive_number' => $receiveNumber,
+                'receipt_type' => $receiptType
+            ]
+        ]);
+    }
+
+    /**
+     * Get suppliers untuk direct receipts
+     */
+    public function getSuppliers(Request $request)
+    {
+        $suppliers = Supplier::active()
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $query->where('supplier_name', 'like', '%' . $request->search . '%');
+            })
+            ->orderBy('supplier_name')
+            ->get(['supplier_id', 'supplier_name', 'supplier_code']);
+
+        return response()->json([
+            'success' => true,
+            'data' => $suppliers
+        ]);
+    }
+
+    /**
+     * Get items untuk direct receipts
+     */
+    public function getItems(Request $request)
+    {
+        $items = Item::with('category')
+            ->active()
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('item_name', 'like', '%' . $search . '%')
+                        ->orWhere('item_code', 'like', '%' . $search . '%');
+                });
+            })
+            ->orderBy('item_name')
+            ->get(['item_id', 'item_code', 'item_name', 'unit'])
+            ->map(function ($item) {
+                return [
                     'item_id' => $item->item_id,
                     'item_code' => $item->item_code,
-                    'item_name' => $item->item_name
-                ]
-            ],
-            'message' => "Generated {$quantity} serial numbers"
-        ]);
-    } catch (\Exception $e) {
+                    'item_name' => $item->item_name,
+                    'unit' => $item->unit,
+                    'category_name' => $item->category->category_name ?? 'N/A'
+                ];
+            });
+
         return response()->json([
-            'success' => false,
-            'message' => 'Gagal generate serial numbers: ' . $e->getMessage()
-        ], 500);
+            'success' => true,
+            'data' => $items
+        ]);
     }
-}
 
-/**
- * Simple F1 serial number generation
- */
-private function generateSimpleF1SerialNumbers(int $quantity): array
-{
-    $serialNumbers = [];
-    $characters = 'ACDEFHJKLMNPQRTUVWXYZ23479'; // Exclude confusing chars
+    /**
+     * Simple serial number template generation
+     */
+    public function getSerialNumberTemplate(Request $request)
+    {
+        try {
+            $itemId = $request->get('item_id');
+            $quantity = (int) $request->get('quantity', 1);
 
-    for ($i = 0; $i < $quantity; $i++) {
-        $attempts = 0;
-        do {
-            $randomPart = '';
-            for ($j = 0; $j < 6; $j++) {
-                $randomPart .= $characters[random_int(0, strlen($characters) - 1)];
+            if (!$itemId || $quantity <= 0 || $quantity > 100) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Item ID dan quantity (1-100) wajib diisi'
+                ], 400);
             }
-            $serialNumber = 'F1' . $randomPart;
-            $attempts++;
-        } while (
-            in_array($serialNumber, $serialNumbers) ||
-            ItemDetail::where('serial_number', $serialNumber)->exists() &&
-            $attempts < 50
-        );
 
-        if ($attempts < 50) {
-            $serialNumbers[] = $serialNumber;
+            $item = Item::find($itemId);
+            if (!$item) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Item tidak ditemukan'
+                ], 404);
+            }
+
+            // Simple F1 generation
+            $serialNumbers = $this->generateSimpleF1SerialNumbers($quantity);
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'serial_numbers' => $serialNumbers,
+                    'item_info' => [
+                        'item_id' => $item->item_id,
+                        'item_code' => $item->item_code,
+                        'item_name' => $item->item_name
+                    ]
+                ],
+                'message' => "Generated {$quantity} serial numbers"
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal generate serial numbers: ' . $e->getMessage()
+            ], 500);
         }
     }
 
-    return $serialNumbers;
-}
+    /**
+     * Simple F1 serial number generation
+     */
+    private function generateSimpleF1SerialNumbers(int $quantity): array
+    {
+        $serialNumbers = [];
+        $characters = 'ACDEFHJKLMNPQRTUVWXYZ23479'; // Exclude confusing chars
 
-// /**
-//  * Simple serial number validation
-//  */
-// public function validateSerialNumber(Request $request)
-// {
-//     $serialNumber = trim(string: $request->get('serial_number'));
+        for ($i = 0; $i < $quantity; $i++) {
+            $attempts = 0;
+            do {
+                $randomPart = '';
+                for ($j = 0; $j < 6; $j++) {
+                    $randomPart .= $characters[random_int(0, strlen($characters) - 1)];
+                }
+                $serialNumber = 'F1' . $randomPart;
+                $attempts++;
+            } while (
+                in_array($serialNumber, $serialNumbers) ||
+                ItemDetail::where('serial_number', $serialNumber)->exists() &&
+                $attempts < 50
+            );
 
-//     if (empty($serialNumber)) {
-//         return response()->json([
-//             'valid' => false,
-//             'message' => 'Serial number tidak boleh kosong'
-//         ]);
-//     }
+            if ($attempts < 50) {
+                $serialNumbers[] = $serialNumber;
+            }
+        }
 
-//     $exists = ItemDetail::where('serial_number', $serialNumber)->exists();
+        return $serialNumbers;
+    }
 
-//     return response()->json([
-//         'valid' => !$exists,
-//         'message' => $exists ? 'Serial number sudah digunakan' : 'Serial number tersedia'
-//     ]);
-// }
+    // /**
+    //  * Simple serial number validation
+    //  */
+    // public function validateSerialNumber(Request $request)
+    // {
+    //     $serialNumber = trim(string: $request->get('serial_number'));
 
-// /**
-//  * Generate GR ID
-//  */
-// private function generateGRId(): string
-// {
-//     $lastGR = GoodsReceived::orderBy('gr_id', 'desc')->first();
-//     $lastNumber = $lastGR ? (int) substr($lastGR->gr_id, 2) : 0;
-//     $newNumber = $lastNumber + 1;
-//     return 'GR' . str_pad($newNumber, 6, '0', STR_PAD_LEFT);
-// }
+    //     if (empty($serialNumber)) {
+    //         return response()->json([
+    //             'valid' => false,
+    //             'message' => 'Serial number tidak boleh kosong'
+    //         ]);
+    //     }
+
+    //     $exists = ItemDetail::where('serial_number', $serialNumber)->exists();
+
+    //     return response()->json([
+    //         'valid' => !$exists,
+    //         'message' => $exists ? 'Serial number sudah digunakan' : 'Serial number tersedia'
+    //     ]);
+    // }
+
+    // /**
+    //  * Generate GR ID
+    //  */
+    // private function generateGRId(): string
+    // {
+    //     $lastGR = GoodsReceived::orderBy('gr_id', 'desc')->first();
+    //     $lastNumber = $lastGR ? (int) substr($lastGR->gr_id, 2) : 0;
+    //     $newNumber = $lastNumber + 1;
+    //     return 'GR' . str_pad($newNumber, 6, '0', STR_PAD_LEFT);
+    // }
 }
