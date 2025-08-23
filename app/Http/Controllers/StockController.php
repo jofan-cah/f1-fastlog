@@ -357,6 +357,8 @@ class StockController extends Controller
 
         // Get sync status
         $syncStatus = $stock->validateConsistency();
+        // dd($syncStatus['actual_from_item_details']);
+        // dd($stock);
 
         return view('stocks.edit', compact('stock', 'itemDetailsBreakdown', 'syncStatus'));
     }

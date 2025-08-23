@@ -341,17 +341,20 @@
                         <div class="p-6 space-y-4">
                             <div class="flex justify-between items-center">
                                 <span class="text-sm text-gray-600">Stock (Gudang)</span>
-                                <span class="text-sm font-medium">{{ $stock->quantity_available }}
+                                <span class="text-sm font-medium">
+                                    {{ $syncStatus['actual_from_item_details']['stock_status'] }}
                                     {{ $stock->item->unit }}</span>
                             </div>
                             <div class="flex justify-between items-center">
                                 <span class="text-sm text-gray-600">Available (Siap Pakai)</span>
-                                <span class="text-sm font-medium">{{ $stock->quantity_used }}
-                                    {{ $stock->item->unit }}</span>
+                                <span class="text-sm font-medium">
+                                    {{ $syncStatus['actual_from_item_details']['available_status'] }}
+                                    {{ $stock->item->unit }}
+                                </span>
                             </div>
                             <div class="flex justify-between items-center border-t pt-3">
                                 <span class="text-sm font-medium text-gray-900">Total</span>
-                                <span class="text-sm font-bold">{{ $stock->total_quantity }}
+                                <span class="text-sm font-bold">{{ $syncStatus['actual_from_item_details']['total_trackable'] }}
                                     {{ $stock->item->unit }}</span>
                             </div>
                         </div>
